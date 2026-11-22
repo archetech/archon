@@ -318,7 +318,7 @@ keymaster create-schema schema.json -a my-schema -r local
 A client application asks to publish in an identity's name with a grant link (`archon://grant?request=…`). An agent makes the grant, and keeps it, from the command line:
 
 ```bash
-# Grant what the link asks for, on the first permitted registry the node supports and the link allows
+# Grant what the link asks for, on the first permitted registry the node supports and the link lists
 keymaster create-grant 'archon://grant?request=…'
 
 # Grant less than it asks for, on a chosen registry, until a chosen instant
@@ -332,7 +332,7 @@ keymaster revoke-grant <id>
 
 `create-grant` refuses a link that does not decode or does not carry a valid grant request; a registry other than `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`, or one the node does not support; a granting identity registered on `local`; a request that names the granting identity as its client; and `--actions` the link does not ask for. A grant made on any other terms would be void. `--no-expiry` leaves out an expiry the link asks for.
 
-A link may list the registries its client can publish on. `create-grant` then refuses a `--registry` outside that list, and with no `--registry` takes the first permitted registry that the node supports and the link lists; when there is none it refuses and names both. It prints the grant's DID on standard output and `Created on <registry>` on standard error, so the chain written to is stated even when none was named.
+A link lists the registries its client can publish on. `create-grant` refuses a `--registry` outside that list, and with no `--registry` takes the first of `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta` that the node supports and the link lists, whatever order the link lists them in; when there is none it refuses and names both. It prints the grant's DID on standard output and `Created on <registry>` on standard error, so the chain written to is stated even when none was named.
 
 `list-grants` prints each grant with its `status`: `anchored`, or `pending` while its latest version is not anchored on its registry, when what it states has no effect yet. An asset the node could not resolve is listed as `unresolved`.
 

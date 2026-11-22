@@ -1977,7 +1977,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("create-grant", "Create a Memeplex grant from a grant link", cmd_create_grant)
     sp.add_argument("link")
     sp.add_argument("-a", "--alias", help="DID alias")
-    sp.add_argument("-r", "--registry", help="registry to use (default: the first permitted registry the node supports and the link allows)")
+    sp.add_argument("-r", "--registry", help="registry to use (default: the first permitted registry the node supports and the link lists)")
     sp.add_argument("--actions", help="comma-separated actions, from those the link asks for (default: all of them)")
     sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)")
     sp.add_argument("--no-expiry", action="store_true", help="make a grant that lasts until it is revoked")

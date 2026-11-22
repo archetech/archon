@@ -2141,7 +2141,7 @@ program
     .command('create-grant <link>')
     .description('Create a Memeplex grant from a grant link')
     .option('-a, --alias <alias>', 'DID alias')
-    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports and the link allows)')
+    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports and the link lists)')
     .option('--actions <actions>', 'comma-separated actions, from those the link asks for (default: all of them)')
     .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)')
     .option('--no-expiry', 'make a grant that lasts until it is revoked')

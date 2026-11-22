@@ -7382,7 +7382,7 @@
                     "properties": {
                       "registry": {
                         "type": "string",
-                        "description": "One of `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`, and one of the registries the request lists when it lists any. Defaults to the first of them the node supports and the request allows.\n"
+                        "description": "One of the registries the request lists, which are among `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`. Defaults to the first of those four that the node supports and the request lists.\n"
                       },
                       "controller": {
                         "type": "string",

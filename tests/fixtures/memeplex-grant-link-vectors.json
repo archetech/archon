@@ -2,26 +2,34 @@
     "description": "Memeplex grant links and what decoding each gives: the request it carries, or the refusal. Written by tests/keymaster/generate-grant-link-vectors.mjs; see tests/keymaster/grant.test.ts.",
     "cases": [
         {
-            "name": "every core kind",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
-            "expect": {
-                "request": {
-                    "v": 1,
-                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
-                    "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
-                }
-            }
-        },
-        {
-            "name": "some actions and an expiry",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJtZW1lcGxleDpwb3N0IiwibWVtZXBsZXg6dGFnIl0sImV4cGlyZXNBdCI6IjIwMjgtMDItMjlUMjM6NTk6NTkuNVoifX0",
+            "name": "every core kind, on the registries the client can publish on",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
                     "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "some actions and an expiry",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsibWVtZXBsZXg6cG9zdCIsIm1lbWVwbGV4OnRhZyJdLCJleHBpcmVzQXQiOiIyMDI4LTAyLTI5VDIzOjU5OjU5LjVaIn19",
+            "expect": {
+                "request": {
+                    "v": 1,
+                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
+                    "name": "Memepool",
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
                     "actions": [
                         "memeplex:post",
                         "memeplex:tag"
@@ -32,13 +40,17 @@
         },
         {
             "name": "an extension kind",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJtZW1lcGxleDpyYXRlIiwiZGlkOmNpZDpiYWdhYWllcmFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2g_dmVyc2lvbklkPWJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIl19fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsibWVtZXBsZXg6cmF0ZSIsImRpZDpjaWQ6YmFnYWFpZXJhc2NoZW1hc2NoZW1hc2NoZW1hc2NoZW1hc2NoZW1hc2NoZW1hc2NoZW1hc2NoZW1hc2NoP3ZlcnNpb25JZD1iYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSJdfX0",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
                     "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
                     "actions": [
                         "memeplex:rate",
                         "did:cid:bagaaieraschemaschemaschemaschemaschemaschemaschemaschemasch?versionId=baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -48,44 +60,39 @@
         },
         {
             "name": "a name outside ASCII",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNw6ltw6lwb29sIOaooeWboOaxoCDwn4yKIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNw6ltw6lwb29sIOaooeWboOaxoCDwn4yKIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Mémépool 模因池 🌊",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
         {
             "name": "a name of 100 code points outside the basic plane",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiLwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yKIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiLwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yKIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊🌊",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
         {
             "name": "a field the schema does not name",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwibGFiZWwiOiJwaG9uZSJ9fQ",
-            "expect": {
-                "request": {
-                    "v": 1,
-                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
-                    "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
-                    "label": "phone"
-                }
-            }
-        },
-        {
-            "name": "the registries the client can publish on",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJFVEg6bWFpbm5ldCIsIkJUQzptYWlubmV0Il19fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImxhYmVsIjoicGhvbmUifX0",
             "expect": {
                 "request": {
                     "v": 1,
@@ -93,8 +100,24 @@
                     "name": "Memepool",
                     "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
                     "registries": [
-                        "ETH:mainnet",
-                        "BTC:mainnet"
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "label": "phone"
+                }
+            }
+        },
+        {
+            "name": "one registry",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJFVEg6bWFpbm5ldCJdfX0",
+            "expect": {
+                "request": {
+                    "v": 1,
+                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
+                    "name": "Memepool",
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "ETH:mainnet"
                     ]
                 }
             }
@@ -119,49 +142,65 @@
         },
         {
             "name": "v written as 1.0",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLjAsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLjAsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
         {
             "name": "white space around the JSON",
-            "link": "archon://grant?request=IAoJeyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19DQog",
+            "link": "archon://grant?request=IAoJeyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ0KIA",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
         {
             "name": "a byte order mark before the JSON",
-            "link": "archon://grant?request=77u_eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=77u_eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
         {
             "name": "a member given twice, of which the last counts",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJGaXJzdCIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJGaXJzdCIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "request": {
                     "v": 1,
                     "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
                     "name": "Memepool",
-                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
                 }
             }
         },
@@ -188,21 +227,21 @@
         },
         {
             "name": "a link after a space",
-            "link": " archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": " archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "not-a-grant-link"
             }
         },
         {
             "name": "a prefix in another case",
-            "link": "Archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "Archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "not-a-grant-link"
             }
         },
         {
             "name": "a link one character over the limit",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             "expect": {
                 "error": "too-long"
             }
@@ -216,7 +255,7 @@
         },
         {
             "name": "a link at the limit that does not decode",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             "expect": {
                 "error": "undecodable"
             }
@@ -251,21 +290,21 @@
         },
         {
             "name": "a padded request",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19IA=",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fSA=",
             "expect": {
                 "error": "undecodable"
             }
         },
         {
             "name": "a request of a length base64 cannot have",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19A",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19f",
             "expect": {
                 "error": "undecodable"
             }
         },
         {
             "name": "a request followed by a line feed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19\n",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ\n",
             "expect": {
                 "error": "undecodable"
             }
@@ -314,14 +353,14 @@
         },
         {
             "name": "a trailing comma",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6Iix9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sfX0",
             "expect": {
                 "error": "undecodable"
             }
         },
         {
             "name": "a request with no memeplexGrantRequest",
-            "link": "archon://grant?request=eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In0",
+            "link": "archon://grant?request=eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -345,7 +384,7 @@
         },
         {
             "name": "a request that is an array",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6W3sidiI6MSwiY2xpZW50IjoiZGlkOmNpZDpiYWdhYWllcmFjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGkiLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiJ9XX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6W3sidiI6MSwiY2xpZW50IjoiZGlkOmNpZDpiYWdhYWllcmFjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGkiLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiIsInJlZ2lzdHJpZXMiOlsiQlRDOm1haW5uZXQiLCJFVEg6bWFpbm5ldCJdfV19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -361,7 +400,7 @@
         },
         {
             "name": "a later v",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoyLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoyLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "unsupported"
@@ -369,7 +408,7 @@
         },
         {
             "name": "v as a string",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoiMSIsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoiMSIsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "version"
@@ -377,7 +416,7 @@
         },
         {
             "name": "v as a boolean",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2Ijp0cnVlLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2Ijp0cnVlLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "version"
@@ -385,7 +424,7 @@
         },
         {
             "name": "v with a fraction",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLjUsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLjUsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "version"
@@ -393,7 +432,7 @@
         },
         {
             "name": "v too large to be a number",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxZTQwMCwiY2xpZW50IjoiZGlkOmNpZDpiYWdhYWllcmFjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGkiLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxZTQwMCwiY2xpZW50IjoiZGlkOmNpZDpiYWdhYWllcmFjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGllbnRjbGkiLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiIsInJlZ2lzdHJpZXMiOlsiQlRDOm1haW5uZXQiLCJFVEg6bWFpbm5ldCJdfX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "version"
@@ -401,7 +440,7 @@
         },
         {
             "name": "no v",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "version"
@@ -409,7 +448,7 @@
         },
         {
             "name": "no client",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJuYW1lIjoiTWVtZXBvb2wiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiIsInJlZ2lzdHJpZXMiOlsiQlRDOm1haW5uZXQiLCJFVEg6bWFpbm5ldCJdfX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -417,7 +456,7 @@
         },
         {
             "name": "no name",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -425,7 +464,7 @@
         },
         {
             "name": "no nonce",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsInJlZ2lzdHJpZXMiOlsiQlRDOm1haW5uZXQiLCJFVEg6bWFpbm5ldCJdfX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -433,7 +472,7 @@
         },
         {
             "name": "a null nonce",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjpudWxsfX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjpudWxsLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -441,7 +480,7 @@
         },
         {
             "name": "an empty name",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiIiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiIiLCJub25jZSI6IlFtOXZkSE4wY21Gd0lHNXZibU5sTVRJeiIsInJlZ2lzdHJpZXMiOlsiQlRDOm1haW5uZXQiLCJFVEg6bWFpbm5ldCJdfX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -449,7 +488,7 @@
         },
         {
             "name": "a name of 101 code points outside the basic plane",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiLwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MiiIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiLwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MivCfjIrwn4yK8J-MiiIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -457,7 +496,7 @@
         },
         {
             "name": "a name that is not a string",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOjcsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOjcsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -465,7 +504,7 @@
         },
         {
             "name": "a client that is not a DID",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJtZW1lcG9vbCIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJtZW1lcG9vbCIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -473,7 +512,7 @@
         },
         {
             "name": "a client followed by a line feed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaVxuIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaVxuIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoiLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -481,7 +520,7 @@
         },
         {
             "name": "a nonce of fewer than 128 bits",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiQlFVRkJRVUZCUVVGQlFVRkJRVUZCIn19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiQlFVRkJRVUZCUVVGQlFVRkJRVUZCIiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -489,7 +528,7 @@
         },
         {
             "name": "a nonce that is not base64url",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiQlFVRkJRVUZCUVVGQlFVRkJRVUZCUVUrIn19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiQlFVRkJRVUZCUVVGQlFVRkJRVUZCUVUrIiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -497,7 +536,7 @@
         },
         {
             "name": "a nonce followed by a line feed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6XG4ifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6XG4iLCJyZWdpc3RyaWVzIjpbIkJUQzptYWlubmV0IiwiRVRIOm1haW5uZXQiXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -505,7 +544,7 @@
         },
         {
             "name": "no actions listed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6W119fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOltdfX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -513,7 +552,7 @@
         },
         {
             "name": "actions that are not a list",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6Im1lbWVwbGV4OnBvc3QifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOiJtZW1lcGxleDpwb3N0In19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -521,7 +560,7 @@
         },
         {
             "name": "an action twice",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJtZW1lcGxleDp0YWciLCJtZW1lcGxleDp0YWciXX19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsibWVtZXBsZXg6dGFnIiwibWVtZXBsZXg6dGFnIl19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -529,7 +568,7 @@
         },
         {
             "name": "an unknown action",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJtZW1lcGxleDpkZWxldGUiXX19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsibWVtZXBsZXg6ZGVsZXRlIl19fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -537,7 +576,7 @@
         },
         {
             "name": "an action that is not a string",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WzFdfX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsxXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -545,7 +584,7 @@
         },
         {
             "name": "an extension kind that is not pinned",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJkaWQ6Y2lkOmJhZ2FhaWVyYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaCJdfX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsiZGlkOmNpZDpiYWdhYWllcmFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2giXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -553,11 +592,20 @@
         },
         {
             "name": "an extension kind followed by a line feed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiYWN0aW9ucyI6WyJkaWQ6Y2lkOmJhZ2FhaWVyYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaGVtYXNjaD92ZXJzaW9uSWQ9YmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFcbiJdfX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImFjdGlvbnMiOlsiZGlkOmNpZDpiYWdhYWllcmFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2hlbWFzY2g_dmVyc2lvbklkPWJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhXG4iXX19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
             }
+        },
+        {
+            "name": "no registries",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6In19",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
         },
         {
             "name": "no registries listed",
@@ -615,7 +663,7 @@
         },
         {
             "name": "an expiry with an offset",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMi0zMVQwMDowMDowMCswMDowMCJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTItMzFUMDA6MDA6MDArMDA6MDAifX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -623,7 +671,7 @@
         },
         {
             "name": "an expiry without a time",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMi0zMSJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTItMzEifX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -631,7 +679,7 @@
         },
         {
             "name": "an expiry followed by a line feed",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMi0zMVQwMDowMDowMFpcbiJ9fQ",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTItMzFUMDA6MDA6MDBaXG4ifX0",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -639,7 +687,7 @@
         },
         {
             "name": "an expiry in digits outside ASCII",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0Ijoi2aLZoNmi2aYtMTItMzFUMDA6MDA6MDBaIn19",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6Itmi2aDZotmmLTEyLTMxVDAwOjAwOjAwWiJ9fQ",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -647,7 +695,7 @@
         },
         {
             "name": "an expiry that is not a string",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoxNzk4Njc1MjAwfX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6MTc5ODY3NTIwMH19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
@@ -655,7 +703,7 @@
         },
         {
             "name": "an expiry on a day that does not exist",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNy0wMi0zMFQwMDowMDowMFoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjctMDItMzBUMDA6MDA6MDBaIn19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "expiry-instant"
@@ -663,7 +711,7 @@
         },
         {
             "name": "an expiry on a leap day a century year lacks",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjEwMC0wMi0yOVQwMDowMDowMFoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIxMDAtMDItMjlUMDA6MDA6MDBaIn19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "expiry-instant"
@@ -671,7 +719,7 @@
         },
         {
             "name": "an expiry in a month that does not exist",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMy0wMVQwMDowMDowMFoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTMtMDFUMDA6MDA6MDBaIn19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "expiry-instant"
@@ -679,7 +727,7 @@
         },
         {
             "name": "an expiry at an hour that does not exist",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMi0zMVQyNDowMDowMFoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTItMzFUMjQ6MDA6MDBaIn19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "expiry-instant"
@@ -687,7 +735,7 @@
         },
         {
             "name": "an expiry at a second that does not exist",
-            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwiZXhwaXJlc0F0IjoiMjAyNi0xMi0zMVQyMzo1OTo2MFoifX0",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkVUSDptYWlubmV0Il0sImV4cGlyZXNBdCI6IjIwMjYtMTItMzFUMjM6NTk6NjBaIn19",
             "expect": {
                 "error": "invalid-request",
                 "validity": "expiry-instant"

@@ -196,9 +196,9 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                   registry:
      *                     type: string
      *                     description: >
-     *                       One of `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`, and one of the
-     *                       registries the request lists when it lists any. Defaults to the first of them the node
-     *                       supports and the request allows.
+     *                       One of the registries the request lists, which are among `BTC:mainnet`, `ZEC:mainnet`,
+     *                       `ETH:mainnet` and `SOL:mainnet-beta`. Defaults to the first of those four that the node
+     *                       supports and the request lists.
      *                   controller:
      *                     type: string
      *                     description: The ID name or DID that grants. Defaults to the current ID.

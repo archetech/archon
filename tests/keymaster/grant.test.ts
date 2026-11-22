@@ -46,13 +46,21 @@ describe('the rules Keymaster states', () => {
             .toStrictEqual(['expiry-instant', 'schema', 'unsupported', 'valid', 'version']);
     });
 
+    // What Keymaster makes of a vector. A request needs `registries`, so one
+    // without them that would otherwise reach the schema fails it.
+    const expected = (each: ValidityCase) => {
+        const unlisted = each.member === 'memeplexGrantRequest' && !Object.hasOwn(each.request as object, 'registries');
+
+        return unlisted && ['valid', 'expiry-instant'].includes(each.expect) ? 'schema' : each.expect;
+    };
+
     it.each(validityCases.map(each => [each.name, each] as const))('judge %s as its vector states', (_name, each) => {
         const value = each.request ?? each.operation!.data[each.member];
         const [ours, theirs] = each.member === 'memeplexGrant'
             ? [grants.validateGrant(value), memeplex.validateGrant(value)]
             : [grants.validateGrantRequest(value), memeplex.validateGrantRequest(value)];
 
-        expect(ours).toBe(each.expect);
+        expect(ours).toBe(expected(each));
         expect(theirs).toBe(each.expect);
     });
 
@@ -85,7 +93,7 @@ describe('the rules Keymaster states', () => {
 
     it('leave to the verifier only the registries a request lists', () => {
         expect(linkCases.filter(each => each.verifier === 'pending').map(each => each.name)).toStrictEqual([
-            'no registries listed', 'a registry twice', 'a registry a grant may not be created on',
+            'no registries', 'no registries listed', 'a registry twice', 'a registry a grant may not be created on',
             'a testnet registry', 'registries that are not a list', 'a registry that is not a string',
         ]);
     });
@@ -108,7 +116,10 @@ describe('the rules Keymaster states', () => {
     });
 
     it('decode the links the verifier encodes', () => {
-        const request = { v: 1, client: 'did:cid:bagaaieraclient', name: 'Mémépool 🌊', actions: ['memeplex:tag'], nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' };
+        const request = {
+            v: 1, client: 'did:cid:bagaaieraclient', name: 'Mémépool 🌊', actions: ['memeplex:tag'],
+            nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz', registries: ['SOL:mainnet-beta'],
+        };
 
         expect(grants.decodeGrantLink(memeplex.encodeGrantLink(request))).toStrictEqual({ request });
     });
@@ -170,8 +181,10 @@ async function anchor(block: number, registry = BTC) {
     await gatekeeper.clearQueue(registry, operations);
 }
 
+const PERMITTED = ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'];
+// A link for a request that lists every permitted registry, unless it says otherwise.
 const linkFor = (request: Record<string, unknown> = {}) =>
-    memeplex.encodeGrantLink({ v: 1, client, name: 'Memepool', nonce: NONCE, ...request });
+    memeplex.encodeGrantLink({ v: 1, client, name: 'Memepool', nonce: NONCE, registries: PERMITTED, ...request });
 const grantOf = async (did: string) => ((await keymaster.resolveDID(did)).didDocumentData as Record<string, any>).memeplexGrant;
 const verified = async (did: string) => memeplex.readGrant((await gatekeeper.resolveVersions([did]))[0] as ResolvedVersion[]);
 const sequenceOf = async (did: string) => (await keymaster.resolveDID(did)).didDocumentMetadata?.versionSequence;
@@ -278,7 +291,15 @@ describe('createGrant', () => {
         jest.spyOn(gatekeeper, 'listRegistries').mockResolvedValue(['local', 'hyperswarm', 'BTC:signet']);
 
         await expect(keymaster.createGrant(linkFor())).rejects.toThrow(
-            'Invalid parameter: options.registry: this node supports none of BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta');
+            'Invalid parameter: options.registry: the request lists BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta and this node supports local, hyperswarm, BTC:signet');
+    });
+
+    it('refuses a request that lists no registries', async () => {
+        const link = `${grants.GRANT_LINK_PREFIX}${Buffer.from(JSON.stringify({ memeplexGrantRequest: { v: 1, client, name: 'Memepool', nonce: NONCE } })).toString('base64url')}`;
+
+        await expect(keymaster.createGrant(link)).rejects.toThrow('Invalid parameter: link: invalid-request (schema)');
+        await expect(keymaster.createGrant(link, { registry: BTC })).rejects.toThrow('Invalid parameter: link: invalid-request (schema)');
+        expect(await keymaster.listAssets()).toStrictEqual([]);
     });
 
     it('takes the next permitted registry when the node lacks the first', async () => {
@@ -295,6 +316,7 @@ describe('createGrant', () => {
         expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
         expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
 
+        // The order of the permitted registries, not the order the request lists them in.
         const first = await keymaster.createGrant(linkFor({ registries: [ETH, BTC] }));
         expect((await keymaster.resolveDID(first)).didDocumentRegistration?.registry).toBe(BTC);
 

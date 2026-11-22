@@ -2145,28 +2145,26 @@ export default class Keymaster implements KeymasterInterface {
             ? undefined
             : this.grantExpiry(requested, 'options.expiresAt');
 
-        // A request may list the registries its client can publish on. The
-        // grant is created on one of them, since the client's objects go on
-        // the grant's registry.
-        const listed: string[] | undefined = request.registries;
+        // A request lists the registries its client can publish on. The grant
+        // is created on one of them, since the client's objects go on the
+        // grant's registry. The default is taken in the order of the permitted
+        // registries, so it does not depend on the order a client listed them.
+        const listed: string[] = request.registries;
         const supported = await this.listRegistries();
         let { registry } = options;
 
         if (!registry) {
             registry = PERMITTED_GRANT_REGISTRIES
-                .find(permitted => supported.includes(permitted) && (!listed || listed.includes(permitted)));
+                .find(permitted => supported.includes(permitted) && listed.includes(permitted));
 
-            if (!registry && listed) {
-                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${supported.join(', ')}`);
-            }
             if (!registry) {
-                throw new InvalidParameterError(`options.registry: this node supports none of ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
+                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${supported.join(', ')}`);
             }
         }
         else if (!PERMITTED_GRANT_REGISTRIES.includes(registry)) {
             throw new InvalidParameterError(`options.registry: a grant may be created on ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
         }
-        else if (listed && !listed.includes(registry)) {
+        else if (!listed.includes(registry)) {
             throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')}, not ${registry}`);
         }
         else if (!supported.includes(registry)) {

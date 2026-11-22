@@ -2621,8 +2621,9 @@ class Keymaster:
         The grant has the request's ``client`` and ``nonce``, the scope the
         request asks for unless ``options["actions"]`` narrows it, and the
         expiry the request asks for unless ``options["expiresAt"]`` changes it
-        or, as ``None``, removes it. ``options["registry"]`` defaults to the
-        first permitted registry the node supports.
+        or, as ``None``, removes it. ``options["registry"]`` is one of the
+        registries the request lists, and defaults to the first permitted
+        registry that the node supports and the request lists.
         """
         options = options or {}
         decoded = decode_grant_link(link.strip(JS_WHITESPACE) if isinstance(link, str) else link)
@@ -2638,10 +2639,11 @@ class Keymaster:
         requested = options["expiresAt"] if "expiresAt" in options else request.get("expiresAt")
         expires_at = None if requested is None else self._grant_expiry(requested, "options.expiresAt")
 
-        # A request may list the registries its client can publish on. The
-        # grant is created on one of them, since the client's objects go on
-        # the grant's registry.
-        listed = request.get("registries")
+        # A request lists the registries its client can publish on. The grant
+        # is created on one of them, since the client's objects go on the
+        # grant's registry. The default is taken in the order of the permitted
+        # registries, so it does not depend on the order a client listed them.
+        listed = request["registries"]
         supported = await self.list_registries()
         registry = options.get("registry")
         permitted = ", ".join(PERMITTED_GRANT_REGISTRIES)
@@ -2650,20 +2652,18 @@ class Keymaster:
                 (
                     name
                     for name in PERMITTED_GRANT_REGISTRIES
-                    if name in supported and (not listed or name in listed)
+                    if name in supported and name in listed
                 ),
                 None,
             )
-            if not registry and listed:
+            if not registry:
                 raise KeymasterError(
                     f"Invalid parameter: options.registry: the request lists {', '.join(listed)}"
                     f" and this node supports {', '.join(supported)}"
                 )
-            if not registry:
-                raise KeymasterError(f"Invalid parameter: options.registry: this node supports none of {permitted}")
         elif registry not in PERMITTED_GRANT_REGISTRIES:
             raise KeymasterError(f"Invalid parameter: options.registry: a grant may be created on {permitted}")
-        elif listed and registry not in listed:
+        elif registry not in listed:
             raise KeymasterError(
                 f"Invalid parameter: options.registry: the request lists {', '.join(listed)}, not {registry}"
             )

@@ -17,7 +17,8 @@ const PREFIX = 'archon://grant?request=';
 const CLIENT = 'did:cid:bagaaieraclientclientclientclientclientclientclientclientcli';
 const NONCE = 'Qm9vdHN0cmFwIG5vbmNlMTIz';
 const EXTENSION = `did:cid:bagaaieraschemaschemaschemaschemaschemaschemaschemaschemasch?versionId=b${'a'.repeat(58)}`;
-const request = { v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE };
+const REGISTRIES = ['BTC:mainnet', 'ETH:mainnet'];
+const request = { v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, registries: REGISTRIES };
 
 const encode = bytes => Buffer.from(bytes).toString('base64url');
 const linkOf = text => PREFIX + encode(Buffer.from(text, 'utf8'));
@@ -35,13 +36,13 @@ const long = carrying(request);
 const text = JSON.stringify({ memeplexGrantRequest: request });
 
 const cases = [
-    valid('every core kind', request),
+    valid('every core kind, on the registries the client can publish on', request),
     valid('some actions and an expiry', { ...request, actions: ['memeplex:post', 'memeplex:tag'], expiresAt: '2028-02-29T23:59:59.5Z' }),
     valid('an extension kind', { ...request, actions: ['memeplex:rate', EXTENSION] }),
     valid('a name outside ASCII', { ...request, name: 'Mémépool 模因池 🌊' }),
     valid('a name of 100 code points outside the basic plane', { ...request, name: '🌊'.repeat(100) }),
     valid('a field the schema does not name', { ...request, label: 'phone' }),
-    valid('the registries the client can publish on', { ...request, registries: ['ETH:mainnet', 'BTC:mainnet'] }),
+    valid('one registry', { ...request, registries: ['ETH:mainnet'] }),
     valid('every permitted registry', { ...request, registries: ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'] }),
     accepted('v written as 1.0', linkOf(text.replace('"v":1', '"v":1.0')), request),
     accepted('white space around the JSON', linkOf(` \n\t${text}\r\n `), request),
@@ -84,10 +85,10 @@ const cases = [
     invalid('v as a boolean', { ...request, v: true }, 'version'),
     invalid('v with a fraction', { ...request, v: 1.5 }, 'version'),
     { name: 'v too large to be a number', link: linkOf(text.replace('"v":1', '"v":1e400')), expect: { error: 'invalid-request', validity: 'version' } },
-    invalid('no v', { client: CLIENT, name: 'Memepool', nonce: NONCE }, 'version'),
-    invalid('no client', { v: 1, name: 'Memepool', nonce: NONCE }, 'schema'),
-    invalid('no name', { v: 1, client: CLIENT, nonce: NONCE }, 'schema'),
-    invalid('no nonce', { v: 1, client: CLIENT, name: 'Memepool' }, 'schema'),
+    invalid('no v', { client: CLIENT, name: 'Memepool', nonce: NONCE, registries: REGISTRIES }, 'version'),
+    invalid('no client', { v: 1, name: 'Memepool', nonce: NONCE, registries: REGISTRIES }, 'schema'),
+    invalid('no name', { v: 1, client: CLIENT, nonce: NONCE, registries: REGISTRIES }, 'schema'),
+    invalid('no nonce', { v: 1, client: CLIENT, name: 'Memepool', registries: REGISTRIES }, 'schema'),
     invalid('a null nonce', { ...request, nonce: null }, 'schema'),
     invalid('an empty name', { ...request, name: '' }, 'schema'),
     invalid('a name of 101 code points outside the basic plane', { ...request, name: '🌊'.repeat(101) }, 'schema'),
@@ -104,6 +105,7 @@ const cases = [
     invalid('an action that is not a string', { ...request, actions: [1] }, 'schema'),
     invalid('an extension kind that is not pinned', { ...request, actions: [EXTENSION.split('?')[0]] }, 'schema'),
     invalid('an extension kind followed by a line feed', { ...request, actions: [`${EXTENSION}\n`] }, 'schema'),
+    pending(invalid('no registries', { v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE }, 'schema')),
     pending(invalid('no registries listed', { ...request, registries: [] }, 'schema')),
     pending(invalid('a registry twice', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] }, 'schema')),
     pending(invalid('a registry a grant may not be created on', { ...request, registries: ['BTC:mainnet', 'hyperswarm'] }, 'schema')),

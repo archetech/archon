@@ -60,12 +60,19 @@ def test_there_are_vectors_for_grants_and_for_grant_requests():
     ]
 
 
+def expected(case):
+    """What Keymaster makes of a vector. A request needs ``registries``, so one
+    without them that would otherwise reach the schema fails it."""
+    unlisted = case["member"] == "memeplexGrantRequest" and "registries" not in case["request"]
+    return "schema" if unlisted and case["expect"] in ("valid", "expiry-instant") else case["expect"]
+
+
 @pytest.mark.parametrize("case", named(VALIDITY_CASES))
 def test_a_grant_or_a_request_is_judged_as_its_vector_states(case):
     if case["member"] == "memeplexGrant":
         assert grants.validate_grant(case["operation"]["data"]["memeplexGrant"]) == case["expect"]
     else:
-        assert grants.validate_grant_request(case["request"]) == case["expect"]
+        assert grants.validate_grant_request(case["request"]) == expected(case)
 
 
 @pytest.mark.parametrize("case", named(LINK_CASES))
@@ -106,7 +113,15 @@ def link_of(text: str) -> str:
 
 
 def link_for(node, **request) -> str:
-    carried = {"v": 1, "client": node.client, "name": "Memepool", "nonce": NONCE, **request}
+    """A link for a request that lists every permitted registry, unless it says otherwise."""
+    carried = {
+        "v": 1,
+        "client": node.client,
+        "name": "Memepool",
+        "nonce": NONCE,
+        "registries": list(grants.PERMITTED_GRANT_REGISTRIES),
+        **request,
+    }
     return link_of(json.dumps({"memeplexGrantRequest": carried}))
 
 
@@ -235,8 +250,20 @@ def test_create_grant_refuses_a_permitted_registry_the_node_does_not_support(nod
 def test_create_grant_refuses_when_the_node_supports_no_permitted_registry(node):
     node.gatekeeper.registries = ["local", "hyperswarm", "BTC:signet"]
 
-    with refuses(f"options.registry: this node supports none of {PERMITTED}$"):
+    with refuses(f"options.registry: the request lists {PERMITTED} and this node supports local, hyperswarm, BTC:signet$"):
         run(node.keymaster.create_grant(link_for(node)))
+
+
+def test_create_grant_refuses_a_request_that_lists_no_registries(node):
+    request = {"v": 1, "client": node.client, "name": "Memepool", "nonce": NONCE}
+    link = link_of(json.dumps({"memeplexGrantRequest": request}))
+
+    assert grants.validate_grant_request(request) == "schema"
+    with refuses(r"link: invalid-request \(schema\)$"):
+        run(node.keymaster.create_grant(link))
+    with refuses(r"link: invalid-request \(schema\)$"):
+        run(node.keymaster.create_grant(link, {"registry": BTC}))
+    assert run(node.keymaster.list_assets()) == []
 
 
 def test_create_grant_takes_the_next_permitted_registry_when_the_node_lacks_the_first(node):
@@ -253,6 +280,7 @@ def test_create_grant_uses_a_registry_the_request_lists_and_leaves_the_list_out_
     assert run(node.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == ETH
     assert grant_of(node, did) == {"v": 1, "client": node.client, "nonce": NONCE}
 
+    # The order of the permitted registries, not the order the request lists them in.
     first = run(node.keymaster.create_grant(link_for(node, registries=[ETH, BTC])))
     assert run(node.keymaster.resolve_did(first))["didDocumentRegistration"]["registry"] == BTC
 
