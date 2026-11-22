@@ -23,7 +23,7 @@ import WalletChrome from "@didcid/keymaster/wallet/chrome";
 // Both seams in one place, because both are answered from this UIContext and a
 // component can only read it from inside the provider.
 function HostSeams({ children }: { children: ReactNode }) {
-    const { openBrowser, setOpenBrowser, openBrowserWindow, refreshStored } = useUIContext();
+    const { openBrowser, setOpenBrowser, openBrowserWindow, refreshStored, arrived, clearArrived } = useUIContext();
     const { isBrowser } = useWalletContext();
     return (
         <WalletNavigationProvider
@@ -38,6 +38,12 @@ function HostSeams({ children }: { children: ReactNode }) {
             clearPendingView={setOpenBrowser ? () => setOpenBrowser(undefined) : undefined}
             // Only the full-page view has state to reset; the popup has none.
             resetView={setOpenBrowser ? () => setOpenBrowser({ clearState: true }) : undefined}
+            // What a link the user clicked asked the wallet for, handed to the
+            // Auth tab, which takes it up and clears it.
+            pendingChallenge={arrived?.challenge ?? null}
+            setPendingChallenge={clearArrived}
+            pendingGrant={arrived?.grant ?? null}
+            setPendingGrant={clearArrived}
         >
             {/* No camera here; the wallet's other views need telling when state
                 changes, and the popup restores the view it had when it closed. */}
@@ -115,6 +121,7 @@ export function ContextProviders(
         children,
         isBrowser,
         pendingAuth,
+        pendingGrant,
         pendingCredential,
         pendingAlias,
         openBrowser,
@@ -125,6 +132,7 @@ export function ContextProviders(
         children: ReactNode,
         isBrowser: boolean,
         pendingAuth?: string,
+        pendingGrant?: string,
         pendingCredential?: string,
         pendingAlias?: { alias: string; did: string },
         openBrowser?: openBrowserValues,
@@ -189,6 +197,7 @@ export function ContextProviders(
                                 <AuthProvider>
                                     <UIProvider
                                         pendingAuth={pendingAuth}
+                                        pendingGrant={pendingGrant}
                                         pendingCredential={pendingCredential}
                                         pendingAlias={pendingAlias}
                                         openBrowser={openBrowser}

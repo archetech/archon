@@ -98,11 +98,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             chrome.runtime.sendMessage({
                 action: "SHOW_POPUP_AUTH",
                 challenge: message.challenge,
+                grant: message.grant,
             });
         }).catch(() => {
-            const challengeEncoded = encodeURIComponent(message.challenge);
+            // What arrived is a challenge or a grant request, and the popup is
+            // told which.
+            const arrived = message.grant
+                ? `grant=${encodeURIComponent(message.grant)}`
+                : `challenge=${encodeURIComponent(message.challenge)}`;
             chrome.windows.create({
-                url: chrome.runtime.getURL(`popup.html?challenge=${challengeEncoded}`),
+                url: chrome.runtime.getURL(`popup.html?${arrived}`),
                 type: "popup",
                 width: 500,
                 height: 600,

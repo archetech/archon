@@ -194,7 +194,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *               request:
      *                 type: string
      *                 description: >
-     *                   The grant request: its DID, an alias for it, or a link `archon://grant?request=<did>`.
+     *                   The grant request: its DID, an alias for it, or a link `archon://auth?grant=<did>`.
      *               options:
      *                 type: object
      *                 properties:

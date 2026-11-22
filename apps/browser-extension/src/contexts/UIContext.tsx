@@ -36,6 +36,10 @@ interface UIContextValue {
     // Restores the view this popup had before it was closed. Handed to the
     // shared code as the restoreSession capability.
     refreshStored: () => Promise<boolean | undefined>;
+    // A challenge or a grant request that arrived by a link, until the Auth
+    // tab takes it up.
+    arrived: { challenge?: string; grant?: string } | null;
+    clearArrived: () => void;
     handleCopyDID: (did: string) => void;
     getVaultItemIcon: (name: string, item: any) => React.ReactNode;
     updateManifest: () => Promise<void>;
@@ -73,6 +77,7 @@ export function UIProvider(
     {
         children,
         pendingAuth,
+        pendingGrant,
         pendingCredential,
         pendingAlias,
         openBrowser,
@@ -82,6 +87,7 @@ export function UIProvider(
     }: {
         children: ReactNode,
         pendingAuth?: string,
+        pendingGrant?: string,
         pendingCredential?: string,
         pendingAlias?: { alias: string; did: string },
         openBrowser?: openBrowserValues,
@@ -94,6 +100,7 @@ export function UIProvider(
     const [selectedTab, setSelectedTabState] = useState<string>("identities");
     const [selectedMessageTab, setSelectedMessageTabState] = useState<string>("receive");
     const [pendingUsed, setPendingUsed] = useState<boolean>(false);
+    const [arrived, setArrived] = useState<{ challenge?: string; grant?: string } | null>(null);
 
     const {
         isBrowser,
@@ -309,9 +316,17 @@ export function UIProvider(
         if (!currentId) {
             return;
         }
-        if (pendingAuth && !pendingUsed) {
+        if (pendingGrant && !pendingUsed) {
             (async () => {
                 await setSelectedTab("auth");
+                setArrived({ grant: pendingGrant });
+            })();
+
+            setPendingUsed(true);
+        } else if (pendingAuth && !pendingUsed) {
+            (async () => {
+                await setSelectedTab("auth");
+                setArrived({ challenge: pendingAuth });
                 await setChallenge(pendingAuth);
                 await setResponse("");
                 await setCallback("");
@@ -349,7 +364,7 @@ export function UIProvider(
             })();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentId, pendingAuth, pendingCredential, pendingAlias, pendingTab, pendingMessageTab]);
+    }, [currentId, pendingAuth, pendingGrant, pendingCredential, pendingAlias, pendingTab, pendingMessageTab]);
 
     function openBrowserWindow(options: openBrowserValues) {
         const tab = options.tab ?? "viewer";
@@ -491,6 +506,8 @@ export function UIProvider(
         updateManifest,
         refreshAll,
         refreshStored,
+        arrived,
+        clearArrived: () => setArrived(null),
         resetCurrentID,
         refreshHeld,
         refreshAliases,

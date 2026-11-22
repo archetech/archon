@@ -13,8 +13,10 @@
 // python/keymaster/src/keymaster/grant.py is the same code for the Python port.
 // Both run tests/fixtures/grant-request-vectors.json.
 
-// What a link to a grant request begins with. The request's DID follows.
-export const GRANT_LINK_PREFIX = 'archon://grant?request=';
+// What a link to a grant request begins with. The request's DID follows. It is
+// an auth link, as a challenge's is (`archon://auth?challenge=<DID>`): both name
+// a DID that a service made and a wallet answers, and the parameter says which.
+export const GRANT_LINK_PREFIX = 'archon://auth?grant=';
 
 const GRANT_REQUEST_SUFFIX = 'GrantRequest';
 const GRANT_SUFFIX = 'Grant';
@@ -69,7 +71,10 @@ const BARE_DID = /^did:[a-z0-9]+:[A-Za-z0-9_.:-]+$/;
 // one alone.
 export function grantRequestId(named: string): string {
     const text = named.trim();
-    const id = text.startsWith(GRANT_LINK_PREFIX) ? text.slice(GRANT_LINK_PREFIX.length) : text;
+    // A link built with a URL library has the DID's colons percent-encoded.
+    const id = text.startsWith(GRANT_LINK_PREFIX)
+        ? text.slice(GRANT_LINK_PREFIX.length).replace(/%3A/gi, ':')
+        : text;
 
     return id.startsWith('did:') && !BARE_DID.test(id) ? '' : id;
 }

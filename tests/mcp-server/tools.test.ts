@@ -469,7 +469,7 @@ describe('mcp server tools', () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, baseConfig);
-        const request = 'archon://grant?request=did:cid:request';
+        const request = 'archon://auth?grant=did:cid:request';
         const call = (name: string, args: Record<string, unknown>) => server.tools.get(name)!.handler(args);
 
         runtime.keymaster.resolveDID.mockResolvedValue({ didDocumentRegistration: { registry: 'BTC:mainnet' } });

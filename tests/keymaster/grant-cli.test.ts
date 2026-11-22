@@ -13,7 +13,7 @@ import path from 'path';
 type Reply = { status?: number, body: unknown };
 
 const SCRIPT = path.resolve('scripts/archon-cli.js');
-const REQUEST = 'archon://grant?request=did:cid:request';
+const REQUEST = 'archon://auth?grant=did:cid:request';
 const GRANTS = [{ did: 'did:cid:grant', status: 'pending', grant: { v: 1, client: 'did:cid:client' }, registry: 'BTC:mainnet', created: true }];
 
 let server: http.Server;

@@ -12,6 +12,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import PageHeader from "./layout/PageHeader";
 import GrantsTab from "./GrantsTab";
+import { grantRequestIn } from "@didcid/keymaster/grant";
 import ActionMenu from "./layout/ActionMenu";
 
 // What the challenge's issuer says a response grants, such as connecting an
@@ -32,7 +33,15 @@ interface AutoLoginState {
     credentials: { vc: string; vp: string }[];
 }
 
+// What is said of a DID that came as a challenge and holds a grant request.
+const NOT_A_CHALLENGE = "This is a grant request, not a challenge. A grant request's link is archon://auth?grant= followed by its DID: open that, or paste it under Grants.";
+
 // Signing in: answering a challenge, and making one and checking its answer.
+//
+// A challenge and a grant request are both a DID a service made, and a link
+// says which it names. What the DID holds is checked all the same, before
+// anything is answered: nothing is made of a grant request by its arriving as a
+// challenge.
 function SignIn() {
     const [authDID, setAuthDID] = useState<string>("");
     const [callback, setCallback] = useState<string>("");
@@ -80,8 +89,14 @@ function SignIn() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keymaster]);
 
+    // Each arrival is numbered, so that an answer to one that another has
+    // since replaced is dropped.
+    const arrivals = useRef(0);
+
     async function handleAutoResponse(challengeDID: string) {
         if (!keymaster) return;
+
+        const arrival = arrivals.current += 1;
 
         setAutoLoginLoading(true);
         setAutoLogin(null);
@@ -89,16 +104,34 @@ function SignIn() {
 
         try {
             const asset = await keymaster.resolveAsset(challengeDID);
+
+            if (arrival !== arrivals.current) {
+                return;
+            }
+            if (grantRequestIn(asset)) {
+                setChallenge("");
+                setError(NOT_A_CHALLENGE);
+                return;
+            }
+
             const challengeData = (asset as { challenge: { callback?: string; description?: string; credentials?: { schema: string; issuers?: string[] }[] } }).challenge;
             const callbackUrl = challengeData?.callback || "";
 
             const responseDID = await keymaster.createResponse(challengeDID, { retries: 10 });
+
+            if (arrival !== arrivals.current) {
+                return;
+            }
             setResponse(responseDID);
 
             const decrypted = await keymaster.decryptJSON(responseDID) as {
                 response: { challenge: string; credentials: { vc: string; vp: string }[]; requested: number; fulfilled: number; match: boolean }
             };
             const responseData = decrypted.response;
+
+            if (arrival !== arrivals.current) {
+                return;
+            }
 
             setAutoLogin({
                 responseDID,
@@ -113,9 +146,13 @@ function SignIn() {
             setCallback(callbackUrl);
             setDisableSendResponse(!callbackUrl);
         } catch (error: any) {
-            setError(error);
+            if (arrival === arrivals.current) {
+                setError(error);
+            }
         } finally {
-            setAutoLoginLoading(false);
+            if (arrival === arrivals.current) {
+                setAutoLoginLoading(false);
+            }
         }
     }
 
@@ -216,6 +253,17 @@ function SignIn() {
         }
         try {
             await clearResponse();
+
+            // A challenge this node does not have yet is left to createResponse,
+            // which waits for it.
+            const held = await keymaster.resolveAsset(challenge).catch(() => undefined);
+
+            if (grantRequestIn(held)) {
+                setChallenge("");
+                setError(NOT_A_CHALLENGE);
+                return;
+            }
+
             const response = await keymaster.createResponse(challenge, {
                 retries: 10,
             });
@@ -582,17 +630,27 @@ type Section = "sign-in" | "grants";
 // the service made and shows the wallet.
 //
 // Signing in stays mounted while grants are shown, since it is what takes a
-// challenge that arrives by a link, and a challenge that arrives brings it to
-// the front.
+// challenge that arrives by a link or a scan, and one that arrives brings it to
+// the front. A grant request that arrives is shown for review under Grants.
 function AuthTab() {
     const [section, setSection] = useState<Section>("sign-in");
-    const { pendingChallenge } = useWalletNavigation();
+    const [asked, setAsked] = useState<string | null>(null);
+    const { pendingChallenge, pendingGrant, setPendingGrant } = useWalletNavigation();
 
     useEffect(() => {
         if (pendingChallenge) {
             setSection("sign-in");
         }
     }, [pendingChallenge]);
+
+    useEffect(() => {
+        if (pendingGrant) {
+            setAsked(pendingGrant);
+            setSection("grants");
+            setPendingGrant?.(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingGrant]);
 
     return (
         <Box>
@@ -609,7 +667,7 @@ function AuthTab() {
                 <SignIn />
             </Box>
             <Box role="tabpanel" id="auth-panel-grants" aria-labelledby="auth-tab-grants" hidden={section !== "grants"}>
-                {section === "grants" && <GrantsTab />}
+                {section === "grants" && <GrantsTab request={asked ?? undefined} onRequestTaken={() => setAsked(null)} />}
             </Box>
         </Box>
     );

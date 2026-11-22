@@ -45,16 +45,21 @@ describe('the shape every grant request has', () => {
     it('names a request by its DID, an alias, or a link to it', () => {
         expect(grants.grantRequestId('did:cid:abc')).toBe('did:cid:abc');
         expect(grants.grantRequestId('  did:cid:abc\n')).toBe('did:cid:abc');
-        expect(grants.grantRequestId('archon://grant?request=did:cid:abc')).toBe('did:cid:abc');
-        expect(grants.grantRequestId('\tarchon://grant?request=did:cid:abc \n')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('archon://auth?grant=did:cid:abc')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('\tarchon://auth?grant=did:cid:abc \n')).toBe('did:cid:abc');
         expect(grants.grantRequestId('my-request')).toBe('my-request');
-        expect(grants.grantRequestId('archon://grant?request=')).toBe('');
+        expect(grants.grantRequestId('archon://auth?grant=')).toBe('');
         // A DID URL would have a node resolve another version than the latest.
         for (const url of ['did:cid:abc?versionSequence=1', 'did:cid:abc#key-1', 'did:cid:abc/path', 'did:cid:abc%3FversionSequence=1', 'did:cid:abc versionSequence=1']) {
             expect(grants.grantRequestId(url)).toBe('');
-            expect(grants.grantRequestId(`archon://grant?request=${url}`)).toBe('');
+            expect(grants.grantRequestId(`archon://auth?grant=${url}`)).toBe('');
         }
+        expect(grants.grantRequestId('archon://accept?credential=did:cid:abc')).toBe('archon://accept?credential=did:cid:abc');
+        // A link that names a challenge is not one that names a request.
         expect(grants.grantRequestId('archon://auth?challenge=did:cid:abc')).toBe('archon://auth?challenge=did:cid:abc');
+        // As a URL library writes it.
+        expect(grants.grantRequestId('archon://auth?grant=did%3Acid%3Aabc')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('archon://auth?grant=did%3acid%3aabc%3FversionSequence=1')).toBe('');
     });
 
     it('finds the one grant in an asset\'s data', () => {
@@ -164,7 +169,7 @@ describe('createGrant', () => {
         const request = await requestOf();
         await keymaster.addAlias('example-request', request);
 
-        for (const named of [`archon://grant?request=${request}`, `  archon://grant?request=${request}\n`, 'example-request', ` ${request} `, 'archon://grant?request=example-request']) {
+        for (const named of [`archon://auth?grant=${request}`, `  archon://auth?grant=${request}\n`, 'example-request', ` ${request} `, 'archon://auth?grant=example-request']) {
             expect(await grantOf(await keymaster.createGrant(named))).toStrictEqual({ client, request });
         }
     });
@@ -178,21 +183,21 @@ describe('createGrant', () => {
     it.each([
         ['nothing', ''],
         ['white space', '  \n'],
-        ['a link to nothing', 'archon://grant?request='],
+        ['a link to nothing', 'archon://auth?grant='],
         ['what is not a string', 7],
         ['no request at all', undefined],
     ])('refuses %s', async (_name, named) => {
         await expect(keymaster.createGrant(named as never))
-            .rejects.toThrow('Invalid parameter: request: a DID, an alias or an archon://grant link is needed');
+            .rejects.toThrow('Invalid parameter: request: a DID, an alias or an archon://auth link is needed');
     });
 
     it('refuses a request the node does not have', async () => {
         const unknown = (await requestOf()).replace(/.{6}$/, 'aaaaaa');
 
         await expect(keymaster.createGrant(unknown)).rejects.toThrow('Invalid parameter: request: not found');
-        await expect(keymaster.createGrant(`archon://grant?request=${unknown}`)).rejects.toThrow('Invalid parameter: request: not found');
+        await expect(keymaster.createGrant(`archon://auth?grant=${unknown}`)).rejects.toThrow('Invalid parameter: request: not found');
         await expect(keymaster.createGrant('no-such-alias')).rejects.toThrow('Invalid parameter: request: not found');
-        await expect(keymaster.createGrant('archon://auth?challenge=did:cid:abc')).rejects.toThrow('Invalid parameter: request: not found');
+        await expect(keymaster.createGrant('archon://accept?credential=did:cid:abc')).rejects.toThrow('Invalid parameter: request: not found');
         expect(await keymaster.listAssets()).toStrictEqual([]);
     });
 
@@ -666,7 +671,7 @@ describe('an app of its own', () => {
             { birdwatchGrantRequest: { v: 3, name: 'Birdwatch', registries: ['hyperswarm'], actions: ['sightings:add', 'sightings:edit'], colour: 'teal' } },
             { registry: 'hyperswarm', controller: 'Client' });
 
-        const did = await keymaster.createGrant(`archon://grant?request=${request}`, { actions: ['sightings:add'] });
+        const did = await keymaster.createGrant(`archon://auth?grant=${request}`, { actions: ['sightings:add'] });
         const grant = { v: 3, client, request, actions: ['sightings:add'] };
 
         expect(await dataOf(did)).toStrictEqual({ birdwatchGrant: grant });

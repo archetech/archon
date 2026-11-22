@@ -2053,7 +2053,7 @@ describe('listRevocations', () => {
 });
 
 describe('grants', () => {
-    const request = 'archon://grant?request=did:cid:request';
+    const request = 'archon://auth?grant=did:cid:request';
     const grants = [{ did: 'did1', status: 'pending', grant: { v: 1, client: 'did:cid:client' }, registry: 'BTC:mainnet', created: true }];
 
     it('should create a grant from a request', async () => {

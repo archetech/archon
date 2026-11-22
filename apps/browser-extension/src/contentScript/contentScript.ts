@@ -61,11 +61,13 @@ window.addEventListener("message", (event) => {
         return;
     }
 
-    const { requestId, action, challenge, credential, alias, did } = event.data;
+    const { requestId, action, challenge, grant, credential, alias, did } = event.data;
 
     let message: Record<string, unknown> | null = null;
     if (action === "auth" && isDidLike(challenge)) {
         message = { action: "OPEN_AUTH_TAB", challenge };
+    } else if (action === "grant" && isDidLike(grant)) {
+        message = { action: "OPEN_AUTH_TAB", grant };
     } else if (action === "credential" && isDidLike(credential)) {
         message = { action: "OPEN_CREDENTIAL_TAB", credential };
     } else if (action === "alias" && isAliasLike(alias) && isDidLike(did)) {
@@ -119,6 +121,11 @@ document.addEventListener("click", (event) => {
         const tab = parsedURL.pathname.slice(1);
         if (tab === "auth") {
             const challenge = parsedURL.searchParams.get("challenge");
+            const grant = parsedURL.searchParams.get("grant");
+            if (grant) {
+                chrome.runtime.sendMessage({ action: "OPEN_AUTH_TAB", grant });
+                return;
+            }
             if (!challenge) {
                 return;
             }
