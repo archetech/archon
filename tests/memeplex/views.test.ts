@@ -10,14 +10,14 @@ import type { Signer } from './grant-vectors.ts';
 
 let alice: Signer, bob: Signer, web: Signer, bot: Signer;
 let agents: Signer[];
-let nonces = 0;
+let requests = 0;
 
 const publication = async (object: History, grant: History): Promise<Publication> =>
     attribute((await exported(agents, object.steps)).history, (await exported(agents, grant.steps)).history);
 
 // A live grant from a user to a client, anchored at block 100.
 const grantTo = (user: Signer, client: Signer) => History.create(user, {
-    memeplexGrant: { v: 1, client: client.did, nonce: Buffer.from(new Uint8Array(18).fill(nonces++)).toString('base64url') },
+    memeplexGrant: { v: 1, client: client.did, request: `did:cid:request${requests++}` },
 }, 100);
 
 beforeAll(async () => {

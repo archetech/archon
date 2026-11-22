@@ -6,7 +6,7 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
-import { decodeGrantLink } from '@didcid/memeplex';
+import { parseGrantLink, readGrantRequest } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
 import { createMemepoolApp } from '../../services/memepool/src/api.ts';
 
@@ -67,17 +67,23 @@ async function signIn(wallet: Keymaster, agent = browser()) {
     return agent;
 }
 
-// What a wallet does with the grant link the service shows.
-async function grant(wallet: Keymaster, link: string) {
-    const decoded = decodeGrantLink(link);
+// What a wallet reads from the grant link the service shows: the request it
+// names, as the wallet's node resolves it.
+async function asked(link: string, wallet: Keymaster = alice) {
+    const read = readGrantRequest(await wallet.resolveDID(parseGrantLink(link)!) as never);
 
-    if ('error' in decoded) {
-        throw new Error(decoded.error);
+    if ('error' in read) {
+        throw new Error(read.error);
     }
 
-    const { client: named, nonce } = decoded.request;
+    return read;
+}
 
-    return wallet.createAsset({ memeplexGrant: { v: 1, client: named, nonce } }, { registry: REGISTRY });
+// What a wallet does with it.
+async function grant(wallet: Keymaster, link: string, more: Record<string, unknown> = {}) {
+    const { did, client: named } = await asked(link, wallet);
+
+    return wallet.createAsset({ memeplexGrant: { v: 1, client: named, request: did, ...more } }, { registry: REGISTRY });
 }
 
 async function granted(wallet: Keymaster) {
@@ -451,7 +457,7 @@ describe('the user\'s grant', () => {
         const before = (await agent.get('/api/v1/me')).body;
 
         expect(before).toMatchObject({ did: aliceDid, pending: [] });
-        expect(decodeGrantLink(before.link)).toMatchObject({ request: { client: serviceDid, name: 'Memepool' } });
+        expect(await asked(before.link)).toMatchObject({ client: serviceDid, request: { name: 'Memepool' } });
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Too soon.' })).status).toBe(403);
 
         const grantDid = await grant(alice, before.link);
@@ -509,8 +515,7 @@ describe('a user with more than one grant', () => {
 describe('a grant that allows some kinds', () => {
     async function narrowed(actions: string[]) {
         const agent = await signIn(alice);
-        const { request: asked } = decodeGrantLink((await agent.get('/api/v1/me')).body.link) as { request: { client: string; nonce: string } };
-        const grantDid = await alice.createAsset({ memeplexGrant: { v: 1, client: asked.client, nonce: asked.nonce, actions } }, { registry: REGISTRY });
+        const grantDid = await grant(alice, (await agent.get('/api/v1/me')).body.link, { actions });
 
         await anchor();
 
@@ -575,9 +580,24 @@ describe('the registries the service can publish on', () => {
         app = on(['BTC:mainnet', 'ZEC:mainnet']);
         const agent = await signIn(alice);
 
-        expect(decodeGrantLink((await agent.get('/api/v1/me')).body.link)).toMatchObject({
-            request: { client: serviceDid, registries: ['BTC:mainnet', 'ZEC:mainnet'] },
+        expect(await asked((await agent.get('/api/v1/me')).body.link)).toMatchObject({
+            client: serviceDid, request: { registries: ['BTC:mainnet', 'ZEC:mainnet'] },
         });
+    });
+
+    it('shows a session one request, and makes another when that one nears its end', async () => {
+        app = on(['BTC:mainnet']);
+        const agent = await signIn(alice);
+        const other = await signIn(bob);
+        const first = (await agent.get('/api/v1/me')).body.link;
+
+        expect((await agent.get('/api/v1/me')).body.link).toBe(first);
+        expect((await other.get('/api/v1/me')).body.link).not.toBe(first);
+
+        clock += 49 * 60_000;
+        expect((await agent.get('/api/v1/me')).body.link).toBe(first);
+        clock += 2 * 60_000;
+        expect((await agent.get('/api/v1/me')).body.link).not.toBe(first);
     });
 
     it('asks for no grant on a node with no registry a grant may be on, and says so', async () => {
@@ -622,7 +642,7 @@ describe('the registries the service can publish on', () => {
         supported = ['hyperswarm', 'ZEC:mainnet'];
         await alice.revokeDID(grantDid);
         await anchor();
-        expect(decodeGrantLink((await agent.get('/api/v1/me')).body.link)).toMatchObject({ request: { registries: ['BTC:mainnet', 'ZEC:mainnet'] } });
+        expect(await asked((await agent.get('/api/v1/me')).body.link)).toMatchObject({ request: { registries: ['BTC:mainnet', 'ZEC:mainnet'] } });
     }, 120_000);
 
     it('does not take a grant on a registry its node lacks as one to publish under', async () => {

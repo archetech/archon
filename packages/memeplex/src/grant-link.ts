@@ -1,111 +1,96 @@
 import { validateGrantRequest } from './validate.js';
 import type { Validity } from './validate.js';
+import type { ResolvedVersion } from './grant.js';
 
-// The link a client presents to ask a user for a grant:
+// A request for a grant, and the link that presents it to a wallet:
 // docs/plans/memeplex-reference-1436.md, "Grant request flow".
 //
-//   archon://grant?request=<base64url({ "memeplexGrantRequest": { … } })>
+// A client asks by creating an asset whose data is
+// `{ "memeplexGrantRequest": { … } }`, as a challenge is an asset, and shows a
+// wallet its DID:
 //
-// The request travels in the link, so presenting it takes no network call and
-// creates no DID. A wallet shows what it asks for and, if the user agrees,
-// creates the grant.
+//   archon://grant?request=<DID of the request>
+//
+// The client is whoever created the request, which a wallet reads from the
+// request as its node resolves it. Nothing in the request names the client.
 
 export const GRANT_LINK_PREFIX = 'archon://grant?request=';
 
-// The longest a link may be, which keeps it scannable as a QR code.
-export const MAX_GRANT_LINK_LENGTH = 2048;
+const DID = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
 
-export type GrantLinkError =
-    // Not an `archon://grant` link with a `request`.
-    | 'not-a-grant-link'
-    // Longer than the limit.
-    | 'too-long'
-    // The `request` is not unpadded base64url holding UTF-8 JSON.
-    | 'undecodable'
-    // The request is not a valid grant request. `validity` says how.
+// The link for a request.
+export function grantLink(request: string): string {
+    if (!DID.test(request)) {
+        throw new Error('a grant link names the DID of a grant request');
+    }
+
+    return GRANT_LINK_PREFIX + request;
+}
+
+// The DID of the request a grant link names. A wallet also takes the DID alone.
+// `undefined` for anything else.
+export function parseGrantLink(link: unknown): string | undefined {
+    if (typeof link !== 'string') {
+        return undefined;
+    }
+
+    const text = link.trim();
+    const did = text.startsWith(GRANT_LINK_PREFIX) ? text.slice(GRANT_LINK_PREFIX.length) : text;
+
+    return DID.test(did) ? did : undefined;
+}
+
+export type GrantRequestError =
+    // The node resolves nothing for the DID.
+    | 'not-found'
+    // The request was deleted.
+    | 'deactivated'
+    // The DID is not an asset.
+    | 'not-an-asset'
+    // The request is not as its creator made it, so nothing says who is asking.
+    | 'changed'
+    // The data is not a valid grant request. `validity` says how.
     | 'invalid-request';
 
-export type GrantLink =
-    | { request: Record<string, any> }
-    | { error: GrantLinkError; validity?: Validity };
+export type ReadGrantRequest =
+    | { did: string; client: string; request: Record<string, any> }
+    | { error: GrantRequestError; validity?: Validity };
 
-function toBase64url(text: string): string {
-    const bytes = new TextEncoder().encode(text);
-    let binary = '';
+// What a request asks for, and who asks, from the request as a node resolves it.
+//
+// The client is the request's controller, and only while the request is at its
+// first version: that version is the one the controller signed with these
+// contents. An asset's owner can replace its contents and transfer it to an
+// identity that signed nothing, so a later version's controller is not
+// evidence of who asked.
+export function readGrantRequest(resolved: (ResolvedVersion & { didDocumentMetadata?: { versionSequence?: string | number } }) | undefined): ReadGrantRequest {
+    const did = resolved?.didDocument?.id;
 
-    for (const byte of bytes) {
-        binary += String.fromCharCode(byte);
+    if (!resolved || !did) {
+        return { error: 'not-found' };
+    }
+    if (resolved.didDocumentMetadata?.deactivated) {
+        return { error: 'deactivated' };
     }
 
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
+    const client = resolved.didDocument?.controller;
 
-// The text an unpadded base64url string holds, or undefined when it is not one
-// or does not hold UTF-8.
-function fromBase64url(encoded: string): string | undefined {
-    if (!/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length % 4 === 1) {
-        return undefined;
+    if (resolved.didDocumentRegistration?.type !== 'asset' || typeof client !== 'string' || !client) {
+        return { error: 'not-an-asset' };
+    }
+    if (String(resolved.didDocumentMetadata?.versionSequence) !== '1') {
+        return { error: 'changed' };
     }
 
-    try {
-        const binary = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
-        const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-
-        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    }
-    catch {
-        return undefined;
-    }
-}
-
-// The link for a grant request. Throws when the request is not a valid one or
-// its link would be too long, since a client would otherwise present a link no
-// wallet accepts.
-export function encodeGrantLink(request: Record<string, unknown>): string {
-    const validity = validateGrantRequest(request);
-
-    if (validity !== 'valid') {
-        throw new Error(`not a valid grant request: ${validity}`);
-    }
-
-    const link = GRANT_LINK_PREFIX + toBase64url(JSON.stringify({ memeplexGrantRequest: request }));
-
-    if (link.length > MAX_GRANT_LINK_LENGTH) {
-        throw new Error(`grant link is ${link.length} characters, over the limit of ${MAX_GRANT_LINK_LENGTH}`);
-    }
-
-    return link;
-}
-
-// The request a link carries, or why a wallet refuses the link.
-export function decodeGrantLink(link: string): GrantLink {
-    if (typeof link !== 'string' || !link.startsWith(GRANT_LINK_PREFIX)) {
-        return { error: 'not-a-grant-link' };
-    }
-    if (link.length > MAX_GRANT_LINK_LENGTH) {
-        return { error: 'too-long' };
-    }
-
-    const text = fromBase64url(link.slice(GRANT_LINK_PREFIX.length));
-    let carried: unknown;
-
-    try {
-        carried = text === undefined ? undefined : JSON.parse(text);
-    }
-    catch {
-        carried = undefined;
-    }
-
-    if (carried === undefined) {
-        return { error: 'undecodable' };
-    }
-
-    const request = carried && typeof carried === 'object' && !Array.isArray(carried)
-        ? (carried as Record<string, unknown>).memeplexGrantRequest
+    const data = resolved.didDocumentData;
+    const request = data && typeof data === 'object' && !Array.isArray(data)
+        ? (data as Record<string, unknown>).memeplexGrantRequest
         : undefined;
     const validity = validateGrantRequest(request);
 
-    return validity === 'valid'
-        ? { request: request as Record<string, any> }
-        : { error: 'invalid-request', validity };
+    if (validity !== 'valid') {
+        return { error: 'invalid-request', validity };
+    }
+
+    return { did, client, request: request as Record<string, any> };
 }

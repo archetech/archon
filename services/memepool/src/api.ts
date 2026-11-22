@@ -56,6 +56,8 @@ const ASKED = 'memepool_challenge';
 // How many challenges and sessions are kept at once. Anyone can ask for a
 // challenge, so the oldest are dropped past this.
 const MAX_HELD = 10_000;
+// How long a session is shown one grant request, which is valid for an hour.
+const REQUEST_REUSE = 50 * 60_000;
 // How many answers sent to the callback are verified at once.
 const MAX_VERIFYING = 8;
 
@@ -376,6 +378,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
         if (token) {
             sessions.take(token);
+            asked.take(token);
         }
         res.clearCookie(COOKIE, { path: '/' });
         res.json(true);
@@ -392,6 +395,25 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         (req as Signed).user = user;
         next();
     });
+
+    // A grant request is an asset the service creates, so a session is shown
+    // one and the same request until it nears the end of its hour or the
+    // registries the service can publish on change.
+    const asked = new Expiring<{ link: string; registries: string }>(REQUEST_REUSE, now);
+    const asking = async (session: string, registries: string[]): Promise<string> => {
+        const listed = registries.join(' ');
+        const held = asked.get(session);
+
+        if (held?.registries === listed) {
+            return held.link;
+        }
+
+        const { link } = await client.requestGrant({ name, registries });
+
+        asked.set(session, { link, registries: listed });
+
+        return link;
+    };
 
     // Who is signed in, and their grant or the link that asks for one. A user is
     // known by signing in, so their grants are found by who made them. With
@@ -431,9 +453,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return;
         }
 
-        const { link } = await client.requestGrant({ name, registries });
-
-        res.json({ did: user, pending, link });
+        res.json({ did: user, pending, link: await asking(cookieOf(req) ?? user, registries) });
     });
 
     // `of` names the object a request changes. A change goes under the grant

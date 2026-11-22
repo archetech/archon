@@ -78,7 +78,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     const client = await agent(0x32);
     const other = await agent(0x33);
     const agents = [user, client, other];
-    const nonce = Buffer.from(new Uint8Array(18).fill(9)).toString('base64url');
+    const request = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequestre';
     const cases: AttributionCase[] = [];
     const target = `did:cid:${await cid({ target: 1 })}`;
     const [version1, version2] = [await cid({ version: 1 }), await cid({ version: 2 })];
@@ -100,7 +100,7 @@ export async function build(): Promise<{ description: string; registry: string; 
 
     let grants = 0;
     const grantData = (more: Operation = {}, to: Signer = client) =>
-        ({ memeplexGrant: { v: 1, client: to.did, nonce: `${nonce}${grants++}`, ...more } });
+        ({ memeplexGrant: { v: 1, client: to.did, request: `${request}${grants++}`, ...more } });
     const live = () => History.create(user, grantData(), 100);
     const revoked = async (at: number) => (await live()).delete(user, at);
 

@@ -76,7 +76,7 @@ beforeEach(async () => {
 
     ({ keymaster: user, did: userDid } = await keymaster('alice'));
     ({ keymaster: client, did: clientDid } = await keymaster('memepool'));
-    grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid } }, { registry: REGISTRY });
     await anchor(100);
 });
 
