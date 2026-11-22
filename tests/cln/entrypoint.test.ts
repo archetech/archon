@@ -30,14 +30,27 @@ beforeEach(() => {
     mkdirSync(hsDir);
 
     // STUB_<NAME>=exit:N exits at once with N; anything else runs until TERM.
+    // STUB_<NAME>=when:N exits with 0 once socat has recorded N calls: the
+    // script stops its relays when lightningd exits, so a lightningd that
+    // exits at once can end a relay before it has recorded that it started.
+    // STUB_<NAME>_DELAY is how many seconds the stub takes to start, and
+    // `never` is a stub that does not get as far as recording that it started.
     for (const name of ['lightningd', 'socat']) {
         const control = `STUB_${name.toUpperCase()}`;
         stub(name, `
+[[ "\${${control}_DELAY:-0}" == never ]] && while :; do sleep 0.05; done
+sleep "\${${control}_DELAY:-0}"
 printf '%s\\n' "$@" > "${log}/${name}.args"
 echo "$*" >> "${log}/${name}.calls"
 case "\${${control}:-run}" in
     exit:*) exit "\${${control}#exit:}" ;;
     after:*) sleep 0.5; exit "\${${control}#after:}" ;;
+    when:*)
+        for _ in {1..500}; do
+            [[ -f "${log}/socat.calls" && "$(wc -l < "${log}/socat.calls")" -ge "\${${control}#when:}" ]] && break
+            sleep 0.02
+        done
+        exit 0 ;;
 esac
 trap 'echo stopped > "${log}/${name}.stopped"; exit 0' TERM
 while :; do sleep 0.05; done`);
@@ -210,7 +223,7 @@ describe('config', () => {
 
 describe('network modes', () => {
     it('tor: proxies everything through the relay and announces the onion', () => {
-        expect(run(tor()).status).toBe(0);
+        expect(run(tor({ STUB_LIGHTNINGD: 'when:1' })).status).toBe(0);
 
         expect(lines()).toEqual(expect.arrayContaining(['proxy=127.0.0.1:9050', 'always-use-proxy=true']));
         expect(announced()).toEqual([`announce-addr=${ONION}:9736`]);
@@ -302,7 +315,7 @@ describe('RPC share', () => {
         : [];
 
     it('relays the RPC socket into a directory of its own for the group', () => {
-        expect(run({ RPC_SHARE: 'true', RPC_SHARE_GID: gid }).status).toBe(0);
+        expect(run({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_LIGHTNINGD: 'when:1' }).status).toBe(0);
 
         expect(calls()).toEqual([
             `UNIX-LISTEN:${shareDir()}/lightning-rpc,fork,unlink-early,mode=0660,group=${gid} ` +
@@ -314,8 +327,20 @@ describe('RPC share', () => {
     });
 
     it('runs alongside the Tor relay', () => {
-        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid })).status).toBe(0);
+        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_LIGHTNINGD: 'when:2' })).status).toBe(0);
         expect(calls()).toHaveLength(2);
+    });
+
+    it('is seen to start both relays when they are slow to start', () => {
+        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_LIGHTNINGD: 'when:2', STUB_SOCAT_DELAY: '0.3' })).status).toBe(0);
+        expect(calls()).toHaveLength(2);
+    });
+
+    it('stops a relay that has not started yet when lightningd exits at once', () => {
+        // What the tests above wait out: nothing is recorded by a relay the
+        // script stopped before it began. The script does not wait for one.
+        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_SOCAT_DELAY: 'never' })).status).toBe(0);
+        expect(calls()).toEqual([]);
     });
 
     it('is off by default, and removes a socket left from an earlier start', () => {
