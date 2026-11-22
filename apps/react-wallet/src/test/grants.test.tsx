@@ -48,7 +48,7 @@ function holding(docs: Record<string, unknown>) {
 }
 
 function linkFor(request: Record<string, unknown> = {}) {
-    return encodeGrantLink({ v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, ...request });
+    return encodeGrantLink({ v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, registries: ['BTC:mainnet', 'ZEC:mainnet'], ...request });
 }
 
 async function review(link: string) {

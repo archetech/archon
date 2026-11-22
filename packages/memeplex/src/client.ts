@@ -32,8 +32,8 @@ export interface GrantRequest {
     actions?: string[];
     nonce: string;
     expiresAt?: string;
-    // The permitted registries the client can publish on. Absent means any.
-    registries?: string[];
+    // The permitted registries the client can publish on.
+    registries: string[];
 }
 
 // A grant that answers a request: its DID and what the verifier reads from its
@@ -122,7 +122,7 @@ export class MemeplexClient {
     //
     // `registries` are those this client's node supports. A grant made on
     // another could not be published under.
-    async requestGrant(asked: { name: string; actions?: string[]; expiresAt?: string; registries?: string[] }): Promise<{ request: GrantRequest; link: string }> {
+    async requestGrant(asked: { name: string; registries: string[]; actions?: string[]; expiresAt?: string }): Promise<{ request: GrantRequest; link: string }> {
         const request: GrantRequest = {
             v: 1,
             client: await this.did(),
@@ -130,7 +130,7 @@ export class MemeplexClient {
             ...(asked.actions ? { actions: asked.actions } : {}),
             nonce: nonce(),
             ...(asked.expiresAt ? { expiresAt: asked.expiresAt } : {}),
-            ...(asked.registries ? { registries: asked.registries } : {}),
+            registries: asked.registries,
         };
 
         return { request, link: encodeGrantLink(request as unknown as Record<string, unknown>) };

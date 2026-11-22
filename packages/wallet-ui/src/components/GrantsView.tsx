@@ -250,8 +250,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     // is asking says it can publish. A grant on a registry the client cannot
     // reach is one it cannot use.
     const supported = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
-    const asked: string[] | undefined = request?.registries;
-    const permitted = supported.filter(name => !asked || asked.includes(name));
+    const asked: string[] = request?.registries ?? [];
+    const permitted = supported.filter(name => asked.includes(name));
 
     const showRevocations = useCallback(() => setRevocations(tracked(sessionKey)), [sessionKey]);
 
@@ -461,8 +461,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         setRequest(decoded.request);
         setScope(scopeOf(decoded.request.actions, decoded.request.expiresAt));
 
-        const listed: string[] | undefined = decoded.request.registries;
-        const choices = supported.filter(name => !listed || listed.includes(name));
+        const listed: string[] = decoded.request.registries;
+        const choices = supported.filter(name => listed.includes(name));
 
         setRegistry(current => (choices.includes(current as typeof choices[number]) ? current : choices[0] ?? ""));
     }
@@ -625,7 +625,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                         ({PERMITTED_REGISTRIES.join(", ")}).
                     </Alert>
                 )}
-                {supported.length > 0 && asked && permitted.length === 0 && (
+                {supported.length > 0 && request && permitted.length === 0 && (
                     <Alert severity="warning" sx={{ mb: 2 }}>
                         This client can publish only on {asked.join(", ")}, and this node supports
                         none of them. A grant made on {supported.join(", ")} would be one the

@@ -31,8 +31,8 @@ export interface MemepoolOptions {
     version: { version: string; commit: string };
     // The permitted registries the service's node supports, which are the ones
     // it can publish on. A grant request lists them, and a grant on another is
-    // not one the service can use. Absent means any permitted registry.
-    registries?: string[];
+    // not one the service can use. With none, the service can ask for no grant.
+    registries: string[];
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -111,7 +111,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const { client, keymaster, name, version, registries } = options;
     // Whether a grant is on a registry the service's node supports. One that
     // is not is in force and of no use here.
-    const reachable = (grant: UsableGrant) => !registries || registries.includes(grant.registry);
+    const reachable = (grant: UsableGrant) => registries.includes(grant.registry);
     const callback = options.publicURL ? `${options.publicURL.replace(/\/+$/, '')}/api/v1/callback` : undefined;
     const now = options.now ?? Date.now;
     // A challenge's browser mark, and the challenge a mark was set with.
@@ -400,7 +400,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         }
 
         const pending = found.filter(each => each.grant.status === 'pending').map(each => each.did);
-        const { link } = await client.requestGrant({ name, ...(registries ? { registries } : {}) });
+
+        // A request names where the service can publish. On a node with no
+        // registry a grant may be on, there is nothing to ask for.
+        if (registries.length === 0) {
+            res.json({ did: user, pending, unavailable: 'this node supports no registry a grant may be made on' });
+            return;
+        }
+
+        const { link } = await client.requestGrant({ name, registries });
 
         res.json({ did: user, pending, link });
     });

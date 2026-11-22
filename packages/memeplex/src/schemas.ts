@@ -670,7 +670,8 @@ export const schemas = {
             "v",
             "client",
             "name",
-            "nonce"
+            "nonce",
+            "registries"
         ],
         "properties": {
             "v": {

@@ -9,6 +9,7 @@ const request = {
     name: 'Memepool',
     actions: ['memeplex:post', 'memeplex:reply', 'memeplex:tag'],
     nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz',
+    registries: ['BTC:mainnet'],
 };
 
 function linkOf(payload: string): string {

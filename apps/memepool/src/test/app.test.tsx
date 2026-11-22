@@ -153,6 +153,15 @@ describe('the grant', () => {
         expect(screen.queryByLabelText('Post')).toBeNull();
     });
 
+    it('says why when the service can ask for no grant', async () => {
+        const { api } = services({ me: { did: ALICE, pending: [], unavailable: 'this node supports no registry a grant may be made on' } });
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/cannot be granted here: this node supports no registry/);
+        expect(screen.queryByRole('button', { name: 'I have approved it' })).toBeNull();
+        expect(screen.queryByLabelText('Grant request')).toBeNull();
+    });
+
     it('says a grant is waiting to be anchored, and checks again when asked', async () => {
         const { api, state } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://grant?request=abc' } });
         render(<App api={api} />);

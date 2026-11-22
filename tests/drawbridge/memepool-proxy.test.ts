@@ -66,6 +66,7 @@ beforeAll(async () => {
         keymaster: service.keymaster,
         name: 'Memepool',
         version: { version: 'test', commit: 'test' },
+        registries: ['BTC:mainnet'],
         pagesDir: pages,
     }));
     memepoolURL = `http://127.0.0.1:${(memepool.address() as AddressInfo).port}`;

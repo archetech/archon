@@ -341,7 +341,7 @@ ignored, as the strictness rule requires.
 {
   "title": "Memeplex grant request",
   "type": "object",
-  "required": ["v", "client", "name", "nonce"],
+  "required": ["v", "client", "name", "nonce", "registries"],
   "properties": {
     "v": {"const": 1},
     "client": {"$ref": "#/$defs/did"},
@@ -731,8 +731,8 @@ cutoff, even though Archon supports historical resolution by time.
    `registries` lists the permitted registries the client can publish on: those its
    own node supports. A client publishes every object on its grant's registry, so a
    grant on a registry the client cannot reach is a grant it cannot use, and the user
-   would have paid to anchor it. A request that leaves `registries` out can publish
-   on any permitted registry.
+   would have paid to anchor it. Every request lists at least one: a client that can
+   publish on all four says so.
 
    `nonce` is at least 128 random bits, base64url-encoded. The client presents the
    request as a **grant link**, following the `archon://` deep links Archon wallets
@@ -756,8 +756,7 @@ cutoff, even though Archon supports historical resolution by time.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
    claim) and the requested scope: the listed actions, or every core kind when the
    request has no `actions`. The user approves it or a narrower subset and picks a
-   registry from those that are permitted, that the request lists when it lists any,
-   and that the wallet's own node supports. With none of those, the wallet creates no
+   registry from those the request lists that the wallet's own node supports. With none of those, the wallet creates no
    grant and says why. Otherwise it creates the grant there with that scope and the
    request's `client` and `nonce`. The grant does not carry `registries`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see

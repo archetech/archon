@@ -101,7 +101,7 @@ beforeEach(async () => {
     ({ keymaster: bob } = await keymasterFor('bob'));
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
-        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' },
+        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
         sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock,
     });
 });
@@ -240,7 +240,7 @@ describe('signing in', () => {
 
     it('issues no more challenges in a minute than it is set to', async () => {
         app = createMemepoolApp({
-            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, challengesPerMinute: 2,
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock, challengesPerMinute: 2,
         });
 
         expect((await request(app).get('/api/v1/challenge')).status).toBe(200);
@@ -267,7 +267,7 @@ describe('signing in', () => {
 describe('signing in with a wallet that sends its answer to the callback', () => {
     beforeEach(() => {
         app = createMemepoolApp({
-            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' },
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
             sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, publicURL: 'https://node.example/memepool/',
         });
     });
@@ -580,11 +580,13 @@ describe('the registries the service can publish on', () => {
         });
     });
 
-    it('lists none when it is told of none', async () => {
+    it('asks for no grant on a node with no registry a grant may be on, and says so', async () => {
+        app = on([]);
         const agent = await signIn(alice);
-        const decoded = decodeGrantLink((await agent.get('/api/v1/me')).body.link) as { request: Record<string, unknown> };
 
-        expect('registries' in decoded.request).toBe(false);
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({
+            did: aliceDid, pending: [], unavailable: 'this node supports no registry a grant may be made on',
+        });
     });
 
     it('does not take a grant on a registry its node lacks as one to publish under', async () => {

@@ -12,7 +12,9 @@ A user does two things with a wallet, once each:
 
 The grant link lists the registries the service can publish on: the permitted ones
 its node supports. A wallet offers the user those, so the grant is one the service
-can use, and the service does not take a grant on any other as one to publish under.
+can use, and the service does not take a grant on any other as one to publish under. On a
+node that supports none of them the service asks for no grant, and `GET /me` says why
+in `unavailable`.
 
 From then on the service publishes what the user writes, as objects it creates on
 the grant's registry, naming the user as author. The user ends this at any time by
