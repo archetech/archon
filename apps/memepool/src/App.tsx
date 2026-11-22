@@ -414,8 +414,10 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                 <>
                     {may(me, 'memeplex:post') && <button className="quiet" disabled={busy} onClick={boost}>Boost</button>}
                     {/* Not until the ratings have been read: a thumb has to know
-                        whether the reader has a rating to change. */}
-                    {may(me, 'memeplex:rate') && (
+                        whether the reader has a rating to change. A rating the
+                        reader has can be changed whatever the scope is since:
+                        the permission it was made with covers its edits. */}
+                    {(may(me, 'memeplex:rate') || mine) && (
                         <>
                             <button className="quiet" disabled={busy || !responses} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
                             <button className="quiet" disabled={busy || !responses} onClick={() => rate(0)} aria-label="Thumb down">👎</button>

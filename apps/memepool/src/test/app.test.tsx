@@ -758,6 +758,21 @@ describe('a grant that allows some kinds', () => {
         expect(screen.queryByRole('button', { name: 'Thumb up' })).toBeNull();
     });
 
+    it('still lets the reader change a rating they made before their grant was narrowed', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const made = services({ me: { ...granted, actions: ['memeplex:post'] }, timeline: [root] });
+        made.state.responses = { boosts: [], ratings: { ratings: [under(post('did:cid:myrating', ALICE, ''), 'did:cid:grant')], mean: 1 }, tags: [] };
+        render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(made.state.edited).toHaveLength(1));
+        expect(made.state.edited[0].did).toBe('did:cid:myrating');
+        expect(made.state.published).toStrictEqual([]);
+    });
+
     it('offers everything when the grant names no actions', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const { api } = services({ me: granted, timeline: [root] });
