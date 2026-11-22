@@ -13,8 +13,10 @@
 // python/keymaster/src/keymaster/grant.py is the same code for the Python port.
 // Both run tests/fixtures/grant-request-vectors.json.
 
-// What a link to a grant request begins with. The request's DID follows.
-export const GRANT_LINK_PREFIX = 'archon://grant?request=';
+// What a link to a grant request begins with. The request's DID follows. It is
+// the link that names a challenge: both name a DID that a service made and a
+// wallet answers, and what the DID holds says which it is.
+export const GRANT_LINK_PREFIX = 'archon://auth?challenge=';
 
 const GRANT_REQUEST_SUFFIX = 'GrantRequest';
 const GRANT_SUFFIX = 'Grant';

@@ -3,7 +3,9 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import GrantsView from "./GrantsView";
 
-export default function GrantsTab() {
+// `request` is a grant request that arrived by a link or a scan, to be shown
+// for review.
+export default function GrantsTab({ request, onRequestTaken }: { request?: string; onRequestTaken?: () => void } = {}) {
     const { keymaster } = useWalletContext();
     const { currentId, currentDID, registries } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
@@ -18,6 +20,8 @@ export default function GrantsTab() {
             identity={currentId}
             sessionKey={currentDID || currentId}
             registries={registries ?? []}
+            request={request}
+            onRequestTaken={onRequestTaken}
             notify={{ error: setError, success: setSuccess }}
         />
     );

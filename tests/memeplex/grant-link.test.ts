@@ -18,7 +18,7 @@ const resolved = (more: Record<string, unknown> = {}) => ({
 
 it('names a request by its DID', () => {
     expect(grantLink(REQUEST)).toBe(`${GRANT_LINK_PREFIX}${REQUEST}`);
-    expect(grantLink(REQUEST)).toBe(`archon://grant?request=${REQUEST}`);
+    expect(grantLink(REQUEST)).toBe(`archon://auth?challenge=${REQUEST}`);
     expect(() => grantLink('the request')).toThrow('names the DID');
 });
 
@@ -30,7 +30,7 @@ it('reads the DID from a link, or takes the DID alone', () => {
 
 it.each([
     ['nothing', ''],
-    ['another archon link', `archon://auth?challenge=${REQUEST}`],
+    ['another archon link', `archon://accept?credential=${REQUEST}`],
     ['a link with no request', GRANT_LINK_PREFIX],
     ['a request that is not a DID', `${GRANT_LINK_PREFIX}eyJ2IjoxfQ`],
     ['a DID with more after it', `${grantLink(REQUEST)}&x=1`],

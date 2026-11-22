@@ -66,13 +66,13 @@ def test_a_request_is_named_by_its_did_an_alias_or_a_link_to_it():
         "did:cid:abc%3FversionSequence=1", "did:cid:abc versionSequence=1",
     ):
         assert grants.grant_request_id(url) == ""
-        assert grants.grant_request_id(f"archon://grant?request={url}") == ""
+        assert grants.grant_request_id(f"archon://auth?challenge={url}") == ""
     assert grants.grant_request_id("  did:cid:abc\n") == "did:cid:abc"
-    assert grants.grant_request_id("archon://grant?request=did:cid:abc") == "did:cid:abc"
-    assert grants.grant_request_id("\tarchon://grant?request=did:cid:abc \n") == "did:cid:abc"
+    assert grants.grant_request_id("archon://auth?challenge=did:cid:abc") == "did:cid:abc"
+    assert grants.grant_request_id("\tarchon://auth?challenge=did:cid:abc \n") == "did:cid:abc"
     assert grants.grant_request_id("my-request") == "my-request"
-    assert grants.grant_request_id("archon://grant?request=") == ""
-    assert grants.grant_request_id("archon://auth?challenge=did:cid:abc") == "archon://auth?challenge=did:cid:abc"
+    assert grants.grant_request_id("archon://auth?challenge=") == ""
+    assert grants.grant_request_id("archon://accept?credential=did:cid:abc") == "archon://accept?credential=did:cid:abc"
 
 
 def test_the_white_space_trimmed_is_what_javascript_trims():
@@ -191,11 +191,11 @@ def test_create_grant_takes_a_link_to_the_request_an_alias_for_it_and_white_spac
     run(node.keymaster.add_alias("example-request", request))
 
     for name in [
-        f"archon://grant?request={request}",
-        f"  archon://grant?request={request}\n",
+        f"archon://auth?challenge={request}",
+        f"  archon://auth?challenge={request}\n",
         "example-request",
         f" {request} ",
-        "archon://grant?request=example-request",
+        "archon://auth?challenge=example-request",
     ]:
         assert grant_of(node, run(node.keymaster.create_grant(name))) == {"client": node.client, "request": request}
 
@@ -206,16 +206,16 @@ def test_create_grant_takes_who_asks_from_who_made_the_request_and_nothing_from_
     assert grant_of(node, run(node.keymaster.create_grant(request))) == {"client": node.client, "request": request}
 
 
-@pytest.mark.parametrize("name", ["", "  \n", "archon://grant?request=", 7, None])
+@pytest.mark.parametrize("name", ["", "  \n", "archon://auth?challenge=", 7, None])
 def test_create_grant_refuses_what_names_no_request(node, name):
-    with refuses("request: a DID, an alias or an archon://grant link is needed$"):
+    with refuses("request: a DID, an alias or an archon://auth link is needed$"):
         run(node.keymaster.create_grant(name))
 
 
 def test_create_grant_refuses_a_request_the_node_does_not_have(node):
     unknown = request_of(node) + "aaaaaa"
 
-    for name in [unknown, f"archon://grant?request={unknown}", "no-such-alias", "archon://auth?challenge=did:cid:abc"]:
+    for name in [unknown, f"archon://auth?challenge={unknown}", "no-such-alias", "archon://accept?credential=did:cid:abc"]:
         with refuses("request: not found$"):
             run(node.keymaster.create_grant(name))
     assert run(node.keymaster.list_assets()) == []
@@ -783,7 +783,7 @@ def test_an_app_is_granted_listed_changed_and_revoked_by_its_name_alone(node):
         {"birdwatchGrantRequest": asked}, {"registry": "hyperswarm", "controller": "Client"},
     ))
 
-    did = run(node.keymaster.create_grant(f"archon://grant?request={request}", {"actions": ["sightings:add"]}))
+    did = run(node.keymaster.create_grant(f"archon://auth?challenge={request}", {"actions": ["sightings:add"]}))
     grant = {"v": 3, "client": node.client, "request": request, "actions": ["sightings:add"]}
 
     assert data_of(node, did) == {"birdwatchGrant": grant}

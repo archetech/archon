@@ -12,6 +12,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import PageHeader from "./layout/PageHeader";
 import GrantsTab from "./GrantsTab";
+import { grantRequestIn } from "@didcid/keymaster/grant";
 import ActionMenu from "./layout/ActionMenu";
 
 // What the challenge's issuer says a response grants, such as connecting an
@@ -33,7 +34,12 @@ interface AutoLoginState {
 }
 
 // Signing in: answering a challenge, and making one and checking its answer.
-function SignIn() {
+//
+// The link that names a challenge also names a grant request, and what the DID
+// holds says which it is. One that turns out to be a grant request is handed
+// on to `onGrantRequest` before anything is answered: a grant is the user's to
+// approve, and nothing is made of a request by its arriving.
+function SignIn({ onGrantRequest }: { onGrantRequest: (did: string) => void }) {
     const [authDID, setAuthDID] = useState<string>("");
     const [callback, setCallback] = useState<string>("");
     const [description, setDescription] = useState<string>("");
@@ -89,6 +95,13 @@ function SignIn() {
 
         try {
             const asset = await keymaster.resolveAsset(challengeDID);
+
+            if (grantRequestIn(asset)) {
+                setChallenge("");
+                onGrantRequest(challengeDID);
+                return;
+            }
+
             const challengeData = (asset as { challenge: { callback?: string; description?: string; credentials?: { schema: string; issuers?: string[] }[] } }).challenge;
             const callbackUrl = challengeData?.callback || "";
 
@@ -216,6 +229,13 @@ function SignIn() {
         }
         try {
             await clearResponse();
+
+            if (grantRequestIn(await keymaster.resolveAsset(challenge))) {
+                setChallenge("");
+                onGrantRequest(challenge);
+                return;
+            }
+
             const response = await keymaster.createResponse(challenge, {
                 retries: 10,
             });
@@ -582,10 +602,11 @@ type Section = "sign-in" | "grants";
 // the service made and shows the wallet.
 //
 // Signing in stays mounted while grants are shown, since it is what takes a
-// challenge that arrives by a link, and a challenge that arrives brings it to
-// the front.
+// DID that arrives by a link or a scan, and one that arrives brings it to the
+// front. It hands a grant request on to the grants, which show it for review.
 function AuthTab() {
     const [section, setSection] = useState<Section>("sign-in");
+    const [asked, setAsked] = useState<string | null>(null);
     const { pendingChallenge } = useWalletNavigation();
 
     useEffect(() => {
@@ -606,10 +627,15 @@ function AuthTab() {
                 <Tab label="Grants" value="grants" id="auth-tab-grants" aria-controls="auth-panel-grants" />
             </Tabs>
             <Box role="tabpanel" id="auth-panel-sign-in" aria-labelledby="auth-tab-sign-in" hidden={section !== "sign-in"}>
-                <SignIn />
+                <SignIn
+                    onGrantRequest={did => {
+                        setAsked(did);
+                        setSection("grants");
+                    }}
+                />
             </Box>
             <Box role="tabpanel" id="auth-panel-grants" aria-labelledby="auth-tab-grants" hidden={section !== "grants"}>
-                {section === "grants" && <GrantsTab />}
+                {section === "grants" && <GrantsTab request={asked ?? undefined} onRequestTaken={() => setAsked(null)} />}
             </Box>
         </Box>
     );

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AuthTab from '../../../../packages/wallet-ui/src/components/AuthTab';
 
@@ -7,7 +7,10 @@ import AuthTab from '../../../../packages/wallet-ui/src/components/AuthTab';
 // grant a client.
 
 const { keymaster, navigation } = vi.hoisted(() => ({
-    keymaster: { listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), createResponse: vi.fn() },
+    keymaster: {
+        listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), resolveAsset: vi.fn(), createResponse: vi.fn(),
+        createAsset: vi.fn(), decryptJSON: vi.fn(),
+    },
     navigation: { pendingChallenge: null as string | null, setPendingChallenge: vi.fn(), dispatchDeepLink: vi.fn(), openView: vi.fn() },
 }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/WalletProvider', () => ({ useWalletContext: () => ({ keymaster }) }));
@@ -66,6 +69,52 @@ describe('the Auth tab', () => {
         expect((screen.getByLabelText('Challenge') as HTMLInputElement).value).toBe('did:cid:challenge');
         expect(screen.getByLabelText('Challenge').closest('[hidden]')).toBeNull();
         expect(screen.queryByLabelText('Grant link')).toBeNull();
+    });
+
+    it('shows a grant request that arrives by a link for review, and answers and creates nothing', async () => {
+        const REQUEST = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequestre';
+        const data = { exampleGrantRequest: { name: 'Example', registries: ['BTC:mainnet'], actions: ['read'] } };
+
+        keymaster.resolveAsset.mockResolvedValue(data);
+        keymaster.resolveDID.mockImplementation(async (did: string) => (did === REQUEST
+            ? {
+                didDocument: { id: REQUEST, controller: 'did:cid:client' }, didDocumentData: data,
+                didDocumentRegistration: { type: 'asset' }, didDocumentMetadata: { versionSequence: '1' },
+            }
+            : { didDocumentData: {}, didDocumentMetadata: {}, didDocumentRegistration: {} }));
+        navigation.pendingChallenge = REQUEST;
+        render(<AuthTab />);
+
+        const panel = await screen.findByRole('tabpanel', { name: 'Grants' });
+        expect(await within(panel).findByRole('button', { name: 'Create Grant' })).toBeTruthy();
+        expect(within(panel).getByText('did:cid:client')).toBeTruthy();
+        expect(within(panel).getByText('Example')).toBeTruthy();
+        expect(within(panel).getByLabelText('read')).toBeTruthy();
+        expect(keymaster.createResponse).not.toHaveBeenCalled();
+        expect(keymaster.createAsset).not.toHaveBeenCalled();
+    });
+
+    it('answers a challenge that arrives by a link as signing in', async () => {
+        keymaster.resolveAsset.mockResolvedValue({ challenge: { callback: 'https://example.org/callback' } });
+        keymaster.createResponse.mockResolvedValue('did:cid:response');
+        keymaster.decryptJSON.mockResolvedValue({ response: { challenge: 'did:cid:arrived', credentials: [], requested: 0, fulfilled: 0, match: true } });
+        navigation.pendingChallenge = 'did:cid:arrived';
+        render(<AuthTab />);
+
+        await waitFor(() => expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:arrived', { retries: 10 }));
+        expect(screen.getByRole('tab', { name: 'Sign in' }).getAttribute('aria-selected')).toBe('true');
+        expect(screen.queryByRole('tabpanel', { name: 'Grants' })).toBeNull();
+    });
+
+    it('hands on a grant request typed where a challenge goes', async () => {
+        const user = userEvent.setup();
+        keymaster.resolveAsset.mockResolvedValue({ exampleGrantRequest: { registries: ['BTC:mainnet'] } });
+        render(<AuthTab />);
+        await user.type(screen.getByLabelText('Challenge'), 'did:cid:asked');
+        await user.click(screen.getByRole('button', { name: 'Respond' }));
+
+        expect(await screen.findByRole('tabpanel', { name: 'Grants' })).toBeTruthy();
+        expect(keymaster.createResponse).not.toHaveBeenCalled();
     });
 
     it('comes back to signing in when a challenge arrives by a link', async () => {

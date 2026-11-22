@@ -7,14 +7,16 @@ import type { ResolvedVersion } from './grant.js';
 //
 // A client asks by creating an asset whose data is
 // `{ "memeplexGrantRequest": { … } }`, as a challenge is an asset, and shows a
-// wallet its DID:
+// wallet its DID in the link that shows a challenge's:
 //
-//   archon://grant?request=<DID of the request>
+//   archon://auth?challenge=<DID of the request>
+//
+// A wallet tells a request from a challenge by what the DID holds.
 //
 // The client is whoever created the request, which a wallet reads from the
 // request as its node resolves it. Nothing in the request names the client.
 
-export const GRANT_LINK_PREFIX = 'archon://grant?request=';
+export const GRANT_LINK_PREFIX = 'archon://auth?challenge=';
 
 const DID = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
 

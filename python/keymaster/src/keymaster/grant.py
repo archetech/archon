@@ -20,8 +20,10 @@ import math
 import re
 from typing import Any
 
-# What a link to a grant request begins with. The request's DID follows.
-GRANT_LINK_PREFIX = "archon://grant?request="
+# What a link to a grant request begins with. The request's DID follows. It is
+# the link that names a challenge: both name a DID that a service made and a
+# wallet answers, and what the DID holds says which it is.
+GRANT_LINK_PREFIX = "archon://auth?challenge="
 
 GRANT_REQUEST_SUFFIX = "GrantRequest"
 GRANT_SUFFIX = "Grant"

@@ -1540,7 +1540,7 @@ def test_file_and_image_handlers(stub_service: StubService):
 
 
 def test_grant_handlers(stub_service: StubService):
-    named = "archon://grant?request=did:cid:request"
+    named = "archon://auth?challenge=did:cid:request"
     options = {"registry": "ETH:mainnet", "actions": ["example:tag"], "expiresAt": None}
     changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
 

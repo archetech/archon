@@ -53,6 +53,11 @@ type Props = {
     // How often, in milliseconds, the grants and revocations shown are read from
     // the node.
     pollMs?: number;
+    // A grant request to show for review without its being pasted: one that
+    // arrived by a link or a scan. `onRequestTaken` is called once it is taken
+    // up, so that the same request can arrive again.
+    request?: string;
+    onRequestTaken?: () => void;
 };
 
 type GrantData = {
@@ -244,7 +249,7 @@ function isExpired(grant: GrantData): boolean {
     return isDateTime(grant.expiresAt) && new Date(grant.expiresAt).getTime() <= Date.now();
 }
 
-const NOT_A_LINK = "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.";
+const NOT_A_LINK = "This is not a link to a grant request. One is archon://auth?challenge= followed by the DID of the request.";
 const NOT_FOUND = "This node cannot find the request this link names. A request may last only an hour: ask the client for a new link.";
 
 const LINK_ERRORS: Record<GrantRequestRefusal, string> = {
@@ -262,7 +267,7 @@ const REVOCATION_TEXT: Record<RevocationState, string> = {
     displaced: "Revocation did not take effect",
 };
 
-export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000 }: Props) {
+export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000, request: arrived, onRequestTaken }: Props) {
     const notifyRef = useRef(hostNotify);
     notifyRef.current = hostNotify;
 
@@ -494,8 +499,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
 
     // The request a link names is an asset its client created. Who is asking
     // is read from the request as the node resolves it.
-    async function readLink() {
-        const reading = link;
+    async function readLink(reading = link) {
         const named = grantRequestId(reading);
 
         if (!named.startsWith("did:")) {
@@ -536,6 +540,19 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
 
         setRegistry(current => (choices.includes(current) ? current : choices[0] ?? ""));
     }
+
+    // A request that arrives is reviewed as one pasted would be. Reviewing
+    // creates nothing: the grant is made when the user approves.
+    useEffect(() => {
+        if (!arrived) {
+            return;
+        }
+        setLink(arrived);
+        linkRef.current = arrived;
+        onRequestTaken?.();
+        readLink(arrived);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [arrived]);
 
     function discard() {
         setRequest(null);
@@ -699,7 +716,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                             helperText={linkError || "Paste the link the client shows."}
                             sx={{ flex: 1, minWidth: 240 }}
                         />
-                        <Button variant="contained" onClick={readLink} disabled={busy || !link.trim()}>
+                        <Button variant="contained" onClick={() => readLink()} disabled={busy || !link.trim()}>
                             Review
                         </Button>
                     </Box>

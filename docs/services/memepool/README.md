@@ -8,7 +8,8 @@ A user does two things with a wallet, once each:
 1. **Signs in.** The service issues a challenge, the wallet answers it, and the
    service knows which DID it is talking to.
 2. **Grants the service.** The service creates a grant request, an asset of its own
-   as a challenge is, and shows a grant link naming it; the wallet resolves the
+   as a challenge is, and shows a link naming it, of the kind that names a
+   challenge, which a wallet opens, scans or is given pasted; the wallet resolves the
    request, reads from it that the service is asking, and creates the grant from the
    user's identity. A session is shown one request, which lasts an hour, and a new
    one when that nears its end.

@@ -7375,7 +7375,7 @@
                 "properties": {
                   "request": {
                     "type": "string",
-                    "description": "The grant request: its DID, an alias for it, or a link `archon://grant?request=<did>`.\n"
+                    "description": "The grant request: its DID, an alias for it, or a link `archon://auth?challenge=<did>`.\n"
                   },
                   "options": {
                     "type": "object",

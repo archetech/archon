@@ -735,18 +735,24 @@ cutoff, even though Archon supports historical resolution by time.
    would have paid to anchor it. Every request lists at least one: a client that can
    publish on all four says so.
 
-   The client presents the request as a **grant link**, following the `archon://`
-   deep links Archon wallets already handle (`archon://auth?challenge=…`,
-   `archon://accept?credential=…`):
+   The client presents the request as a **grant link**, which is the link that
+   presents a challenge:
 
    ```text
-   archon://grant?request=<DID of the request>
+   archon://auth?challenge=<DID of the request>
    ```
+
+   A challenge and a grant request are both a DID that a service made and a wallet
+   answers, so one link names either, and a wallet tells them apart by what the DID
+   holds: a `challenge`, or an app's grant request. A wallet that opens such a link,
+   or scans it, shows a grant request for review and creates nothing until the user
+   approves.
 
    - The client shows the link as a QR code for a wallet on another device, as a
      clickable link for a wallet on the same device (the browser extension or the
      mobile app), and as copyable text that the wallet accepts when pasted. A wallet
-     also accepts the DID alone.
+     also accepts the DID alone. A wallet from before grants takes the link for a
+     challenge and says it cannot answer it.
    - The wallet sends nothing back: the client finds the grant by query (step 3).
 2. The wallet resolves the request and reads who is asking from it. It creates no
    grant, and says why, when the request cannot be resolved, is deleted, is not an
@@ -967,8 +973,7 @@ until the verifier exists.
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
 5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The wallets (`packages/wallet-ui`) have grants in their Auth tab, beside signing in: it takes a pasted grant link, resolves the request it names and reads it with Keymaster's `grantRequestOf` (`@didcid/keymaster/grant`), as it would any app's. The wallet knows no app, so it shows a request's actions as the request names them and can narrow a grant's actions but not add one. An agent, which acts through the CLI and the MCP tools and cannot paste a link into a wallet, uses Keymaster's grants: `create-grant <request>`, `list-grants`, `update-grant <id>` and `revoke-grant <id>` in the three CLIs (`scripts/archon-cli.js`, the TypeScript and the Python Keymaster CLI), the MCP tools `archon_create_grant` and the rest, and `/grants` on the Keymaster service. Those grants are not Memeplex's alone. Keymaster knows no app: a client of any app asks with a grant request, an asset it creates holding `<app>GrantRequest`, and Keymaster answers with an asset holding `<app>Grant`, to the identity that created the request (`packages/keymaster/README.md`, "Grants"). Memeplex is the app `memeplex`. Keymaster checks only the shape every request has, so a grant it makes is not thereby valid under these rules: the verifier says. `tests/keymaster/grant.test.ts` has the verifier read the grants Keymaster makes for a `memeplexGrantRequest`. Still to do:
-   - Opening a wallet from a link, and scanning one as a QR code. A wallet shows a
-     revocation's state only until it is closed.
+   - A wallet shows a revocation's state only until it is closed.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
 7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge.
 8. **Moderation:** block lists and labels.
