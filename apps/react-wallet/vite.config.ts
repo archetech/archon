@@ -21,7 +21,6 @@ export default defineConfig({
             // For the render test of the demo client UI, which imports this subpath.
             "@didcid/wallet-ui/did-repair": path.resolve(__dirname, "../../packages/wallet-ui/src/components/DIDRepairDialog.tsx"),
             "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
-            "@didcid/memeplex": path.resolve(__dirname, "../../packages/memeplex/dist/esm/index.js"),
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
@@ -32,6 +31,7 @@ export default defineConfig({
             "@didcid/keymaster/wallet/cache": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/cache.js"),
             "@didcid/keymaster/wallet/typeGuards": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/typeGuards.js"),
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
+            "@didcid/keymaster/grant": path.resolve(__dirname, "../../packages/keymaster/dist/esm/grant.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
             "@didcid/keymaster/didcomm-protocols": path.resolve(__dirname, "../../packages/keymaster/dist/esm/didcomm-protocols.js"),
 

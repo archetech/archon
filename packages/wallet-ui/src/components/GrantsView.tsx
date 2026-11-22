@@ -19,12 +19,15 @@ import {
 } from "@mui/material";
 import { VerifiedUser } from "@mui/icons-material";
 import type { KeymasterInterface } from "@didcid/clients/keymaster-types";
-import { PERMITTED_REGISTRIES, parseGrantLink, positionOn, readGrantRequest, validateGrant } from "@didcid/memeplex";
+import { anchoredOn, grantIn, grantMember, grantRequestId, grantRequestOf } from "@didcid/keymaster/grant";
+import type { GrantRequestRefusal } from "@didcid/keymaster/grant";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";
 
-// Memeplex grants: the assets by which an identity lets a client publish in its
-// name. docs/plans/memeplex-reference-1436.md, "Grant request flow" and "Wallet".
+// Grants: the assets by which an identity lets a client of an app act in its
+// name. A grant is any app's: the wallet shows what a request asks for and
+// makes, changes and revokes the grant, and what the grant's actions mean is
+// the app's to say. packages/keymaster/README.md, "Grants".
 
 export type GrantsKeymaster = Pick<KeymasterInterface,
     "createAsset" | "listAssets" | "listRevocations" | "resolveDID" | "mergeData"
@@ -52,17 +55,8 @@ type Props = {
     pollMs?: number;
 };
 
-export const CORE_ACTIONS = ["memeplex:post", "memeplex:reply", "memeplex:rate", "memeplex:tag"];
-
-const ACTION_NAMES: Record<string, string> = {
-    "memeplex:post": "Post",
-    "memeplex:reply": "Reply",
-    "memeplex:rate": "Rate",
-    "memeplex:tag": "Tag",
-};
-
 type GrantData = {
-    v: 1;
+    v?: number;
     client: string;
     request?: string;
     actions?: string[];
@@ -72,6 +66,9 @@ type GrantData = {
 
 type HeldGrant = {
     did: string;
+    // The app the grant is for, and the member of the asset's data that holds it.
+    app: string;
+    member: string;
     // The grant as its latest version states it.
     grant: GrantData;
     registry: string;
@@ -84,7 +81,8 @@ type HeldGrant = {
 
 // A revocation, from the wallet's side: `requested` once the user has asked,
 // `submitted` once a node has accepted the signed deletion, `effective` once
-// that deletion is anchored. A client can publish until it is effective.
+// that deletion is anchored. A client can act under the grant until it is
+// effective.
 //
 // `displaced` is a revocation a node accepted and that then lost its place to
 // another change to the grant, made elsewhere: the grant is live.
@@ -111,11 +109,11 @@ function track(key: string, did: string, change: (revocation?: Revocation) => Re
 
 // `expiresAt` is the instant the editor was opened with, kept so that an expiry
 // the user leaves alone is written back exactly.
+//
+// `actions` are those on offer, which are the ones the request or the grant
+// lists: the wallet knows no app's actions, so it can leave one out and cannot
+// add one. With none listed there is nothing to choose among.
 type Scope = { actions: string[]; chosen: string[]; expiry: string; expiresAt?: string };
-
-function actionName(action: string): string {
-    return ACTION_NAMES[action] ?? action;
-}
 
 // A datetime-local value for an instant, and back.
 function toLocalInput(instant?: string): string {
@@ -138,10 +136,10 @@ function fromLocalInput(value: string): string | undefined {
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-// What a scope editor starts from: the actions on offer, all chosen.
-function scopeOf(actions: string[] | undefined, expiresAt: string | undefined, offered = actions): Scope {
-    const all = offered ?? CORE_ACTIONS;
-    return { actions: all, chosen: actions ?? all, expiry: toLocalInput(expiresAt), expiresAt };
+// What a scope editor starts from: the actions listed, all chosen.
+function scopeOf(actions: string[] | undefined, expiresAt: string | undefined): Scope {
+    const listed = actions ?? [];
+    return { actions: listed, chosen: listed, expiry: toLocalInput(expiresAt), expiresAt };
 }
 
 function expiryOf(scope: Scope): string | undefined {
@@ -150,18 +148,14 @@ function expiryOf(scope: Scope): string | undefined {
 
 type Resolved = Awaited<ReturnType<GrantsKeymaster["resolveDID"]>>;
 
-// Whether a resolved version is anchored on a registry: confirmation alone is
-// not that, since a creation is confirmed from the start.
 function isAnchored(doc: Resolved, registry: string): boolean {
-    return positionOn(doc as Parameters<typeof positionOn>[0], registry) !== undefined;
+    return anchoredOn(doc as Parameters<typeof anchoredOn>[0], registry);
 }
 
-// The `actions` a scope stands for: none when it is every core kind, which a
-// grant states by leaving `actions` out.
+// The `actions` a scope stands for: none when none are listed, which a grant
+// states by leaving `actions` out.
 function actionsOf(scope: Scope): string[] | undefined {
-    const everyCore = scope.chosen.length === CORE_ACTIONS.length
-        && CORE_ACTIONS.every(action => scope.chosen.includes(action));
-    return everyCore ? undefined : scope.actions.filter(action => scope.chosen.includes(action));
+    return scope.actions.length === 0 ? undefined : scope.actions.filter(action => scope.chosen.includes(action));
 }
 
 function ScopeEditor({ scope, onChange, disabled }: { scope: Scope; onChange: (scope: Scope) => void; disabled?: boolean }) {
@@ -171,7 +165,7 @@ function ScopeEditor({ scope, onChange, disabled }: { scope: Scope; onChange: (s
                 {scope.actions.map(action => (
                     <FormControlLabel
                         key={action}
-                        label={<Typography variant="body2" sx={{ wordBreak: "break-all" }}>{actionName(action)}</Typography>}
+                        label={<Typography variant="body2" sx={{ wordBreak: "break-all" }}>{action}</Typography>}
                         control={
                             <Checkbox
                                 size="small"
@@ -203,21 +197,23 @@ function ScopeEditor({ scope, onChange, disabled }: { scope: Scope; onChange: (s
     );
 }
 
-function describeScope(grant: GrantData): string {
-    return grant.actions ? grant.actions.map(actionName).join(", ") : "All core kinds";
+function describeScope(held: HeldGrant): string {
+    return held.grant.actions ? held.grant.actions.join(", ") : `Whatever ${held.app} allows a client`;
 }
 
 function isExpired(grant: GrantData): boolean {
     return grant.expiresAt !== undefined && new Date(grant.expiresAt).getTime() <= Date.now();
 }
 
-const LINK_ERRORS: Record<string, string> = {
-    "not-a-grant-link": "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.",
-    "not-found": "This node cannot find the request this link names. A request lasts an hour: ask the client for a new link.",
-    "deactivated": "The request this link names was withdrawn.",
+const NOT_A_LINK = "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.";
+const NOT_FOUND = "This node cannot find the request this link names. A request may last only an hour: ask the client for a new link.";
+
+const LINK_ERRORS: Record<GrantRequestRefusal, string> = {
+    "deleted": "The request this link names was withdrawn.",
     "not-an-asset": "This link does not name a grant request.",
     "changed": "The request this link names was changed after it was made, so it does not say who is asking.",
-    "invalid-request": "This link does not name a valid grant request.",
+    "not-a-request": "This link does not name a grant request.",
+    "invalid": "This link does not name a valid grant request.",
 };
 
 const REVOCATION_TEXT: Record<RevocationState, string> = {
@@ -250,12 +246,11 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const [editing, setEditing] = useState<{ grant: HeldGrant; scope: Scope } | null>(null);
     const [revoking, setRevoking] = useState<HeldGrant | null>(null);
 
-    // Where this node could create a grant, and of those, where the client that
-    // is asking says it can publish. A grant on a registry the client cannot
-    // reach is one it cannot use.
-    const supported = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
+    // Where the client that is asking says a grant can be, and of those, where
+    // this node can create one. A grant on a registry the client did not list
+    // is one it cannot use.
     const asked: string[] = request?.registries ?? [];
-    const permitted = supported.filter(name => asked.includes(name));
+    const permitted = asked.filter(name => registries.includes(name));
     // The choice holds only while it is one of the registries on offer.
     const registry = permitted.find(name => name === chosen) ?? permitted[0] ?? "";
 
@@ -283,9 +278,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     continue;
                 }
 
-                const data = found.doc.didDocumentData as { memeplexGrant?: unknown } | undefined;
+                const holds = grantIn(found.doc.didDocumentData);
 
-                if (found.doc.didDocumentMetadata?.deactivated || validateGrant(data?.memeplexGrant) !== "valid") {
+                if (found.doc.didDocumentMetadata?.deactivated || !holds) {
                     continue;
                 }
 
@@ -293,7 +288,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
 
                 held.push({
                     did: found.did,
-                    grant: data!.memeplexGrant as GrantData,
+                    app: holds.app,
+                    member: holds.member,
+                    grant: holds.grant as GrantData,
                     registry,
                     anchored: isAnchored(found.doc, registry),
                     created: Number(found.doc.didDocumentMetadata?.versionSequence ?? 1) <= 1,
@@ -326,7 +323,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         }
         catch (error) {
             // What is held is unknown, so neither is whether a client can
-            // still publish under a grant that is not listed.
+            // still act under a grant that is not listed.
             heldRead.current = { error, failed: true, unread: 0 };
             return;
         }
@@ -352,16 +349,18 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 const before = status === "displaced"
                     ? current
                     : await keymaster.resolveDID(did, { versionSequence: sequence - 1 });
-                const data = before.didDocumentData as { memeplexGrant?: unknown } | undefined;
+                const holds = grantIn(before.didDocumentData);
 
-                if (validateGrant(data?.memeplexGrant) !== "valid") {
+                if (!holds) {
                     continue;
                 }
 
                 const registry = before.didDocumentRegistration?.registry ?? "";
                 const grant: HeldGrant = {
                     did,
-                    grant: data!.memeplexGrant as GrantData,
+                    app: holds.app,
+                    member: holds.member,
+                    grant: holds.grant as GrantData,
                     registry,
                     anchored: isAnchored(before, registry),
                     created: Number(before.didDocumentMetadata?.versionSequence ?? 1) <= 1,
@@ -458,22 +457,22 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     // is read from the request as the node resolves it.
     async function readLink() {
         const reading = link;
-        const did = parseGrantLink(reading);
+        const named = grantRequestId(reading);
 
-        if (!did) {
+        if (!named.startsWith("did:")) {
             setRequest(null);
-            setLinkError(LINK_ERRORS["not-a-grant-link"]);
+            setLinkError(NOT_A_LINK);
             return;
         }
 
         setBusy(true);
-        let read: ReturnType<typeof readGrantRequest>;
+        let read: ReturnType<typeof grantRequestOf> | undefined;
 
         try {
-            read = readGrantRequest(await keymaster.resolveDID(did));
+            read = grantRequestOf(await keymaster.resolveDID(named));
         }
         catch {
-            read = { error: "not-found" };
+            read = undefined;
         }
         finally {
             setBusy(false);
@@ -481,22 +480,22 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         if (linkRef.current !== reading) {
             return;
         }
-        if ("error" in read) {
+        if (!read || "refused" in read) {
             setRequest(null);
-            setLinkError(LINK_ERRORS[read.error]);
+            setLinkError(read ? LINK_ERRORS[read.refused] : NOT_FOUND);
             return;
         }
 
-        const asked: Record<string, any> = { ...read.request, client: read.client, did: read.did };
+        const asking: Record<string, any> = { ...read.request, client: read.client, did: read.did, app: read.app };
 
         setLinkError("");
-        setRequest(asked);
-        setScope(scopeOf(asked.actions, asked.expiresAt));
+        setRequest(asking);
+        setScope(scopeOf(asking.actions, asking.expiresAt));
 
-        const listed: string[] = asked.registries;
-        const choices = supported.filter(name => listed.includes(name));
+        const listed: string[] = asking.registries;
+        const choices = listed.filter(name => registries.includes(name));
 
-        setRegistry(current => (choices.includes(current as typeof choices[number]) ? current : choices[0] ?? ""));
+        setRegistry(current => (choices.includes(current) ? current : choices[0] ?? ""));
     }
 
     function discard() {
@@ -512,8 +511,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
 
         const actions = actionsOf(scope);
         const expiresAt = expiryOf(scope);
-        const memeplexGrant: GrantData = {
-            v: 1,
+        const grant: GrantData = {
+            ...(request.v === undefined ? {} : { v: request.v }),
             client: request.client,
             request: request.did,
             ...(actions ? { actions } : {}),
@@ -523,18 +522,17 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         setBusy(true);
         try {
             // Keymaster creates a local identity's assets on `local` whatever
-            // registry is asked for, and a grant there, like a grant to oneself,
-            // is void.
+            // registry is asked for, so that is where its grant would be.
             const grantor = await keymaster.resolveDID(identity, { confirm: true });
 
-            if (grantor.didDocumentRegistration?.registry === "local") {
-                throw new Error("A local identity cannot make a grant: its assets cannot be created on a chain registry");
+            if (grantor.didDocumentRegistration?.registry === "local" && registry !== "local") {
+                throw new Error(`A local identity's grant is created on local, and this one is to be on ${registry}`);
             }
             if (grantor.didDocument?.id === request.client) {
                 throw new Error("This request is this identity's own. An identity cannot grant itself.");
             }
 
-            await keymaster.createAsset({ memeplexGrant }, { registry, controller: identity });
+            await keymaster.createAsset({ [grantMember(request.app)]: grant }, { registry, controller: identity });
             discard();
             notifyRef.current.success("Grant created");
             await load();
@@ -557,31 +555,31 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         const expiresAt = expiryOf(edited);
         // Everything else the grant holds is kept: a change to anything but
         // `actions` and `expiresAt` would end the grant.
-        const memeplexGrant: GrantData = { ...held.grant };
+        const grant: GrantData = { ...held.grant };
 
-        delete memeplexGrant.actions;
-        delete memeplexGrant.expiresAt;
+        delete grant.actions;
+        delete grant.expiresAt;
 
         if (actions) {
-            memeplexGrant.actions = actions;
+            grant.actions = actions;
         }
         if (expiresAt) {
-            memeplexGrant.expiresAt = expiresAt;
+            grant.expiresAt = expiresAt;
         }
 
         setBusy(true);
         try {
             // The change is to the grant as the user saw it. If the grant has
             // changed since, saving would put back what that change took away.
-            const latest = (await keymaster.resolveDID(held.did)).didDocumentData as { memeplexGrant?: unknown } | undefined;
+            const latest = (await keymaster.resolveDID(held.did)).didDocumentData as Record<string, unknown> | undefined;
 
-            if (JSON.stringify(latest?.memeplexGrant) !== JSON.stringify(held.grant)) {
+            if (JSON.stringify(latest?.[held.member]) !== JSON.stringify(held.grant)) {
                 setEditing(null);
                 await load();
                 throw new Error("This grant has changed since it was shown. Review it and make the change again.");
             }
 
-            if (!await keymaster.mergeData(held.did, { memeplexGrant })) {
+            if (!await keymaster.mergeData(held.did, { [held.member]: grant })) {
                 throw new Error("The node did not accept the change");
             }
             setEditing(null);
@@ -639,29 +637,23 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         await load().catch(() => undefined);
     }
 
-    const scopeEmpty = (edited: Scope) => edited.chosen.length === 0;
+    // A scope that lists actions and has none of them chosen allows nothing.
+    const scopeEmpty = (edited: Scope) => edited.actions.length > 0 && edited.chosen.length === 0;
 
     return (
         <Box>
             <PageHeader
                 title="Grants"
-                description="Clients you have allowed to publish in this identity's name."
+                description="Clients you have allowed to act in this identity's name."
             />
 
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                 <Typography variant="h6" component="h2" sx={{ mb: 1 }}>Grant a client</Typography>
 
-                {supported.length === 0 && (
+                {request && permitted.length === 0 && (
                     <Alert severity="warning" sx={{ mb: 2 }}>
-                        This node supports none of the registries a grant may be created on
-                        ({PERMITTED_REGISTRIES.join(", ")}).
-                    </Alert>
-                )}
-                {supported.length > 0 && request && permitted.length === 0 && (
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                        This client can publish only on {asked.join(", ")}, and this node supports
-                        none of them. A grant made on {supported.join(", ")} would be one the
-                        client cannot use.
+                        This client can use a grant only on {asked.join(", ")}, and this node supports
+                        none of them.
                     </Alert>
                 )}
 
@@ -688,14 +680,20 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                         <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all", mb: 1 }}>
                             {request.client}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">It calls itself</Typography>
-                        <Typography variant="body1" sx={{ mb: 1 }}>{request.name}</Typography>
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            The name is the client's own claim. The grant is to the client DID above.
-                        </Alert>
+                        <Typography variant="body2" color="text.secondary">App</Typography>
+                        <Typography variant="body1" sx={{ mb: 1 }}>{request.app}</Typography>
+                        {request.name !== undefined && (
+                            <>
+                                <Typography variant="body2" color="text.secondary">It calls itself</Typography>
+                                <Typography variant="body1" sx={{ mb: 1 }}>{request.name}</Typography>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    The name is the client's own claim. The grant is to the client DID above.
+                                </Alert>
+                            </>
+                        )}
 
                         <Typography variant="body2" color="text.secondary">
-                            {request.actions ? "It asks to" : "It asks for every core kind"}
+                            {request.actions ? "It asks for" : `It lists no actions: the grant allows whatever ${request.app} allows a client`}
                         </Typography>
                         <ScopeEditor scope={scope} onChange={setScope} disabled={busy} />
 
@@ -744,12 +742,12 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     </Typography>
                     {state === "displaced" && (
                         <Typography variant="body2">
-                            Another change to this grant took the revocation's place. The client can still publish.
+                            Another change to this grant took the revocation's place. The client can still act under it.
                         </Typography>
                     )}
                     {(state === "requested" || state === "submitted") && (
                         <Typography variant="body2">
-                            The client can still publish until the revocation is anchored on {held.registry}.
+                            The client can still act under this grant until the revocation is anchored on {held.registry}.
                         </Typography>
                     )}
                 </Alert>
@@ -782,13 +780,14 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 <EmptyState
                     icon={<VerifiedUser />}
                     title="No grants"
-                    description="This identity has not allowed any client to publish for it."
+                    description="This identity has not allowed any client to act for it."
                 />
             )}
 
             {grants?.map(held => (
                 <Paper key={held.did} variant="outlined" sx={{ p: 2, mb: 1 }} data-testid="grant">
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 1 }}>
+                        <Chip size="small" variant="outlined" label={held.app} />
                         <Chip size="small" label={held.registry} />
                         {!held.anchored
                             ? <Chip size="small" color="warning" label={held.created ? "Awaiting anchoring" : "Change awaiting anchoring"} />
@@ -799,7 +798,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     {!held.anchored && (
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                             {held.created
-                                ? `The client cannot publish until this grant is anchored on ${held.registry}.`
+                                ? `The client cannot act under this grant until it is anchored on ${held.registry}.`
                                 : `What is shown takes effect once it is anchored on ${held.registry}. Until then the grant is as it was.`}
                         </Typography>
                     )}
@@ -808,7 +807,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                         {held.grant.client}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">May</Typography>
-                    <Typography variant="body2" sx={{ wordBreak: "break-all", mb: 1 }}>{describeScope(held.grant)}</Typography>
+                    <Typography variant="body2" sx={{ wordBreak: "break-all", mb: 1 }}>{describeScope(held)}</Typography>
                     <Typography variant="body2" color="text.secondary">Expires</Typography>
                     <Typography variant="body2" sx={{ mb: 1 }}>
                         {held.grant.expiresAt ? new Date(held.grant.expiresAt).toLocaleString() : "Never"}
@@ -818,11 +817,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                             size="small"
                             onClick={() => setEditing({
                                 grant: held,
-                                scope: scopeOf(
-                                    held.grant.actions,
-                                    held.grant.expiresAt,
-                                    [...CORE_ACTIONS, ...(held.grant.actions ?? []).filter(action => !CORE_ACTIONS.includes(action))],
-                                ),
+                                scope: scopeOf(held.grant.actions, held.grant.expiresAt),
                             })}
                         >
                             Change
@@ -862,9 +857,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 <DialogTitle>Revoke grant?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        The client will no longer be able to publish for this identity once the
-                        revocation is anchored on {revoking?.registry}. What it has published stays
-                        attributed. A revocation cannot be undone.
+                        The client will no longer be able to act for this identity once the
+                        revocation is anchored on {revoking?.registry}. What it did under the grant
+                        stands. A revocation cannot be undone.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>

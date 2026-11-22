@@ -18,6 +18,7 @@ const config = {
         'keymaster-client': 'dist/esm/keymaster-client.js',
         'wallet-location': 'dist/esm/wallet-location.js',
         'didcomm-protocols': 'dist/esm/didcomm-protocols.js',
+        'grant': 'dist/esm/grant.js',
         'db/abstract-base': 'dist/esm/db/abstract-base.js',
         'db/json': 'dist/esm/db/json.js',
         'db/open': 'dist/esm/db/open.js',

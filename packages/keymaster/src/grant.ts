@@ -142,3 +142,81 @@ export function grantIn(data: unknown): { app: string; member: string; grant: Re
 export function grantMember(app: string): string {
     return app + GRANT_SUFFIX;
 }
+
+// A document as a node resolves it, as far as a grant or a request is read
+// from it.
+export interface GrantDocument {
+    didDocument?: { id?: string; controller?: string };
+    didDocumentData?: unknown;
+    didDocumentRegistration?: { type?: string; registry?: string };
+    didDocumentMetadata?: {
+        deactivated?: boolean;
+        versionSequence?: string | number;
+        timestamp?: { chain?: string; upperBound?: { height?: unknown; timeISO?: unknown } };
+    };
+}
+
+// Why a resolved document cannot be read as a grant request.
+export type GrantRequestRefusal =
+    // The request was deleted.
+    | 'deleted'
+    // The DID is not an asset.
+    | 'not-an-asset'
+    // The request has had a version after its first, so who asks is not
+    // established.
+    | 'changed'
+    // The data holds no one `<app>GrantRequest`.
+    | 'not-a-request'
+    // What it holds does not have the shape every request has. `fault` names
+    // the member.
+    | 'invalid';
+
+export type ReadGrantRequest =
+    | { did: string; app: string; client: string; request: Record<string, any> }
+    | { refused: GrantRequestRefusal; fault?: GrantRequestFault };
+
+// The app, the client and the request of a grant request, from the request as a
+// node resolves it.
+//
+// Who asks is the request's controller, and only while the request is as it was
+// created. An asset's owner can transfer it to any identity, which signs
+// nothing, and can replace its contents first. The creation is signed by its
+// controller and holds the contents that controller gave it, so a request that
+// has had any version after its first does not say who asks for what it holds.
+// Nothing in the data is read for who asks.
+export function grantRequestOf(doc: GrantDocument): ReadGrantRequest {
+    const did = doc.didDocument?.id;
+    const client = doc.didDocument?.controller;
+
+    if (doc.didDocumentMetadata?.deactivated) {
+        return { refused: 'deleted' };
+    }
+    if (doc.didDocumentRegistration?.type !== 'asset' || !did || !client) {
+        return { refused: 'not-an-asset' };
+    }
+    if (Number(doc.didDocumentMetadata?.versionSequence) !== 1) {
+        return { refused: 'changed' };
+    }
+
+    const held = grantRequestIn(doc.didDocumentData);
+
+    if (!held) {
+        return { refused: 'not-a-request' };
+    }
+
+    const fault = grantRequestFault(held.request);
+
+    return fault
+        ? { refused: 'invalid', fault }
+        : { did, app: held.app, client, request: held.request as Record<string, any> };
+}
+
+// Whether a resolved version is anchored on a registry: it names that registry
+// as its chain and has the height and time of a block. `confirmed` is not that,
+// since a creation is confirmed from the start.
+export function anchoredOn(doc: GrantDocument, registry: string): boolean {
+    const timestamp = doc.didDocumentMetadata?.timestamp;
+    const { height, timeISO } = timestamp?.upperBound ?? {};
+
+    return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string';
+}

@@ -51,7 +51,7 @@ async function anchor() {
 }
 
 // What a wallet does with a grant link: resolve the request it names and create
-// the grant it asks for, as the Grants tab does.
+// the grant it asks for, as a wallet does.
 async function grantFrom(link: string, keymaster = wallet, more: Record<string, unknown> = {}): Promise<string> {
     const read = readGrantRequest(await keymaster.resolveDID(parseGrantLink(link)!) as never);
 

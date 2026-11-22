@@ -50,6 +50,11 @@
       "require": "./dist/cjs/didcomm-protocols.cjs",
       "types": "./dist/types/didcomm-protocols.d.ts"
     },
+    "./grant": {
+      "import": "./dist/esm/grant.js",
+      "require": "./dist/cjs/grant.cjs",
+      "types": "./dist/types/grant.d.ts"
+    },
     "./wallet/json": {
       "import": "./dist/esm/db/json.js",
       "require": "./dist/cjs/db/json.cjs",
@@ -119,6 +124,9 @@
       ],
       "didcomm-protocols": [
         "./dist/types/didcomm-protocols.d.ts"
+      ],
+      "grant": [
+        "./dist/types/grant.d.ts"
       ],
       "wallet/json": [
         "./dist/types/db/json.d.ts"
