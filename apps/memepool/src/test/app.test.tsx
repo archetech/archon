@@ -962,6 +962,41 @@ describe('an article', () => {
         expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
     });
 
+    it('starts an edit again from another version that a refresh shows, and keeps a paper\'s summary when it is emptied', async () => {
+        const paper = under({
+            ...post('did:cid:1', ALICE, ''),
+            memeplex: { kind: 'paper', author: ALICE, title: 'On DIDs', summary: 'A summary.', authors: [ALICE], content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length }, v: 1 },
+        }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [paper] });
+        state.bodies['did:cid:1 op-did:cid:1'] = BODY;
+        state.bodies['did:cid:1 op-second'] = 'Rewritten elsewhere.';
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        await user.type(screen.getByLabelText('Article'), 'Not to be saved over what was not seen.');
+
+        // Changed from another device while the editor is open.
+        vi.mocked(api.publication).mockResolvedValue({
+            ...paper, current: 1,
+            versions: [...paper.versions, { opid: 'op-second', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } }],
+            memeplex: { ...paper.memeplex!, title: 'On every DID', content: { cid: 'bafkreisecond', type: 'text/markdown', bytes: 20 } },
+        });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe('Rewritten elsewhere.'));
+        expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('On every DID');
+
+        await user.clear(screen.getByLabelText('Summary'));
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(state.edited).toStrictEqual([{
+            did: 'did:cid:1',
+            object: { kind: 'paper', title: 'On every DID', summary: '', authors: [ALICE], content: { cid: 'bafkreisecond', type: 'text/markdown', bytes: 20 } },
+        }]));
+    });
+
     it('cannot be changed here when the service does not hold its body', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
         render(<App api={api} />);

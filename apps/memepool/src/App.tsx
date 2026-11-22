@@ -616,7 +616,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
             await api.edit(publication.did!, {
                 ...rest,
                 title: title.trim(),
-                ...(summary.trim() ? { summary: summary.trim() } : {}),
+                // A paper has a summary, which may be empty. A post has one or none.
+                ...(summary.trim() || object.kind === 'paper' ? { summary: summary.trim() } : {}),
                 ...(body === held ? { content } : { body }),
             });
             onDone(true);
@@ -725,7 +726,9 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
-            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); if (saved) setEdited(versionKey(root)); }} />}
+            {/* An editor is of one version. When another is shown it starts again from that one,
+                so that what is saved was written against what the reader saw. */}
+            {editing && <Edit key={versionKey(root)} api={api} publication={root} onDone={saved => { setEditing(false); if (saved) setEdited(versionKey(root)); }} />}
             {edited !== undefined && <p className="muted">Your edit is waiting to be anchored.</p>}
             <Respond api={api} me={me} grants={grants} target={root} />
             {error && <p role="alert" className="error">{error}</p>}
