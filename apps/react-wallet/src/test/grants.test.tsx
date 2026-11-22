@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { encodeGrantLink, validateGrant } from '@didcid/memeplex';
+import { grantLink, validateGrant } from '@didcid/memeplex';
 import GrantsView from '../../../../packages/wallet-ui/src/components/GrantsView';
 
 const CLIENT = 'did:cid:bagaaieraclientclientclientclientclientclientclientclientcli';
 const GRANT = 'did:cid:bagaaieragrantgrantgrantgrantgrantgrantgrantgrantgrantgran';
-const NONCE = 'Qm9vdHN0cmFwIG5vbmNlMTIz';
+const REQUEST = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequestre';
 const SCHEMA = `did:cid:bagaaieraschema?versionId=b${'a'.repeat(58)}`;
 
 const keymaster = {
@@ -37,6 +37,9 @@ const alice = (registry = 'BTC:mainnet') => ({ didDocument: { id: ALICE }, didDo
 function holding(docs: Record<string, unknown>) {
     keymaster.listAssets.mockResolvedValue(Object.keys(docs));
     keymaster.resolveDID.mockImplementation(async (did: string) => {
+        if (did in requests) {
+            return requests[did];
+        }
         if (did === 'Alice') {
             return alice();
         }
@@ -47,20 +50,38 @@ function holding(docs: Record<string, unknown>) {
     });
 }
 
-function linkFor(request: Record<string, unknown> = {}) {
-    return encodeGrantLink({ v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, registries: ['BTC:mainnet', 'ZEC:mainnet'], ...request });
+// The requests a node resolves: each an asset its client created.
+let requests: Record<string, unknown> = {};
+
+// A link to a request, which the node resolves as its client made it unless
+// `as` says otherwise. The first of a test is REQUEST.
+function linkFor(request: Record<string, unknown> = {}, as: Record<string, unknown> = {}) {
+    const did = Object.keys(requests).length ? `${REQUEST}${Object.keys(requests).length}` : REQUEST;
+
+    requests[did] = {
+        didDocument: { id: did, controller: CLIENT },
+        didDocumentData: { memeplexGrantRequest: { v: 1, name: 'Memepool', registries: ['BTC:mainnet', 'ZEC:mainnet'], ...request } },
+        didDocumentRegistration: { type: 'asset', registry: 'hyperswarm' },
+        didDocumentMetadata: { versionSequence: '1' },
+        ...as,
+    };
+
+    return grantLink(did);
 }
 
+// Reviewing resolves the request, so the view is read once it has an answer.
 async function review(link: string) {
     const user = userEvent.setup();
     await user.click(await screen.findByLabelText('Grant link'));
     await user.paste(link);
     await user.click(screen.getByRole('button', { name: 'Review' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Create Grant' }) ?? document.querySelector('.Mui-error')).toBeTruthy());
     return user;
 }
 
 beforeEach(() => {
     vi.resetAllMocks();
+    requests = {};
     holding({});
     keymaster.listRevocations.mockResolvedValue([]);
     keymaster.createAsset.mockResolvedValue(GRANT);
@@ -89,7 +110,7 @@ describe('Grants view: a grant link', () => {
 
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
         const [data, options] = keymaster.createAsset.mock.calls[0];
-        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:tag'], nonce: NONCE } });
+        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:tag'], request: REQUEST } });
         expect(validateGrant(data.memeplexGrant)).toBe('valid');
         expect(options).toStrictEqual({ registry: 'BTC:mainnet', controller: 'Alice' });
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Grant created'));
@@ -103,7 +124,7 @@ describe('Grants view: a grant link', () => {
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
 
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
-        expect(keymaster.createAsset.mock.calls[0][0]).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE } });
+        expect(keymaster.createAsset.mock.calls[0][0]).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST } });
     });
 
     it('grants a narrower scope when the user unticks an action', async () => {
@@ -139,8 +160,7 @@ describe('Grants view: a grant link', () => {
     });
 
     it('creates no grant for a local identity, whose assets cannot be on a chain', async () => {
-        holding({});
-        keymaster.resolveDID.mockResolvedValue(alice('local'));
+        keymaster.resolveDID.mockImplementation(async (did: string) => requests[did] ?? alice('local'));
         view();
         const user = await review(linkFor());
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
@@ -152,7 +172,7 @@ describe('Grants view: a grant link', () => {
 
     it('creates no grant to the identity itself', async () => {
         view();
-        const user = await review(linkFor({ client: ALICE }));
+        const user = await review(linkFor({}, { didDocument: { id: REQUEST, controller: ALICE } }));
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
 
         await waitFor(() => expect(notify.error).toHaveBeenCalled());
@@ -186,7 +206,7 @@ describe('Grants view: a grant link', () => {
         const [data, options] = keymaster.createAsset.mock.calls[0];
         expect(options.registry).toBe('ZEC:mainnet');
         // The grant says nothing of registries: it is on one.
-        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE } });
+        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST } });
     });
 
     it('creates nothing, and says why, when the client can publish on no registry this node supports', async () => {
@@ -237,16 +257,28 @@ describe('Grants view: a grant link', () => {
     });
 
     it.each([
-        ['archon://auth?challenge=did:cid:abc', /not a grant link/],
-        ['archon://grant?request=!!!', /cannot be read/],
-        [`archon://grant?request=${Buffer.from('{"memeplexGrantRequest":{"v":1}}').toString('base64url')}`, /valid grant request/],
-    ])('refuses %s and creates nothing', async (link, message) => {
+        ['another archon link', () => 'archon://auth?challenge=did:cid:abc', /not a grant link/],
+        ['a link that names no DID', () => 'archon://grant?request=!!!', /not a grant link/],
+        ['a request the node cannot find', () => grantLink(`${REQUEST}9`), /cannot find the request/],
+        ['a deleted request', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2', deactivated: true } }), /was withdrawn/],
+        ['a DID that is not an asset', () => linkFor({}, { didDocumentRegistration: { type: 'agent' } }), /does not name a grant request/],
+        ['a request changed since it was made', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2' } }), /does not say who is asking/],
+        ['an asset that is not a valid request', () => linkFor({ registries: [] }), /valid grant request/],
+    ])('refuses %s and creates nothing', async (_name, link, message) => {
         view();
-        await review(link);
+        await review(link());
 
         expect(screen.getByText(message)).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Create Grant' })).toBeNull();
         expect(keymaster.createAsset).not.toHaveBeenCalled();
+    });
+
+    it('takes the DID of a request alone', async () => {
+        view();
+        linkFor();
+        await review(REQUEST);
+
+        expect(screen.getByText(CLIENT)).toBeTruthy();
     });
 
     it('reports a failure and keeps the request', async () => {
@@ -325,7 +357,7 @@ describe('Grants view: the grants an identity holds', () => {
     });
 
     it('keeps a field it does not know, and an expiry it was not asked to change, exactly', async () => {
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE, expiresAt: '2030-01-02T03:04:59.500Z', note: 'kept' } }) });
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, expiresAt: '2030-01-02T03:04:59.500Z', note: 'kept' } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
@@ -336,7 +368,7 @@ describe('Grants view: the grants an identity holds', () => {
         await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
         expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({
             memeplexGrant: {
-                v: 1, client: CLIENT, nonce: NONCE, note: 'kept',
+                v: 1, client: CLIENT, request: REQUEST, note: 'kept',
                 actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate'], expiresAt: '2030-01-02T03:04:59.500Z',
             },
         });
@@ -398,8 +430,8 @@ describe('Grants view: the grants an identity holds', () => {
         expect(await screen.findByText('No grants')).toBeTruthy();
     });
 
-    it('changes scope and expiry in place, keeping the client and the nonce', async () => {
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE, expiresAt: '2030-01-02T03:04:00Z' } }) });
+    it('changes scope and expiry in place, keeping the client and the request', async () => {
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, expiresAt: '2030-01-02T03:04:00Z' } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
@@ -412,7 +444,7 @@ describe('Grants view: the grants an identity holds', () => {
         const [did, data] = keymaster.mergeData.mock.calls[0];
         expect(did).toBe(GRANT);
         expect(data).toStrictEqual({
-            memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], nonce: NONCE },
+            memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], request: REQUEST },
         });
         expect(validateGrant(data.memeplexGrant)).toBe('valid');
     });

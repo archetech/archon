@@ -6,7 +6,7 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
-import { MemeplexIndex, decodeGrantLink, validateGrantRequest } from '@didcid/memeplex';
+import { MemeplexIndex, grantLink, parseGrantLink, readGrantRequest, validateGrantRequest } from '@didcid/memeplex';
 import { IndexerClient, MemeplexClient, allows, liveGrants, usable } from '@didcid/memeplex/client';
 import type { ClientGatekeeper } from '@didcid/memeplex/client';
 import { Sync } from '../../services/memeplex-indexer/src/sync.ts';
@@ -50,19 +50,19 @@ async function anchor() {
     await sync.poll();
 }
 
-// What a wallet does with a grant link: read the request and create the grant it
-// asks for, as the Grants tab does.
+// What a wallet does with a grant link: resolve the request it names and create
+// the grant it asks for, as the Grants tab does.
 async function grantFrom(link: string, keymaster = wallet, more: Record<string, unknown> = {}): Promise<string> {
-    const decoded = decodeGrantLink(link);
+    const read = readGrantRequest(await keymaster.resolveDID(parseGrantLink(link)!) as never);
 
-    if ('error' in decoded) {
-        throw new Error(decoded.error);
+    if ('error' in read) {
+        throw new Error(read.error);
     }
 
-    const { client: named, actions, nonce, expiresAt } = decoded.request;
+    const { actions, expiresAt } = read.request;
 
     return keymaster.createAsset({
-        memeplexGrant: { v: 1, client: named, ...(actions ? { actions } : {}), nonce, ...(expiresAt ? { expiresAt } : {}), ...more },
+        memeplexGrant: { v: 1, client: read.client, request: read.did, ...(actions ? { actions } : {}), ...(expiresAt ? { expiresAt } : {}), ...more },
     }, { registry: REGISTRY });
 }
 
@@ -111,30 +111,52 @@ afterEach(async () => {
     await new Promise(resolve => server.close(resolve));
 });
 
-it('asks for a grant with a link that carries a valid request with a nonce of its own', async () => {
+it('asks for a grant by creating a request a wallet resolves, and gives the link that names it', async () => {
     const first = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], actions: ['memeplex:post', 'memeplex:reply'] });
     const second = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
 
-    expect(first.request).toStrictEqual({
-        v: 1, client: await client.did(), name: 'Memepool', actions: ['memeplex:post', 'memeplex:reply'], nonce: first.request.nonce, registries: [REGISTRY],
-    });
+    expect(first.request).toStrictEqual({ v: 1, name: 'Memepool', actions: ['memeplex:post', 'memeplex:reply'], registries: [REGISTRY] });
     expect(validateGrantRequest(first.request)).toBe('valid');
-    expect(first.request.nonce).toMatch(/^[A-Za-z0-9_-]{22}$/);
-    expect(second.request.nonce).not.toBe(first.request.nonce);
-    expect(decodeGrantLink(first.link)).toStrictEqual({ request: first.request });
+    expect(first.link).toBe(grantLink(first.did));
+    expect(second.did).not.toBe(first.did);
 
-    const narrowed = await client.requestGrant({ name: 'Memepool', registries: ['BTC:mainnet', 'ZEC:mainnet'] });
-    expect(narrowed.request.registries).toStrictEqual(['BTC:mainnet', 'ZEC:mainnet']);
-    expect(decodeGrantLink(narrowed.link)).toStrictEqual({ request: narrowed.request });
+    // A wallet reads what is asked, and who asks, from the request as resolved.
+    const resolved = await wallet.resolveDID(first.did);
+
+    expect(readGrantRequest(resolved as never)).toStrictEqual({ did: first.did, client: await client.did(), request: first.request });
+    expect(resolved.didDocumentRegistration).toMatchObject({ type: 'asset', registry: 'hyperswarm' });
+    expect(Date.parse(resolved.didDocumentRegistration!.validUntil!)).toBeGreaterThan(Date.now() + 50 * 60_000);
+    expect(Date.parse(resolved.didDocumentRegistration!.validUntil!)).toBeLessThanOrEqual(Date.now() + 60 * 60_000);
+
     await expect(client.requestGrant({ name: 'Memepool', registries: ['BTC:signet'] })).rejects.toThrow('not a valid grant request: schema');
 
     // A Gatekeeper as it is, with no adapter, is what the client reads from.
     const direct = new MemeplexClient({ keymaster: clientKeymaster, gatekeeper, identity: 'memepool' });
-    expect(await direct.did()).toBe(first.request.client);
+    expect(await direct.did()).toBe(await client.did());
+});
+
+it('does not take a request as its controller\'s once it has changed', async () => {
+    const { did } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { keymaster: mallory, did: malloryDid } = await keymasterFor('mallory');
+
+    // Anyone can make a request and hand it to an identity that signed nothing.
+    const forged = await mallory.createAsset({ memeplexGrantRequest: { v: 1, name: 'Memepool', registries: [REGISTRY] } }, { registry: 'hyperswarm' });
+
+    expect(readGrantRequest(await wallet.resolveDID(forged) as never)).toMatchObject({ client: malloryDid });
+    await mallory.transferAsset(forged, await client.did());
+    expect(readGrantRequest(await wallet.resolveDID(forged) as never)).toStrictEqual({ error: 'changed' });
+
+    await clientKeymaster.mergeData(did, { note: 'edited' });
+    expect(readGrantRequest(await wallet.resolveDID(did) as never)).toStrictEqual({ error: 'changed' });
+
+    await clientKeymaster.revokeDID(did);
+    expect(readGrantRequest(await wallet.resolveDID(did) as never)).toStrictEqual({ error: 'deactivated' });
+    expect(readGrantRequest(await wallet.resolveDID(await client.did()) as never)).toStrictEqual({ error: 'not-an-asset' });
+    expect(readGrantRequest(undefined)).toStrictEqual({ error: 'not-found' });
 });
 
 it('carries a user from a grant link to a thread a reader sees', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
 
     expect(await client.findGrants(request)).toStrictEqual([]);
 
@@ -183,7 +205,7 @@ it('carries a user from a grant link to a thread a reader sees', async () => {
 }, 120_000);
 
 it('publishes nothing that counts once the user has revoked the grant', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     const grantDid = await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -204,13 +226,13 @@ it('publishes nothing that counts once the user has revoked the grant', async ()
 }, 120_000);
 
 it('finds each grant made from a request, and takes none as its own when there are two', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     const { keymaster: other, did: otherDid } = await keymasterFor('mallory');
 
     const grantDid = await grantFrom(link);
     const otherGrant = await grantFrom(link, other);
     // A grant to this client from another request.
-    await wallet.createAsset({ memeplexGrant: { v: 1, client: request.client, nonce: 'YW5vdGhlciByZXF1ZXN0IG5vbmNl' } }, { registry: REGISTRY });
+    await wallet.createAsset({ memeplexGrant: { v: 1, client: await client.did(), request: (await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] })).did } }, { registry: REGISTRY });
     await anchor();
 
     const found = await client.findGrants(request);
@@ -223,7 +245,7 @@ it('finds each grant made from a request, and takes none as its own when there a
 }, 120_000);
 
 it('refuses to publish what is not a valid object, and what the grant does not allow is not attributed', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], actions: ['memeplex:post'] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], actions: ['memeplex:post'] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -251,7 +273,7 @@ it('refuses to publish what is not a valid object, and what the grant does not a
 }, 120_000);
 
 it('states the grant\'s user and DID in what it publishes, whatever it is handed', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -274,7 +296,7 @@ it('tells a missing publication from an indexer that is failing or is not one', 
 });
 
 it('refuses an edit that would change what an object is', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -296,7 +318,7 @@ it('refuses an edit that would change what an object is', async () => {
 }, 120_000);
 
 it('does not take an expired grant as one to publish under', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], expiresAt: '2027-01-01T00:00:00Z' });
+    const { did: request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], expiresAt: '2027-01-01T00:00:00Z' });
     await grantFrom(link);
     await anchor();
     const found = await client.findGrants(request);

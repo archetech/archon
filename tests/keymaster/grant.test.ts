@@ -10,6 +10,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import * as memeplex from '@didcid/memeplex';
 import type { ResolvedVersion } from '@didcid/memeplex';
+import { MemeplexClient } from '@didcid/memeplex/client';
 import * as grants from '../../packages/keymaster/src/grant.ts';
 
 // Grants from a Keymaster: what an identity lets a client application do in its
@@ -683,6 +684,19 @@ describe('an app of its own', () => {
 describe('a Memeplex grant', () => {
     const memeplexRequest = (request: Record<string, unknown> = {}) =>
         requestOf({ v: 1, name: 'Memepool', registries: [BTC, ETH], ...request }, 'memeplex');
+
+    it('answers the request a Memeplex client makes, with a grant that client finds', async () => {
+        const asking = new MemeplexClient({ keymaster, gatekeeper, identity: 'Client' } as never);
+        const asked = await asking.requestGrant({ name: 'Memepool', registries: [ETH], actions: ['memeplex:post'] });
+
+        await keymaster.setCurrentId('Alice');
+        const did = await keymaster.createGrant(asked.link);
+
+        expect(await dataOf(did)).toStrictEqual({ memeplexGrant: { v: 1, client, request: asked.did, actions: ['memeplex:post'] } });
+        expect((await keymaster.resolveDID(did)).didDocumentRegistration).toMatchObject({ registry: ETH });
+        await anchor(100, ETH);
+        expect(await asking.findGrants(asked.did)).toMatchObject([{ did, grant: { status: 'valid', user: alice, registry: ETH } }]);
+    });
 
     it('is read by the Memeplex verifier as valid, once it is anchored', async () => {
         const request = await memeplexRequest({ actions: ['memeplex:post', 'memeplex:reply'] });

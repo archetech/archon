@@ -16,8 +16,8 @@
         "actions": {
             "$ref": "#/$defs/actions"
         },
-        "nonce": {
-            "$ref": "#/$defs/nonce"
+        "request": {
+            "$ref": "#/$defs/did"
         },
         "expiresAt": {
             "$ref": "#/$defs/expiresAt"
@@ -54,11 +54,6 @@
             "items": {
                 "$ref": "#/$defs/action"
             }
-        },
-        "nonce": {
-            "type": "string",
-            "minLength": 22,
-            "pattern": "^[A-Za-z0-9_-]+$"
         },
         "expiresAt": {
             "type": "string",
