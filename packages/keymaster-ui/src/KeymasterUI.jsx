@@ -1144,13 +1144,15 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
             setRegistries(registries);
 
             if (currentId) {
-                setCurrentId(currentId);
-                setSelectedId(currentId);
-
                 const idList = await keymaster.listIds();
                 setIdList(idList);
 
                 const docs = await keymaster.resolveDID(currentId);
+
+                // The identity's name and its DID are published together, so
+                // that nothing is shown one identity's name with another's DID.
+                setCurrentId(currentId);
+                setSelectedId(currentId);
                 setCurrentDID(docs.didDocument.id);
                 setManifest(docs.didDocumentData.manifest);
                 setNostrKeys(docs.didDocumentData.nostr || null);

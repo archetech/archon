@@ -130,6 +130,30 @@ describe('grants in the standalone clients', () => {
         await waitFor(() => expect(fns.revokeDID).toHaveBeenCalledWith(GRANT));
     });
 
+    it('are never read for one identity under another\'s DID while the identity is changing', async () => {
+        let current = 'Alice';
+        let release!: (value: unknown) => void;
+        const resolved = (id: string) => documents[id] ?? {
+            didDocument: { id: `did:cid:${id}`, service: [] }, didDocumentData: {}, didDocumentMetadata: { version: 1 }, didDocumentRegistration: {},
+        };
+
+        fns.getCurrentId = vi.fn(async () => current);
+        fns.setCurrentId = vi.fn(async (id: string) => { current = id; return true; });
+        fns.listIds = vi.fn(async () => ['Alice', 'Bob']);
+        const user = await openGrants();
+        await waitFor(() => expect(fns.listRevocations).toHaveBeenCalledWith('Alice'));
+        fns.resolveDID.mockImplementation(async (id: string) => (id === 'Bob' ? new Promise(resolve => { release = resolve; }) : resolved(id)));
+        fns.listRevocations.mockClear();
+
+        // Bob is chosen, and his DID takes a while to resolve.
+        await user.click(screen.getAllByRole('combobox').find(box => box.textContent === 'Alice')!);
+        await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Bob' }));
+        await waitFor(() => expect(release).toBeDefined());
+
+        expect(fns.listRevocations).not.toHaveBeenCalledWith('Bob');
+        release(resolved('Bob'));
+    });
+
     it('open on a grant request named where the client was opened, ready for review', async () => {
         render(<Panel keymaster={keymaster} title="Test" grantDID={REQUEST} />);
 
