@@ -556,6 +556,17 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     const fields = (req: Request) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
 
+    // Whether two references are the same: the same members with the same
+    // values, in whatever order they are written.
+    const sameReference = (one: unknown, other: unknown): boolean => {
+        const members = (value: unknown) => (value && typeof value === 'object' && !Array.isArray(value)
+            ? Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1))
+            : undefined);
+        const [first, second] = [members(one), members(other)];
+
+        return first !== undefined && second !== undefined && JSON.stringify(first) === JSON.stringify(second);
+    };
+
     const memeplexOf = (doc: Awaited<ReturnType<LoginKeymaster['resolveDID']>>): Record<string, any> | undefined => {
         const data = doc.didDocumentData;
         const memeplex = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>).memeplex : undefined;
@@ -599,7 +610,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const held = did ? await publishedHere(did).catch(() => undefined) : undefined;
 
         for (const reference of REFERENCES) {
-            if (reference in stated && JSON.stringify(stated[reference]) !== JSON.stringify(held?.[reference])) {
+            if (reference in stated && !sameReference(stated[reference], held?.[reference])) {
                 throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: send the text of an article as \`body\``);
             }
         }

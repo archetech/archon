@@ -800,6 +800,12 @@ describe('an article', () => {
         expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: first.content })).status).toBe(200);
         expect(await objectOf(did)).toStrictEqual({ v: 1, kind: 'post', author: aliceDid, grant: grantDid, title: 'Retitled', content: first.content });
 
+        // The same reference, however its members are ordered.
+        await anchor();
+        const { cid, type, bytes } = first.content;
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled twice', content: { bytes, type, cid } })).status).toBe(200);
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: { cid, type, bytes, more: 1 } })).status).toBe(400);
+
         await anchor();
         expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', body: `${BODY}More.\n` })).status).toBe(200);
         const revised = await objectOf(did);
