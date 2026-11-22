@@ -126,7 +126,7 @@ on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise
 | `ARCHON_MEMEPOOL_PUBLIC_URL` | none | Where users reach the service, such as `https://node.example/memepool`. With it, a challenge names the service's callback and a wallet sends its answer straight back. Without it, a user copies the answer from the wallet to the page |
 | `ARCHON_MEMEPOOL_PAGES_DIR` | `public` | The built [pages](../../../apps/memepool/README.md), which the service serves beside its API. The image carries them. Empty serves none |
 | `ARCHON_MEMEPOOL_NAME` | `memepool` | The name of the service's identity, and the name it gives in a grant request |
-| `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on |
+| `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on. Not `local`: the service does not start with that setting, or with a wallet whose identity is on `local`, since such an identity can publish only on `local` |
 | `ARCHON_MEMEPOOL_PORT` | `4237` | The host port |
 | `ARCHON_MEMEPOOL_HOST_BIND` | `127.0.0.1` | The host address the port is bound to |
 | `ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE` | `60` | Challenges issued in a minute |
