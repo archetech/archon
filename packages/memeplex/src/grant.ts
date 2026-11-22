@@ -193,6 +193,12 @@ const ACTIONS: Record<Kind, string> = {
     tag: 'memeplex:tag',
 };
 
+// The action a grant's scope has to list for a client to create an object of a
+// kind, or nothing for a kind these rules do not know.
+export function actionFor(kind: string): string | undefined {
+    return Object.hasOwn(ACTIONS, kind) ? ACTIONS[kind as Kind] : undefined;
+}
+
 export type Authority =
     | 'permitted'
     // The position is not after the grant's creation, or shares its block.

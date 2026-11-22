@@ -1,6 +1,6 @@
 import { attribute } from './attribution.js';
 import type { Publication } from './attribution.js';
-import { readGrant } from './grant.js';
+import { actionFor, readGrant } from './grant.js';
 import type { Grant, ResolvedVersion } from './grant.js';
 import { encodeGrantLink } from './grant-link.js';
 import { validateObject } from './validate.js';
@@ -47,6 +47,16 @@ export interface UsableGrant {
     did: string;
     user: string;
     registry: string;
+    // The actions the grant's scope lists. Absent means every core kind.
+    actions?: string[];
+}
+
+// Whether a grant's scope lets a client create an object of a kind. An object
+// outside it would be created and never attributed.
+export function allows(grant: Pick<UsableGrant, 'actions'>, kind: string): boolean {
+    const action = actionFor(kind);
+
+    return !grant.actions || (action !== undefined && grant.actions.includes(action));
 }
 
 // The fields of an object a client supplies. `v`, `author` and `grant` are the
@@ -161,8 +171,14 @@ export class MemeplexClient {
     // Publishes an object for the grant's user, on the grant's registry. Returns
     // the object's DID. The object is a publication once the chain anchors it.
     async publish(grant: UsableGrant, object: ObjectFields): Promise<string> {
+        const memeplex = this.stated(grant, object);
+
+        if (!allows(grant, object.kind)) {
+            throw new MemeplexClientError('invalid', `the grant does not allow a ${object.kind}`);
+        }
+
         return this.keymaster.createAsset(
-            { memeplex: this.stated(grant, object) },
+            { memeplex },
             { registry: grant.registry, controller: this.identity },
         );
     }
@@ -250,10 +266,13 @@ export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableG
             continue;
         }
 
-        const { expiresAt } = grant.versions[grant.versions.length - 1];
+        const { expiresAt, actions } = grant.versions[grant.versions.length - 1];
 
         if (expiresAt === undefined || now.getTime() < Date.parse(expiresAt)) {
-            live.push({ usable: { did, user: grant.user, registry: grant.registry }, created: Date.parse(grant.versions[0].position.time) });
+            live.push({
+                usable: { did, user: grant.user, registry: grant.registry, ...(actions ? { actions } : {}) },
+                created: Date.parse(grant.versions[0].position.time),
+            });
         }
     }
 

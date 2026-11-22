@@ -1,7 +1,7 @@
 export { KINDS, validateObject, validateGrant, validateGrantRequest } from './validate.js';
 export type { Kind, Validity } from './validate.js';
 export { schemas } from './schemas.js';
-export { PERMITTED_REGISTRIES, authorityAt, positionOn, readGrant } from './grant.js';
+export { PERMITTED_REGISTRIES, actionFor, authorityAt, positionOn, readGrant } from './grant.js';
 export type { Authority, Grant, GrantVersion, GrantVoidReason, Position, ResolvedVersion } from './grant.js';
 export { attribute } from './attribution.js';
 export type { Publication, Unattributed, Version, VersionOutcome } from './attribution.js';

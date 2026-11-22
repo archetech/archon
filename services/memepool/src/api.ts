@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { MemeplexClientError, liveGrants } from '@didcid/memeplex/client';
+import { actionFor } from '@didcid/memeplex';
+import { MemeplexClientError, allows, liveGrants } from '@didcid/memeplex/client';
 import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 
 // The Memepool service over HTTP. Memepool is a Memeplex client: an agent DID
@@ -376,7 +377,18 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const [grant, ...others] = liveGrants(found, new Date(now()));
 
         if (grant) {
-            res.json({ did: user, grant: grant.did, registry: grant.registry, ...(others.length ? { others: others.map(each => each.did) } : {}) });
+            const live = [grant, ...others];
+            // What the reader's grants let the service publish between them:
+            // listed only when every one of them is narrowed.
+            const actions = live.every(each => each.actions) ? [...new Set(live.flatMap(each => each.actions ?? []))] : undefined;
+
+            res.json({
+                did: user,
+                grant: grant.did,
+                registry: grant.registry,
+                ...(others.length ? { others: others.map(each => each.did) } : {}),
+                ...(actions ? { actions } : {}),
+            });
             return;
         }
 
@@ -398,12 +410,29 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             }
 
             try {
-                const under = of ? await client.grantOf(of(req)) : live[0].did;
-                const grant = live.find(each => each.did === under);
+                let grant: UsableGrant | undefined;
 
-                if (!grant) {
-                    res.status(400).json({ error: 'the grant this object was published under is not one of yours in force' });
-                    return;
+                if (of) {
+                    const under = await client.grantOf(of(req));
+
+                    grant = live.find(each => each.did === under);
+                    if (!grant) {
+                        res.status(400).json({ error: 'the grant this object was published under is not one of yours in force' });
+                        return;
+                    }
+                }
+                else {
+                    // A new object goes under the earliest grant whose scope
+                    // allows its kind. Under another it would be created and
+                    // never attributed.
+                    const { kind } = fields(req);
+
+                    // A kind the rules do not know is refused as not valid, below.
+                    grant = actionFor(String(kind)) === undefined ? live[0] : live.find(each => allows(each, String(kind)));
+                    if (!grant) {
+                        res.status(403).json({ error: `your grant does not allow a ${String(kind)}` });
+                        return;
+                    }
                 }
 
                 res.json(await act(req as Signed, grant));

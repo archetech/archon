@@ -736,6 +736,44 @@ describe('responding to a post', () => {
     });
 });
 
+describe('a grant that allows some kinds', () => {
+    const root = under(post('did:cid:1', BOB, 'A post.'), 'did:cid:bobs');
+
+    it('offers only what the grant allows', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: { ...granted, actions: ['memeplex:reply', 'memeplex:tag'] }, timeline: [root] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const open = await screen.findByRole('button', { name: 'Open' });
+        expect(screen.queryByLabelText('Post')).toBeNull();
+
+        await user.click(open);
+        await screen.findByText(/0 boosts · no ratings/);
+
+        expect(screen.getByLabelText('Reply')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Like' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Add tag' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Thumb up' })).toBeNull();
+    });
+
+    it('offers everything when the grant names no actions', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [root] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        expect(await screen.findByLabelText('Post')).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+
+        for (const name of ['Boost', 'Thumb up', 'Thumb down', 'Like', 'Add tag']) {
+            expect(await screen.findByRole('button', { name })).toBeTruthy();
+        }
+        expect(screen.getByLabelText('Reply')).toBeTruthy();
+    });
+});
+
 describe('editing', () => {
     it('rewrites the reader\'s own reply, keeping what it answers', async () => {
         const mine = under({ ...post('did:cid:1', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:0', targetVersion: 'op-0', v: 1 } }, 'did:cid:grant');
