@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App from '../App';
+import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
-import type { Api, Me, Publication } from '../api';
+import type { Api, Me, Publication, Responses } from '../api';
 
 const ALICE = 'did:cid:bagaaieraalicealicealicealicealicealicealicealicealicealice';
 const BOB = 'did:cid:bagaaierabobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbo';
@@ -22,13 +22,20 @@ const PAGE = 50;
 
 // The services, as far as the pages can tell.
 function services(start: { me?: Me; timeline?: Publication[] } = {}) {
-    const state = { me: start.me as Me | undefined, timeline: start.timeline ?? [], published: [] as Record<string, unknown>[] };
+    const state = {
+        me: start.me as Me | undefined,
+        timeline: start.timeline ?? [],
+        published: [] as Record<string, unknown>[],
+        edited: [] as { did: string; object: Record<string, unknown> }[],
+        responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
+    };
     const api: Api = {
         me: vi.fn(async () => state.me),
         challenge: vi.fn(async () => ({ challenge: 'did:cid:challenge', link: 'archon://auth?challenge=did%3Acid%3Achallenge' })),
         login: vi.fn(async () => ({ waiting: true as const })),
         logout: vi.fn(async () => { state.me = undefined; }),
         publish: vi.fn(async object => { state.published.push(object); return `did:cid:new${state.published.length}`; }),
+        edit: vi.fn(async (did: string, object: Record<string, unknown>) => { state.edited.push({ did, object }); }),
         withdraw: vi.fn(async did => { state.timeline = state.timeline.map(each => (each.did === did ? { ...each, state: 'withdrawn' as const } : each)); }),
         timeline: vi.fn(async (authors, offset = 0) => {
             const all = state.timeline.filter(each => authors.includes(each.memeplex!.author));
@@ -36,6 +43,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
             return { total: all.length, publications: all.slice(offset, offset + PAGE) };
         }),
         thread: vi.fn(async () => []),
+        responses: vi.fn(async () => state.responses),
         publication: vi.fn(async () => undefined),
     };
 
@@ -528,6 +536,260 @@ describe('reading and publishing', () => {
 
         expect(api.logout).toHaveBeenCalled();
         expect(await screen.findByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+    });
+});
+
+describe('responding to a post', () => {
+    const root = under(post('did:cid:1', BOB, 'A post.'), 'did:cid:bobs');
+    const about = { target: 'did:cid:1', targetVersion: 'op-did:cid:1' };
+
+    async function opened(start: Parameters<typeof services>[0] = {}) {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const made = services({ me: granted, timeline: [root], ...start });
+        render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Boost' });
+
+        return { ...made, user };
+    }
+
+    it('shows what others have made of it', async () => {
+        const made = services({ me: granted, timeline: [root] });
+        made.state.responses = {
+            boosts: [post('did:cid:b1', ALICE, ''), post('did:cid:b2', BOB, '')],
+            ratings: { ratings: [post('did:cid:r1', BOB, '')], mean: 0.75 },
+            tags: [{ tag: 'cryptography', authors: [ALICE, BOB] }, { tag: '❤️', authors: [BOB] }],
+        };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={made.api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByText(/2 boosts · rated 75% by 1/)).toBeTruthy();
+        expect(screen.getByText(/cryptography 2/)).toBeTruthy();
+        expect(made.api.responses).toHaveBeenCalledWith('did:cid:1');
+    });
+
+    it('boosts, likes and tags the version shown, each as an object of the reader\'s', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Boost' }));
+        await user.click(screen.getByRole('button', { name: 'Like' }));
+        await user.type(screen.getByLabelText('Tag'), '  Zero  Knowledge ');
+        await user.click(screen.getByRole('button', { name: 'Add tag' }));
+
+        expect(state.published).toStrictEqual([
+            { kind: 'post', ...about },
+            { kind: 'tag', ...about, tag: '❤️' },
+            { kind: 'tag', ...about, tag: 'zero-knowledge' },
+        ]);
+        expect(await screen.findByText('Your boost is waiting to be anchored.')).toBeTruthy();
+        expect(screen.getByText('Your tag zero-knowledge is waiting to be anchored.')).toBeTruthy();
+        expect((screen.getByLabelText('Tag') as HTMLInputElement).value).toBe('');
+    });
+
+    it('rates with a thumb, and changes the reader\'s rating when they have one', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Thumb up' }));
+        expect(state.published).toStrictEqual([{ kind: 'rating', ...about, rating: 1, min: 0, max: 1 }]);
+    });
+
+    it('edits the rating the reader already has, where a second would not count', async () => {
+        const made = services({ me: granted, timeline: [root] });
+        made.state.responses = { boosts: [], ratings: { ratings: [under(post('did:cid:myrating', ALICE, ''), 'did:cid:grant')], mean: 1 }, tags: [] };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText(/rated 100% by 1/);
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(made.state.edited).toStrictEqual([
+            { did: 'did:cid:myrating', object: { kind: 'rating', ...about, rating: 0, min: 0, max: 1 } },
+        ]));
+        expect(made.state.published).toStrictEqual([]);
+    });
+
+    it('makes a rating of its own when the reader\'s is one this service cannot change', async () => {
+        const made = services({ me: granted, timeline: [root] });
+        made.state.responses = { boosts: [], ratings: { ratings: [under(post('did:cid:elsewhere', ALICE, ''), 'did:cid:another-client')], mean: 1 }, tags: [] };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText(/rated 100% by 1/);
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(made.state.published).toStrictEqual([{ kind: 'rating', ...about, rating: 0, min: 0, max: 1 }]));
+        expect(made.state.edited).toStrictEqual([]);
+    });
+
+    it('changes the rating it has just made when the reader thinks again, before the indexer shows it', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Thumb up' }));
+        await screen.findByText('Your thumb up is waiting to be anchored.');
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(state.edited).toStrictEqual([
+            { did: 'did:cid:new1', object: { kind: 'rating', ...about, rating: 0, min: 0, max: 1 } },
+        ]));
+        expect(state.published).toHaveLength(1);
+        // The first thumb is no longer what waits.
+        await screen.findByText('Your thumb down is waiting to be anchored.');
+        expect(screen.queryByText('Your thumb up is waiting to be anchored.')).toBeNull();
+
+        state.responses = { boosts: [], ratings: { ratings: [{ ...under(post('did:cid:new1', ALICE, ''), 'did:cid:grant'), memeplex: { kind: 'rating', author: ALICE, grant: 'did:cid:grant', rating: 0 } }], mean: 0 }, tags: [] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await waitFor(() => expect(screen.queryByText(/is waiting to be anchored/)).toBeNull());
+    });
+
+    it('keeps a tag the service refused, for the reader to try again', async () => {
+        const { api, user } = await opened();
+        vi.mocked(api.publish).mockRejectedValue(new ApiError(502, 'the node did not accept the operation'));
+
+        await user.type(screen.getByLabelText('Tag'), 'cryptography');
+        await user.click(screen.getByRole('button', { name: 'Add tag' }));
+
+        await screen.findByRole('alert');
+        expect((screen.getByLabelText('Tag') as HTMLInputElement).value).toBe('cryptography');
+    });
+
+    it('stops showing a failure to read the counts once they are read', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [root] });
+        vi.mocked(api.responses).mockRejectedValueOnce(new ApiError(503, 'the index is still being built'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect((await screen.findByRole('alert')).textContent).toBe('the index is still being built');
+
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await screen.findByText(/0 boosts · no ratings/);
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('takes no thumb until it knows whether the reader has a rating', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [root] });
+        vi.mocked(api.responses).mockReturnValue(new Promise(() => undefined));
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect((await screen.findByRole('button', { name: 'Thumb up' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: 'Boost' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('stops saying a response is waiting once the indexer shows it', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Boost' }));
+        await user.click(screen.getByRole('button', { name: 'Like' }));
+        await screen.findByText('Your like is waiting to be anchored.');
+
+        state.responses = { boosts: [post('did:cid:new1', ALICE, '')], ratings: { ratings: [] }, tags: [] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+
+        await waitFor(() => expect(screen.queryByText('Your boost is waiting to be anchored.')).toBeNull());
+        expect(screen.getByText('Your like is waiting to be anchored.')).toBeTruthy();
+
+        state.responses = { ...state.responses, tags: [{ tag: '❤️', authors: [ALICE] }] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await waitFor(() => expect(screen.queryByText(/is waiting to be anchored/)).toBeNull());
+    });
+
+    it('says why a response was refused', async () => {
+        const { api, user } = await opened();
+        vi.mocked(api.publish).mockRejectedValue(new ApiError(403, 'no grant to publish under'));
+
+        await user.click(screen.getByRole('button', { name: 'Boost' }));
+
+        expect((await screen.findByRole('alert')).textContent).toBe('no grant to publish under');
+        expect(screen.queryByText(/is waiting to be anchored/)).toBeNull();
+    });
+
+    it('offers no response to a reader with no grant', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://grant?request=abc' }, timeline: [root] });
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText(/0 boosts · no ratings/);
+
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
+    });
+
+    it('writes a tag as it is published', () => {
+        expect(tagWord('  Zero  Knowledge ')).toBe('zero-knowledge');
+        expect(tagWord('Cafe\u0301')).toBe('caf\u00e9');
+        expect(tagWord('   ')).toBe('');
+        // Lower-casing takes this letter apart; what is published is composed.
+        expect(tagWord('J\u030c')).toBe('\u01f0');
+        expect(tagWord('J\u030c')).toBe(tagWord('\u01f0'));
+    });
+});
+
+describe('editing', () => {
+    it('rewrites the reader\'s own reply, keeping what it answers', async () => {
+        const mine = under({ ...post('did:cid:1', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:0', targetVersion: 'op-0', v: 1 } }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await user.clear(screen.getByLabelText('Edit'));
+        await user.type(screen.getByLabelText('Edit'), 'A better reply.');
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(state.edited).toStrictEqual([
+            { did: 'did:cid:1', object: { kind: 'reply', target: 'did:cid:0', targetVersion: 'op-0', text: 'A better reply.' } },
+        ]));
+        expect(await screen.findByText('Your edit is waiting to be anchored.')).toBeTruthy();
+        // One edit at a time, and the post is as it was until the edit is anchored.
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+        expect(screen.getByText('A reply.')).toBeTruthy();
+
+        vi.mocked(api.publication).mockResolvedValue({ ...mine, current: 1, memeplex: { ...mine.memeplex!, text: 'A better reply.' } });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText('A better reply.')).toBeTruthy();
+        await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A better reply.');
+    });
+
+    it('offers no edit of a post that a refresh shows was withdrawn', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api } = services({ me: granted, timeline: [mine] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Edit' });
+
+        vi.mocked(api.publication).mockResolvedValue({ ...mine, state: 'withdrawn' });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull());
+    });
+
+    it('offers no edit of another author\'s post, or of one published through another client', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [under(post('did:cid:2', BOB, 'Bob\'s.'), 'did:cid:bobs')] });
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Boost' });
+
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
     });
 });
 

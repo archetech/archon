@@ -15,6 +15,15 @@ export interface Reply {
     depth: number;
 }
 
+// What others have made of an object: who boosted it, the ratings that count
+// (one for each author) with their mean from 0 to 1, and the tags and reactions
+// put on it with who put each.
+export interface Responses {
+    boosts: Publication[];
+    ratings: { ratings: Publication[]; mean?: number };
+    tags: { tag: string; authors: string[] }[];
+}
+
 // Who is signed in: with a grant to publish under, or with the link that asks
 // for one and any grants made and not yet anchored.
 export interface Me {
@@ -42,10 +51,13 @@ export interface Api {
     login(body?: { response?: string; confirm?: string }): Promise<{ waiting?: true; answered?: string; did?: string }>;
     logout(): Promise<void>;
     publish(object: Record<string, unknown>): Promise<string>;
+    // Replaces one of the reader's objects with another version of it.
+    edit(did: string, object: Record<string, unknown>): Promise<void>;
     withdraw(did: string): Promise<void>;
     // One page of a timeline, newest first, and how many publications it has in all.
     timeline(authors: string[], offset?: number): Promise<{ total: number; publications: Publication[] }>;
     thread(did: string): Promise<Reply[]>;
+    responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
 }
 
@@ -90,6 +102,9 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             await json(await post('/logout'));
         },
         publish: async object => (await json(await post('/objects', object))).did,
+        async edit(did, object) {
+            await json(await post(`/objects/${encodeURIComponent(did)}`, object, 'PUT'));
+        },
         async withdraw(did) {
             await json(await post(`/objects/${encodeURIComponent(did)}`, undefined, 'DELETE'));
         },
@@ -107,6 +122,13 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             return json(await call(bases.memeplex, `/timeline?${query}`));
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),
+        async responses(did) {
+            const [boosts, ratings, tags] = await Promise.all(['boosts', 'ratings', 'tags'].map(
+                async view => json(await call(bases.memeplex, `/${view}/${encodeURIComponent(did)}`)),
+            ));
+
+            return { boosts, ratings, tags };
+        },
         async publication(did) {
             const response = await call(bases.memeplex, `/publications/${encodeURIComponent(did)}`);
 
