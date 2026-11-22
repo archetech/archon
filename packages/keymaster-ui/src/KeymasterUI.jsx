@@ -7865,6 +7865,7 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                             <GrantsPanel
                                 keymaster={keymaster}
                                 identity={currentId}
+                                did={currentDID}
                                 registries={registries}
                                 request={grantDID}
                                 showError={showError}

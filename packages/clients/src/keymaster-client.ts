@@ -1187,9 +1187,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async listAssets(): Promise<string[]> {
+    async listAssets(owner?: string): Promise<string[]> {
         try {
-            const response = await this.axios.get(`${this.API}/assets`);
+            const response = await this.axios.get(`${this.API}/assets`, owner ? { params: { owner } } : undefined);
             return response.data.assets;
         }
         catch (error) {

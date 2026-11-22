@@ -804,6 +804,15 @@ test('metric labels give every asset, and every grant, one label', () => {
     expect(metricLabel(`/api/v1/grants/${encodeURIComponent('clients/example')}`)).toBe('/api/v1/grants/:id');
 });
 
+test('the assets route lists the assets of the owner asked for, and of the current ID when none is', async () => {
+    const { app, keymaster } = mount();
+
+    expect((await request(app).get('/assets')).status).toBe(200);
+    expect((await request(app).get('/assets').query({ owner: 'Alice' })).status).toBe(200);
+    expect(keymaster.listAssets).toHaveBeenNthCalledWith(1, undefined);
+    expect(keymaster.listAssets).toHaveBeenNthCalledWith(2, 'Alice');
+});
+
 test('grant routes pass the request, its options and the owner', async () => {
     const { app, keymaster } = mount();
     const named = 'archon://auth?grant=did:cid:request';

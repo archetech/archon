@@ -1164,8 +1164,8 @@ def create_asset(data, options=None):
     return response["did"]
 
 
-def list_assets():
-    response = proxy_request("GET", f"{_keymaster_api}/assets")
+def list_assets(owner=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/assets", {"owner": owner}))
     return response["assets"]
 
 

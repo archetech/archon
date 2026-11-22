@@ -7,8 +7,9 @@ import GrantsView from '@didcid/wallet-ui/grants';
 // tests/wallet/ui-capability-parity.test.ts looks for it.
 //
 // `request` is a grant request to show for review: one named in the address
-// this client was opened at.
-export default function GrantsPanel({ keymaster, identity, registries, request, showError, showSuccess }) {
+// this client was opened at. `did` is the identity's DID, which a rename does
+// not change: the view keeps what it knows of an identity's revocations by it.
+export default function GrantsPanel({ keymaster, identity, did, registries, request, showError, showSuccess }) {
     const actions = useMemo(() => ({
         createAsset: (data, options) => keymaster.createAsset(data, options),
         listAssets: owner => keymaster.listAssets(owner),
@@ -20,9 +21,10 @@ export default function GrantsPanel({ keymaster, identity, registries, request, 
 
     return (
         <GrantsView
-            key={identity}
+            key={`${identity} ${did}`}
             keymaster={actions}
             identity={identity}
+            sessionKey={did || identity}
             registries={registries || []}
             request={request}
             notify={{ error: showError, success: showSuccess }}

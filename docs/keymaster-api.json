@@ -7247,7 +7247,18 @@
         }
       },
       "get": {
-        "summary": "List all asset DIDs owned by the current ID.",
+        "summary": "List all asset DIDs owned by an ID.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The ID name or DID whose assets to list. Defaults to the current ID."
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of asset DIDs.",

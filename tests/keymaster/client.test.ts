@@ -2157,6 +2157,17 @@ describe('listAssets', () => {
         expect(assets).toStrictEqual(mockAssets);
     });
 
+    it('should name the owner asked for', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.assets)
+            .query({ owner: 'Alice' })
+            .reply(200, { assets: mockAssets });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.listAssets('Alice')).toStrictEqual(mockAssets);
+    });
+
     it('should throw exception on listAssets server error', async () => {
         nock(KeymasterURL)
             .get(Endpoints.assets)
