@@ -415,7 +415,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                     <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>
                     <label className="inline">
                         Tag
-                        <input value={word} onChange={event => setWord(event.target.value)} placeholder="a word" />
+                        <input value={word} disabled={busy} onChange={event => setWord(event.target.value)} placeholder="a word" />
                     </label>
                     <button
                         className="quiet"

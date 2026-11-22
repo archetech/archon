@@ -71,7 +71,7 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 .post.waiting { border-style: dashed; }
 
 .respond { margin: 0.25rem 0 0.75rem; }
-.respond .tag { white-space: nowrap; }
+.respond .tag { overflow-wrap: anywhere; }
 label.inline { display: inline-block; margin: 0 0.25rem; }
 label.inline input { display: inline-block; width: 8rem; margin: 0 0 0 0.25rem; padding: 0.2rem 0.4rem; }
 
