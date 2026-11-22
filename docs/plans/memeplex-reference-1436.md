@@ -873,9 +873,12 @@ still publish.
 
 IPFS content is available only while someone pins it.
 `ARCHON_GATEKEEPER_REGISTRIES_PIN` pins operation JSON, not the article, PDF or
-image bytes referenced by an operation. Publishers, indexers or pinning services
-must pin those separately. A reviewer who needs the assessed content to survive
-retains its CID and pins it. Long-term preservation remains an open question.
+image bytes referenced by an operation. Those are pinned separately, and **the
+client that publishes an object pins the content the object references**: it put
+the bytes on IPFS, for a user who has no node of their own to keep them. Memepool
+pins what it publishes, and how long it keeps them is that service's to say and to
+tell its users. An indexer or a pinning service may pin the same bytes as well. A
+reviewer who needs the assessed content to survive retains its CID and pins it.
 
 A valid publication can exceed a renderer's automatic-fetch budget or have missing
 content. Show an appropriate link or placeholder; neither condition grants or
@@ -970,12 +973,8 @@ until the verifier exists.
    - Opening a wallet from a link, and scanning one as a QR code. A wallet shows a
      revocation's state only until it is closed.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
-7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge.
+7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge. The service does not publish content by reference yet: when it does, for an article or a paper, it pins what it publishes (see Content availability).
 8. **Moderation:** block lists and labels.
-
-## Open question
-
-**Content availability.** Who pins long-form content and papers, and for how long?
 
 ## References
 
