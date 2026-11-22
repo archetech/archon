@@ -183,14 +183,37 @@ export class MemeplexClient {
         return found;
     }
 
+    // What `publish` would create for an object, or `edit` would write for the
+    // object `did`, refusing what they refuse and writing nothing. A client
+    // that has work to do before it publishes, such as storing an article's
+    // body, checks first, so that it does none of it for an object that would
+    // be refused.
+    async check(grant: UsableGrant, object: ObjectFields, did?: string): Promise<Record<string, unknown>> {
+        const memeplex = this.stated(grant, object);
+
+        if (did === undefined) {
+            if (!allows(grant, object.kind)) {
+                throw new MemeplexClientError('invalid', `the grant does not allow a ${object.kind}`);
+            }
+
+            return memeplex;
+        }
+
+        const created = await this.created(did);
+
+        for (const field of ['author', 'kind', 'grant', 'target']) {
+            if (created[field] !== memeplex[field]) {
+                throw new MemeplexClientError('invalid', `an edit cannot change an object's ${field}`);
+            }
+        }
+
+        return memeplex;
+    }
+
     // Publishes an object for the grant's user, on the grant's registry. Returns
     // the object's DID. The object is a publication once the chain anchors it.
     async publish(grant: UsableGrant, object: ObjectFields): Promise<string> {
-        const memeplex = this.stated(grant, object);
-
-        if (!allows(grant, object.kind)) {
-            throw new MemeplexClientError('invalid', `the grant does not allow a ${object.kind}`);
-        }
+        const memeplex = await this.check(grant, object);
 
         return this.keymaster.createAsset(
             { memeplex },
@@ -203,14 +226,7 @@ export class MemeplexClient {
     // changes one is not attributed, and neither is anything after it, so such
     // an edit is refused.
     async edit(did: string, grant: UsableGrant, object: ObjectFields): Promise<void> {
-        const memeplex = this.stated(grant, object);
-        const created = await this.created(did);
-
-        for (const field of ['author', 'kind', 'grant', 'target']) {
-            if (created[field] !== memeplex[field]) {
-                throw new MemeplexClientError('invalid', `an edit cannot change an object's ${field}`);
-            }
-        }
+        const memeplex = await this.check(grant, object, did);
 
         if (!await this.keymaster.mergeData(did, { memeplex })) {
             throw new MemeplexClientError('refused', 'the node did not accept the edit');

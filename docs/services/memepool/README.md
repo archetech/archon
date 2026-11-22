@@ -47,7 +47,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`, and for an article its `body`; returns its `did` |
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
-| `GET /objects/:did/content` | The body of an article the service published, as `text/markdown` |
+| `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
 
 The service states an object's `v`, `author` and `grant` itself, from the session
 and the grant, whatever the request carries.
@@ -67,8 +67,14 @@ service stores the content of what it publishes and takes none on trust.
   never saw and does not keep. An edit may send back the reference the entry already
   has, to leave its body as it is, or a new `body` to replace it.
 - **It reads the body of what it published, and no other.** `GET /objects/:did/content`
-  answers 404 for an entry that another client published: such an entry can refer to
-  anything, of any size.
+  answers 404 for an entry the service did not create: such an entry can refer to
+  anything, of any size. That includes one that was created elsewhere and then
+  transferred to the service, which an asset's owner can do to any identity. A reader
+  asks for the body of the version it is showing, with `versionId`, since the latest
+  version may be an edit that is not anchored yet.
+- **It stores a body only for an object it would publish.** The object is checked
+  first, with the grant's scope and what an edit may change, so that a request it
+  refuses leaves nothing pinned.
 - **It keeps what it stores.** Content stays on the node for as long as the node's
   IPFS keeps it. Withdrawing an article or replacing its body removes nothing: the
   entry's earlier versions still refer to the earlier body.

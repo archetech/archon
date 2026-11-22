@@ -47,7 +47,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         thread: vi.fn(async () => []),
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async () => undefined),
-        content: vi.fn(async (did: string) => state.bodies[did]),
+        content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
     };
 
     return { api, state };
@@ -870,7 +870,8 @@ describe('an article', () => {
         await user.click(await screen.findByRole('button', { name: 'Open' }));
 
         expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
-        expect(api.content).toHaveBeenCalledWith('did:cid:1');
+        // The body asked for is that of the version shown.
+        expect(api.content).toHaveBeenCalledWith('did:cid:1', 'op-did:cid:1');
         expect(screen.getByText('A summary.')).toBeTruthy();
     });
 
@@ -927,6 +928,38 @@ describe('an article', () => {
         await waitFor(() => expect(state.edited).toStrictEqual([{
             did: 'did:cid:1', object: { kind: 'post', title: 'On DIDs', body: `${BODY}More.` },
         }]));
+    });
+
+    it('reads the body again when another version is shown, and lets it be edited again', async () => {
+        const first = article('did:cid:1');
+        const { api, state } = services({ me: granted, timeline: [first] });
+        state.bodies['did:cid:1 op-did:cid:1'] = BODY;
+        state.bodies['did:cid:1 op-second'] = 'Rewritten.';
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        await user.clear(screen.getByLabelText('Summary'));
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        // Not anchored: the version shown is the one before, with its body.
+        expect(await screen.findByText('Your edit is waiting to be anchored.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+        expect(screen.getByText(/Every post is one\./)).toBeTruthy();
+
+        vi.mocked(api.publication).mockResolvedValue({
+            ...first, current: 1,
+            versions: [...first.versions, { opid: 'op-second', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } }],
+            memeplex: { ...first.memeplex!, summary: undefined, content: { cid: 'bafkreisecond', type: 'text/markdown', bytes: 10 } },
+        });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText('Rewritten.')).toBeTruthy();
+        await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
+        expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
     });
 
     it('cannot be changed here when the service does not hold its body', async () => {
@@ -1026,13 +1059,20 @@ describe('the services\' client', () => {
     });
 
     it('reads a body as text, and none when the service holds none', async () => {
-        const fetcher = (async (url: string) => (url === '/memepool/api/v1/objects/did%3Acid%3A1/content'
-            ? new Response('# On DIDs\n', { status: 200, headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
-            : new Response(JSON.stringify({ error: 'no body the service holds' }), { status: 404 }))) as unknown as typeof fetch;
+        const asked: string[] = [];
+        const fetcher = (async (url: string) => {
+            asked.push(url);
+
+            return url === '/memepool/api/v1/objects/did%3Acid%3A1/content'
+                ? new Response('# On DIDs\n', { status: 200, headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
+                : new Response(JSON.stringify({ error: 'no body the service holds' }), { status: 404 });
+        }) as unknown as typeof fetch;
         const api = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
 
         expect(await api.content('did:cid:1')).toBe('# On DIDs\n');
         expect(await api.content('did:cid:2')).toBeUndefined();
+        expect(await api.content('did:cid:1', 'bafy version')).toBeUndefined();
+        expect(asked[2]).toBe('/memepool/api/v1/objects/did%3Acid%3A1/content?versionId=bafy%20version');
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

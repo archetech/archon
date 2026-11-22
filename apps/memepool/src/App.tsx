@@ -214,22 +214,30 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
 // What an object says. A short one says it in `text`. A longer one keeps its
 // words apart, under `content`, and a paper gives a `summary` of them. A post
 // with neither and a `target` is a boost of that object.
+// Which version of a publication is shown, as something to compare.
+const versionKey = (publication: Publication) => `${publication.current ?? 0} ${publication.versions[publication.current ?? 0]?.opid ?? ''}`;
+
+// The version of a publication that is shown: the last one attributed.
+const shownVersion = (publication: Publication) => publication.versions[publication.current ?? 0]?.opid;
+
 // The body of an article, which is kept apart from its entry. The service
-// holds the bodies of what it published, and no others.
-function Article({ api, did }: { api: Api; did: string }) {
+// holds the bodies of what it published, and no others. The body read is that
+// of the version shown, so that it goes with the title and summary beside it
+// and is read again when another version is shown.
+function Article({ api, did, version }: { api: Api; did: string; version?: string }) {
     const [body, setBody] = useState<{ text?: string; error?: string } | null>(null);
 
     useEffect(() => {
         let stale = false;
 
         setBody(null);
-        api.content(did).then(
+        api.content(did, version).then(
             text => { if (!stale) setBody({ text }); },
             failure => { if (!stale) setBody({ error: message(failure) }); },
         );
 
         return () => { stale = true; };
-    }, [api, did]);
+    }, [api, did, version]);
 
     if (!body) {
         return <p className="muted">Reading the full text.</p>;
@@ -245,14 +253,14 @@ function Article({ api, did }: { api: Api; did: string }) {
 }
 
 // `full` shows the body of an article, where a list shows its summary alone.
-function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string } }) {
+function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string; version?: string } }) {
     const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
     const article = object.text === undefined && object.content !== undefined;
 
     return (
         <>
             {words && <p className={article ? 'text summary' : 'text'}>{words}</p>}
-            {article && (full ? <Article api={full.api} did={full.did} /> : <p className="muted">Open it to read the full text.</p>)}
+            {article && (full ? <Article api={full.api} did={full.did} version={full.version} /> : <p className="muted">Open it to read the full text.</p>)}
             {!words && !article && object.target && (
                 <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
             )}
@@ -274,7 +282,7 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
                 <time>{when(publication)}</time>
             </header>
             {object.title && <h3>{object.title}</h3>}
-            <Body object={object} full={full && publication.did ? { api: full, did: publication.did } : undefined} />
+            <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
             <footer>
                 {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
@@ -548,7 +556,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
 
 // The reader's own post or reply, being rewritten. Its kind and what it answers
 // stay as they are: an edit that changed them would not be the same object.
-function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: string) => void }) {
+function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: boolean) => void }) {
     const object = publication.memeplex!;
     const article = object.text === undefined && object.content !== undefined;
     const [text, setText] = useState(object.text ?? '');
@@ -567,7 +575,7 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
         let stale = false;
 
-        api.content(publication.did!).then(
+        api.content(publication.did!, shownVersion(publication)).then(
             read => {
                 if (stale) {
                     return;
@@ -583,6 +591,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
         );
 
         return () => { stale = true; };
+        // The body is that of the version the editor was opened on.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [api, article, publication.did]);
 
     const save = async () => {
@@ -594,7 +604,7 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
             void _v; void _author; void _grant;
             if (!article) {
                 await api.edit(publication.did!, { ...fields, text: text.trim() });
-                onDone(text.trim());
+                onDone(true);
                 return;
             }
 
@@ -609,7 +619,7 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                 ...(summary.trim() ? { summary: summary.trim() } : {}),
                 ...(body === held ? { content } : { body }),
             });
-            onDone(title.trim());
+            onDone(true);
         }
         catch (failure) {
             setError(message(failure));
@@ -661,7 +671,8 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
     const [editing, setEditing] = useState(false);
-    // The text of an edit that its chain has not anchored yet.
+    // The version an edit was made of, while its chain has not anchored the
+    // edit: the edit is anchored once another version is the one shown.
     const [edited, setEdited] = useState<string | undefined>(undefined);
     const [replies, setReplies] = useState<Reply[] | null>(null);
     const [error, setError] = useState('');
@@ -677,7 +688,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                 setReplies(thread);
                 if (latest) {
                     setRoot(latest);
-                    setEdited(text => (latest.memeplex?.text === text ? undefined : text));
+                    setEdited(of => (of !== undefined && versionKey(latest) !== of ? undefined : of));
                 }
                 setError('');
             }
@@ -714,7 +725,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
-            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); setEdited(saved); }} />}
+            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); if (saved) setEdited(versionKey(root)); }} />}
             {edited !== undefined && <p className="muted">Your edit is waiting to be anchored.</p>}
             <Respond api={api} me={me} grants={grants} target={root} />
             {error && <p role="alert" className="error">{error}</p>}

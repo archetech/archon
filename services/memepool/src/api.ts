@@ -16,7 +16,7 @@ import type { MemeplexClient, ObjectFields, UsableGrant } from '@didcid/memeplex
 export interface LoginKeymaster {
     createChallenge(challenge?: Record<string, unknown>): Promise<string>;
     verifyResponse(response: string, options?: { retries?: number }): Promise<{ challenge: string; match: boolean; responder?: string }>;
-    resolveDID(did: string): Promise<{
+    resolveDID(did: string, options?: { versionSequence?: number; versionId?: string }): Promise<{
         didDocument?: { controller?: string };
         didDocumentData?: unknown;
         didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean };
@@ -75,9 +75,15 @@ const ASKED = 'memepool_challenge';
 const MAX_HELD = 10_000;
 // How long a session is shown one grant request, which is valid for an hour.
 const REQUEST_REUSE = 50 * 60_000;
-// The largest body the service stores, in bytes of UTF-8. It arrives in a JSON
-// request, which the service takes up to 256 kB of.
+// The largest body the service stores, in bytes of UTF-8.
 export const BODY_LIMIT = 200_000;
+// The largest request that publishes or changes an object. A body arrives as a
+// JSON string, in which one byte can be written as six (`\u000a`), beside the
+// object's other fields.
+const OBJECT_REQUEST_LIMIT = BODY_LIMIT * 6 + 256 * 1024;
+// What stands for the reference to a body while the object is checked, before
+// the body is stored.
+const UNSTORED = 'bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 // The kinds that have a body, and the members of an object that refer to
 // content by its CID.
 const BODY_KINDS = ['post', 'paper'];
@@ -171,7 +177,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const sessions = new Expiring<string>(options.sessionLifetime ?? 24 * 60 * 60_000, now);
     const router = express.Router();
 
-    router.use(express.json({ limit: '256kb' }));
+    // An object may carry an article's body. Nothing else the service is sent
+    // is large.
+    const small = express.json({ limit: '256kb' });
+    const large = express.json({ limit: OBJECT_REQUEST_LIMIT });
+
+    router.use((req, res, next) => (req.path === '/objects' || req.path.startsWith('/objects/') ? large : small)(req, res, next));
 
     router.get('/ready', (_req, res) => {
         res.json(true);
@@ -545,16 +556,33 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     const fields = (req: Request) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
 
-    // The object as its latest version states it, or nothing for a DID that
-    // holds no object.
-    const objectOf = async (did: string): Promise<{ controller?: string; memeplex: Record<string, any> } | undefined> => {
-        const doc = await keymaster.resolveDID(did);
+    const memeplexOf = (doc: Awaited<ReturnType<LoginKeymaster['resolveDID']>>): Record<string, any> | undefined => {
         const data = doc.didDocumentData;
         const memeplex = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>).memeplex : undefined;
 
         return memeplex && typeof memeplex === 'object' && !Array.isArray(memeplex) && !doc.didDocumentMetadata?.deactivated
-            ? { controller: doc.didDocument?.controller, memeplex: memeplex as Record<string, any> }
+            ? memeplex as Record<string, any>
             : undefined;
+    };
+
+    // An object the service published, as a version of it states it: the
+    // latest, or the one named. Nothing for a DID that is no such object.
+    //
+    // The service published an object it created and still controls. An asset
+    // can be transferred to any identity, which signs nothing, so one the
+    // service controls and did not create is someone else's: what it refers to
+    // was never stored here, and can be anything. Only its controller can
+    // change an asset, so every version of one the service created and still
+    // has is the service's own.
+    const publishedHere = async (did: string, versionId?: string): Promise<Record<string, any> | undefined> => {
+        const own = await client.did();
+        const [first, latest] = await Promise.all([keymaster.resolveDID(did, { versionSequence: 1 }), keymaster.resolveDID(did)]);
+
+        if (first.didDocument?.controller !== own || latest.didDocument?.controller !== own) {
+            return undefined;
+        }
+
+        return memeplexOf(versionId ? await keymaster.resolveDID(did, { versionId }) : latest);
     };
 
     // What is published for a request: its fields, with a `body` stored and
@@ -563,9 +591,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // The service pins the content of what it publishes, so it takes no
     // reference to bytes it did not store. An edit may keep a reference the
     // object already has, which is to content the service stored before.
-    const stating = async (req: Request, did?: string): Promise<ObjectFields> => {
+    //
+    // A body is stored only for an object that would be published: what is
+    // stored is pinned, and nothing unpins it.
+    const stating = async (req: Request, grant: UsableGrant, did?: string): Promise<ObjectFields> => {
         const { body, ...stated } = fields(req) as ObjectFields & { body?: unknown };
-        const held = did ? (await objectOf(did))?.memeplex : undefined;
+        const held = did ? await publishedHere(did).catch(() => undefined) : undefined;
 
         for (const reference of REFERENCES) {
             if (reference in stated && JSON.stringify(stated[reference]) !== JSON.stringify(held?.[reference])) {
@@ -591,39 +622,43 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             throw new MemeplexClientError('invalid', `a body may be ${BODY_LIMIT} bytes, and this is ${bytes}`);
         }
 
+        await client.check(grant, { ...stated, content: { cid: UNSTORED, type: 'text/markdown', bytes } }, did);
+
         return { ...stated, content: { cid: await content.add(body), type: 'text/markdown', bytes } };
     };
 
-    router.post('/objects', publishing(async (req, grant) => ({ did: await client.publish(grant, await stating(req)) })));
+    router.post('/objects', publishing(async (req, grant) => ({ did: await client.publish(grant, await stating(req, grant)) })));
 
     router.put('/objects/:did', publishing(async (req, grant) => {
         const did = String(req.params.did);
 
-        await client.edit(did, grant, await stating(req, did));
+        await client.edit(did, grant, await stating(req, grant, did));
         return true;
     }, req => String(req.params.did)));
 
     // The body of an article the service published, which is content it
     // stored. It reads no other: a reference in an object someone else made
-    // can be to anything, of any size.
+    // can be to anything, of any size. `versionId` names the version whose body
+    // is wanted, which is how a reader gets the body of the version it shows.
     router.get('/objects/:did/content', async (req, res) => {
-        const object = content ? await objectOf(String(req.params.did)).catch(() => undefined) : undefined;
-        const reference = object?.memeplex.content;
+        const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
+        const object = content ? await publishedHere(String(req.params.did), versionId).catch(() => undefined) : undefined;
+        const reference = object?.content;
 
-        if (!content || !object || object.controller !== await client.did()
-            || typeof reference?.cid !== 'string' || reference.type !== 'text/markdown') {
+        if (!content || typeof reference?.cid !== 'string' || reference.type !== 'text/markdown'
+            || !Number.isSafeInteger(reference.bytes) || reference.bytes > BODY_LIMIT) {
             res.status(404).json({ error: 'no body the service holds' });
             return;
         }
 
         try {
-            // Text a user wrote, served from the pages' own origin: a browser
-            // is told what it is and not to take it for anything else.
             const text = await content.get(reference.cid);
 
             if (typeof text !== 'string') {
                 throw new Error('the node has no such content');
             }
+            // Text a user wrote, served from the pages' own origin: a browser
+            // is told what it is and not to take it for anything else.
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.type('text/markdown; charset=utf-8').send(text);
         }
