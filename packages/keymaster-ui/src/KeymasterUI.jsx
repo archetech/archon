@@ -1,5 +1,6 @@
 import DIDRepairDialog from '@didcid/wallet-ui/did-repair';
 import CashuPanel from './CashuPanel.jsx';
+import GrantsPanel from './GrantsPanel.jsx';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
@@ -184,7 +185,7 @@ function formatAddedDate(value) {
     return value.slice(0, 10);
 }
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, hasCashu, serverUrl, onServerUrlChange }) {
+function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload, hasLightning, hasDidComm, hasCashu, serverUrl, onServerUrlChange }) {
     const [repairTarget, setRepairTarget] = useState(null);
     const checkDID = useCallback(did => keymaster.checkDID(did), [keymaster]);
     const repairDID = useCallback(did => keymaster.repairDID(did), [keymaster]);
@@ -395,6 +396,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [identityNameError, setIdentityNameError] = useState('');
 
     const [lightningTab, setLightningTab] = useState('wallet');
+    // What a service asks of an identity: to sign in, or to grant a client. A
+    // grant request named in the address opens on the grants.
+    const [authTab, setAuthTab] = useState(grantDID ? 'grants' : 'sign-in');
     const [lightningBalance, setLightningBalance] = useState(null);
     const [lightningIsConfigured, setLightningIsConfigured] = useState(null);
     const [lightningWalletError, setLightningWalletError] = useState(null);
@@ -1164,7 +1168,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 await refreshIssued();
                 await refreshDmail();
 
-                setTab('identity');
+                setTab(grantDID ? 'auth' : 'identity');
                 setAssetsTab('schemas');
                 setCredentialTab('held');
                 setDmailTab('inbox');
@@ -7845,7 +7849,30 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             </Grid>
                         </Grid>
                     }
-                    {tab === 'auth' &&
+                    {tab === 'auth' && !widget &&
+                        <Tabs
+                            value={authTab}
+                            onChange={(event, newTab) => setAuthTab(newTab)}
+                            aria-label="Authentication and grants"
+                            sx={{ borderBottom: 1, borderColor: 'divider', mt: 1 }}
+                        >
+                            <Tab value="sign-in" label="Sign in" />
+                            <Tab value="grants" label="Grants" />
+                        </Tabs>
+                    }
+                    {tab === 'auth' && !widget && authTab === 'grants' &&
+                        <Box sx={{ mt: 2, maxWidth: 800 }}>
+                            <GrantsPanel
+                                keymaster={keymaster}
+                                identity={currentId}
+                                registries={registries}
+                                request={grantDID}
+                                showError={showError}
+                                showSuccess={showSuccess}
+                            />
+                        </Box>
+                    }
+                    {tab === 'auth' && (widget || authTab === 'sign-in') &&
                         <Box>
                             <Table style={{ width: '800px' }}>
                                 <TableBody>

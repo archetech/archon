@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./did-repair": "./src/components/DIDRepairDialog.tsx",
-    "./cashu": "./src/components/CashuView.tsx"
+    "./cashu": "./src/components/CashuView.tsx",
+    "./grants": "./src/components/GrantsView.tsx"
   },
   "peerDependencies": {
     "@gandlaf21/bc-ur": "^1.1.12",

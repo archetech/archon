@@ -79,6 +79,15 @@ by `CashuPanel` in `@didcid/keymaster-ui`. Like the repair dialog, it imports on
 React/MUI, `qrcode.react` and type-only client contracts. The host supplies the
 Keymaster methods and its own notifications, and keys the view by identity.
 
+## Shared grants view
+
+`@didcid/wallet-ui/grants` exports `GrantsView`, the Grants section of the wallets'
+Auth tab, used by `GrantsTab` in the wallets and by `GrantsPanel` in
+`@didcid/keymaster-ui`. It reads a request and a grant with the helpers in
+`@didcid/keymaster/grant`, which hold no key and reach no node, and is handed the
+Keymaster methods it calls and its host's notifications. The host keys it by
+identity.
+
 ## Shared DID repair dialog
 
 `@didcid/wallet-ui/did-repair` exports the standalone `DIDRepairDialog` used by

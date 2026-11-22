@@ -32,6 +32,7 @@ export default mergeConfig(viteConfig, defineConfig({
             // here, imports these entry points of it.
             { find: '@didcid/wallet-ui/did-repair', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/DIDRepairDialog.tsx') },
             { find: '@didcid/wallet-ui/cashu', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/CashuView.tsx') },
+            { find: '@didcid/wallet-ui/grants', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/GrantsView.tsx') },
         ],
     },
     test: {
