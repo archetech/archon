@@ -62,7 +62,7 @@ beforeEach(async () => {
 });
 
 it('publishes, edits and withdraws under a grant, with a Keymaster\'s own operations', async () => {
-    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid } }, { registry: REGISTRY });
     await anchor(100);
 
     const post = { v: 1, kind: 'post', author: userDid, grant, text: 'Every post is a DID.' };
@@ -83,7 +83,7 @@ it('publishes, edits and withdraws under a grant, with a Keymaster\'s own operat
 }, 60_000);
 
 it('reads a Keymaster\'s update of a grant as a scope update, and its revocation as the end', async () => {
-    const scope = { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' };
+    const scope = { v: 1, client: clientDid };
     const grant = await user.createAsset({ memeplexGrant: scope }, { registry: REGISTRY });
     await anchor(100);
 
@@ -122,7 +122,7 @@ it('reads a Keymaster\'s update of a grant as a scope update, and its revocation
 // What the command line's update does: resolve the document, change it, and send
 // all of it back.
 it('reads an update that resends the whole resolved document as a scope update or an edit', async () => {
-    const scope = { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' };
+    const scope = { v: 1, client: clientDid };
     const grant = await user.createAsset({ memeplexGrant: scope }, { registry: REGISTRY });
     await anchor(100);
 
@@ -151,7 +151,7 @@ it('reads an update that resends the whole resolved document as a scope update o
 }, 60_000);
 
 it('attributes an edit that resends the whole resolved document', async () => {
-    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid } }, { registry: REGISTRY });
     await anchor(100);
 
     const post = { v: 1, kind: 'post', author: userDid, grant, text: 'First.' };
@@ -168,7 +168,7 @@ it('attributes an edit that resends the whole resolved document', async () => {
 }, 60_000);
 
 it('does not attribute what the user publishes directly, or what a client publishes in another\'s name', async () => {
-    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid } }, { registry: REGISTRY });
     await anchor(100);
 
     const direct = await user.createAsset({ memeplex: { v: 1, kind: 'post', author: userDid, grant, text: 'Mine.' } }, { registry: REGISTRY });
@@ -180,7 +180,7 @@ it('does not attribute what the user publishes directly, or what a client publis
 }, 60_000);
 
 it('ends attribution when the client transfers an object', async () => {
-    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid } }, { registry: REGISTRY });
     await anchor(100);
 
     const object = await client.createAsset({ memeplex: { v: 1, kind: 'post', author: userDid, grant, text: 'First.' } }, { registry: REGISTRY });

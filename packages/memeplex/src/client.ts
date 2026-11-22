@@ -2,7 +2,8 @@ import { attribute } from './attribution.js';
 import type { Publication } from './attribution.js';
 import { actionFor, readGrant } from './grant.js';
 import type { Grant, ResolvedVersion } from './grant.js';
-import { encodeGrantLink } from './grant-link.js';
+import { grantLink } from './grant-link.js';
+import { validateGrantRequest } from './validate.js';
 import { validateObject } from './validate.js';
 
 // What a Memeplex client does with a Keymaster that holds its identity and a
@@ -15,7 +16,7 @@ import { validateObject } from './validate.js';
 
 export interface ClientKeymaster {
     resolveDID(id: string): Promise<{ didDocument?: { id?: string } }>;
-    createAsset(data: unknown, options?: { registry?: string; controller?: string }): Promise<string>;
+    createAsset(data: unknown, options?: { registry?: string; controller?: string; validUntil?: string }): Promise<string>;
     mergeData(did: string, data: Record<string, unknown>): Promise<boolean>;
     revokeDID(did: string): Promise<boolean>;
 }
@@ -27,10 +28,8 @@ export interface ClientGatekeeper {
 
 export interface GrantRequest {
     v: 1;
-    client: string;
     name: string;
     actions?: string[];
-    nonce: string;
     expiresAt?: string;
     // The permitted registries the client can publish on.
     registries: string[];
@@ -81,17 +80,10 @@ export class MemeplexClientError extends Error {
 // How many histories are asked of a Gatekeeper at once.
 const BATCH = 100;
 
-// At least 128 random bits, base64url without padding.
-function nonce(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    let binary = '';
-
-    for (const byte of bytes) {
-        binary += String.fromCharCode(byte);
-    }
-
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
+// Where a grant request is made, and how long it stays valid. A request is not
+// a publication: it need not be on a chain, and a wallet reads it once.
+const REQUEST_REGISTRY = 'hyperswarm';
+const REQUEST_LIFETIME = 60 * 60_000;
 
 export class MemeplexClient {
     private readonly keymaster: ClientKeymaster;
@@ -117,43 +109,59 @@ export class MemeplexClient {
         return did;
     }
 
-    // A request for a grant, and the link that presents it to a wallet. The
-    // client keeps the request: its nonce is how it recognizes the grant.
+    // Asks for a grant: creates the request, an asset of the client's that a
+    // wallet resolves, and gives its DID and the link that presents it. A grant
+    // that answers it names that DID.
     //
     // `registries` are those this client's node supports. A grant made on
     // another could not be published under.
-    async requestGrant(asked: { name: string; registries: string[]; actions?: string[]; expiresAt?: string }): Promise<{ request: GrantRequest; link: string }> {
+    //
+    // The request is made as a challenge is: on hyperswarm and valid for an
+    // hour, unless `options` say otherwise.
+    async requestGrant(
+        asked: { name: string; registries: string[]; actions?: string[]; expiresAt?: string },
+        options: { registry?: string; validUntil?: string } = {},
+    ): Promise<{ did: string; request: GrantRequest; link: string }> {
         const request: GrantRequest = {
             v: 1,
-            client: await this.did(),
             name: asked.name,
             ...(asked.actions ? { actions: asked.actions } : {}),
-            nonce: nonce(),
             ...(asked.expiresAt ? { expiresAt: asked.expiresAt } : {}),
             registries: asked.registries,
         };
+        const validity = validateGrantRequest(request);
 
-        return { request, link: encodeGrantLink(request as unknown as Record<string, unknown>) };
+        if (validity !== 'valid') {
+            throw new MemeplexClientError('invalid', `not a valid grant request: ${validity}`);
+        }
+
+        const did = await this.keymaster.createAsset({ memeplexGrantRequest: request }, {
+            registry: options.registry ?? REQUEST_REGISTRY,
+            validUntil: options.validUntil ?? new Date(Date.now() + REQUEST_LIFETIME).toISOString(),
+            controller: this.identity,
+        });
+
+        return { did, request, link: grantLink(did) };
     }
 
-    // The grants that answer a request: those naming this client and carrying
-    // the request's nonce, each as the verifier reads it. Anyone who saw the
-    // request can create one, so there may be several, from different users;
-    // the client shows whose each is and lets its user choose.
-    async findGrants(request: Pick<GrantRequest, 'client' | 'nonce'>): Promise<FoundGrant[]> {
-        return this.grantsNaming(request.client, created => created.memeplexGrant?.nonce === request.nonce);
+    // The grants that answer a request: those naming this client and the
+    // request's DID, each as the verifier reads it. Anyone who saw the request
+    // can create one, so there may be several, from different users; the
+    // client shows whose each is and lets its user choose.
+    async findGrants(request: string): Promise<FoundGrant[]> {
+        return this.grantsNaming(await this.did(), created => created.memeplexGrant?.request === request);
     }
 
     // The grants a user has made to this client, whatever request they answer.
     // A client that knows who its user is, because the user signed in to it,
-    // needs no nonce to tell that user's grants from another's.
+    // needs no request to tell that user's grants from another's.
     async grantsFrom(user: string): Promise<FoundGrant[]> {
         return this.grantsNaming(await this.did(), created => created.controller === user);
     }
 
     private async grantsNaming(
         client: string,
-        wanted: (created: { controller?: string; memeplexGrant?: { nonce?: unknown } }) => boolean,
+        wanted: (created: { controller?: string; memeplexGrant?: { request?: unknown } }) => boolean,
     ): Promise<FoundGrant[]> {
         const dids = await this.gatekeeper.queryDocs({ 'memeplexGrant.client': { $in: [client] } });
         const found: FoundGrant[] = [];
@@ -163,7 +171,7 @@ export class MemeplexClient {
             const histories = await this.gatekeeper.resolveVersions(batch);
 
             histories.forEach((history, index) => {
-                const data = history[0]?.didDocumentData as { memeplexGrant?: { client?: unknown; nonce?: unknown } } | undefined;
+                const data = history[0]?.didDocumentData as { memeplexGrant?: { client?: unknown; request?: unknown } } | undefined;
 
                 if (data?.memeplexGrant?.client === client
                     && wanted({ controller: history[0].didDocument?.controller, memeplexGrant: data.memeplexGrant })) {
@@ -289,7 +297,7 @@ export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableG
 }
 
 // The grant to publish under, when exactly one of those found is live. Grants
-// found by a request's nonce can be from different users, and a client does not
+// found by a request can be from different users, and a client does not
 // choose between users.
 export function usable(found: FoundGrant[], now: Date = new Date()): UsableGrant | undefined {
     const live = liveGrants(found, now);

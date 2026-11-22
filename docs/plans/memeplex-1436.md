@@ -78,15 +78,16 @@ authorization:
   "memeplexGrant": {
     "v": 1,
     "client": "did:cid:…client",
-    "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
+    "request": "did:cid:…request",
+    "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"]
   }
 }
 ```
 
 The named client must differ from the user. A grant created by someone else and
 later transferred to the user confers no authority. The grant's schema applies;
-`nonce` correlates a request and carries no authority.
+`request` is the DID of the grant request it answers, when it answers one, and
+carries no authority.
 
 | Action | Kinds it permits |
 |---|---|

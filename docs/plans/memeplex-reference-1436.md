@@ -149,7 +149,6 @@ and grants, valid and invalid, each with the outcome these rules give it.
     ]
   },
   "actions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/action"}},
-  "nonce": {"type": "string", "minLength": 22, "pattern": "^[A-Za-z0-9_-]+$"},
   "expiresAt": {
     "type": "string",
     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
@@ -328,8 +327,8 @@ ignored, as the strictness rule requires.
   "properties": {
     "v": {"const": 1},
     "client": {"$ref": "#/$defs/did"},
+    "request": {"$ref": "#/$defs/did"},
     "actions": {"$ref": "#/$defs/actions"},
-    "nonce": {"$ref": "#/$defs/nonce"},
     "expiresAt": {"$ref": "#/$defs/expiresAt"}
   }
 }
@@ -341,13 +340,11 @@ ignored, as the strictness rule requires.
 {
   "title": "Memeplex grant request",
   "type": "object",
-  "required": ["v", "client", "name", "nonce", "registries"],
+  "required": ["v", "name", "registries"],
   "properties": {
     "v": {"const": 1},
-    "client": {"$ref": "#/$defs/did"},
     "name": {"type": "string", "minLength": 1, "maxLength": 100},
     "actions": {"$ref": "#/$defs/actions"},
-    "nonce": {"$ref": "#/$defs/nonce"},
     "expiresAt": {"$ref": "#/$defs/expiresAt"},
     "registries": {"type": "array", "minItems": 1, "uniqueItems": true,
                    "items": {"enum": ["BTC:mainnet", "ZEC:mainnet", "ETH:mainnet", "SOL:mainnet-beta"]}}
@@ -717,16 +714,20 @@ cutoff, even though Archon supports historical resolution by time.
 
 ## Grant request flow
 
-1. The client creates its agent DID and a **grant request**:
+1. The client creates its agent DID and a **grant request**: an asset, as a
+   challenge is an asset, whose data is the request.
 
    ```jsonc
    { "memeplexGrantRequest": { "v": 1,
-                               "client": "did:cid:…client",
                                "name": "Memepool",
                                "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-                               "registries": ["BTC:mainnet", "ZEC:mainnet"],
-                               "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz" } }
+                               "registries": ["BTC:mainnet", "ZEC:mainnet"] } }
    ```
+
+   Nothing in the request names the client: **the client is the request's
+   controller**, which created and signed it. A request is not a publication, so it
+   is made where a challenge is, on `hyperswarm`, and may carry `validUntil`; the
+   reference client's lasts an hour.
 
    `registries` lists the permitted registries the client can publish on: those its
    own node supports. A client publishes every object on its grant's registry, so a
@@ -734,37 +735,41 @@ cutoff, even though Archon supports historical resolution by time.
    would have paid to anchor it. Every request lists at least one: a client that can
    publish on all four says so.
 
-   `nonce` is at least 128 random bits, base64url-encoded. The client presents the
-   request as a **grant link**, following the `archon://` deep links Archon wallets
-   already handle (`archon://auth?challenge=…`, `archon://accept?credential=…`):
+   The client presents the request as a **grant link**, following the `archon://`
+   deep links Archon wallets already handle (`archon://auth?challenge=…`,
+   `archon://accept?credential=…`):
 
    ```text
-   archon://grant?request=<base64url(request JSON)>
+   archon://grant?request=<DID of the request>
    ```
 
-   - `request` is the UTF-8 JSON above, base64url-encoded without padding. The whole
-     link is at most 2,048 characters, which keeps it scannable as a QR code; a
-     typical request is about 330.
    - The client shows the link as a QR code for a wallet on another device, as a
      clickable link for a wallet on the same device (the browser extension or the
-     mobile app), and as copyable text that the wallet accepts when pasted.
-   - The request travels inline, so presenting it needs no network call and creates
-     no DID. The wallet sends nothing back: the client finds the grant by query (step
-     3).
-   - A wallet rejects a link whose `request` does not decode, does not match the grant
-     request schema, or is longer than the limit, and creates no grant.
-2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
+     mobile app), and as copyable text that the wallet accepts when pasted. A wallet
+     also accepts the DID alone.
+   - The wallet sends nothing back: the client finds the grant by query (step 3).
+2. The wallet resolves the request and reads who is asking from it. It creates no
+   grant, and says why, when the request cannot be resolved, is deleted, is not an
+   asset, does not match the grant request schema, or **is not at its first
+   version**. Only the first version is the one its controller signed with these
+   contents: an asset's owner can replace its contents and transfer it to an identity
+   that signed nothing, so the controller of a later version is not evidence of who
+   asked.
+
+   The wallet shows the client DID, the claimed `name` (labelled as the client's own
    claim) and the requested scope: the listed actions, or every core kind when the
    request has no `actions`. The user approves it or a narrower subset and picks a
-   registry from those the request lists that the wallet's own node supports. With none of those, the wallet creates no
-   grant and says why. Otherwise it creates the grant there with that scope and the
-   request's `client` and `nonce`. The grant does not carry `registries`.
+   registry from those the request lists that the wallet's own node supports. With
+   none of those, the wallet creates no grant and says why. Otherwise it creates the
+   grant there with that scope, the request's controller as `client` and the
+   request's DID as `request`. The grant does not carry `registries`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see
-   Discovery queries), keeps the one carrying its nonce, waits until it is anchored,
-   and checks the grant against the core authorization rules. The grant's creator
-   is the user. Anyone who saw the request could create
-   a grant with the same nonce from a different DID, so the client shows the user's
-   identity and asks for confirmation before publishing.
+   Discovery queries), keeps the one whose `request` is its request, waits until it
+   is anchored, and checks the grant against the core authorization rules. The
+   grant's creator is the user. Anyone who saw the request could create a grant
+   naming it from a different DID, so the client shows the user's identity and asks
+   for confirmation before publishing. A client that knows its user, because the
+   user signed in to it, finds that user's grants by who created them.
 4. The client names the grant's DID as `memeplex.grant` in every object it publishes
    for that user, and creates each object on the grant's registry. Its Gatekeeper
    must support that registry.
@@ -961,7 +966,7 @@ until the verifier exists.
 4. **CLI client:** create an agent DID as the client, grant it from the user's
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
-5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link; `@didcid/memeplex` encodes and decodes the link. Still to do:
+5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link, resolves the request it names and reads it with `@didcid/memeplex` (`parseGrantLink`, `readGrantRequest`). Still to do:
    - Opening a wallet from a link, and scanning one as a QR code. A wallet shows a
      revocation's state only until it is closed.
    - **Grants from the command line, for agents.** An agent acts through the CLI and

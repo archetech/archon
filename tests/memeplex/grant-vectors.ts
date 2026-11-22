@@ -123,7 +123,8 @@ export async function build(): Promise<{ description: string; registry: string; 
     const client = await agent(0x22);
     const other = await agent(0x23);
     const agents = [user, client, other];
-    const nonce = Buffer.from(new Uint8Array(18).fill(7)).toString('base64url');
+    // The request each grant answers. A letter after it makes each grant its own.
+    const request = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequestre';
     const cases: GrantCase[] = [];
 
     // A proof time just before the block that anchors the operation.
@@ -158,7 +159,7 @@ export async function build(): Promise<{ description: string; registry: string; 
         return operations;
     };
 
-    const grant = { v: 1, client: client.did, nonce };
+    const grant = { v: 1, client: client.did, request };
     const add = async (name: string, steps: Step[], expect: Grant, probes: Probe[] = []) => {
         const { did, history } = await exported(agents, steps);
         cases.push({ name, did, history, expect, probes });
@@ -184,13 +185,13 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // Not anchored yet.
     {
-        const [made] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}a` } }));
+        const [made] = await chain(create({ memeplexGrant: { ...grant, request: `${request}a` } }));
         await add('creation not anchored', [{ operation: made }],
             { status: 'pending', user: user.did, client: client.did, registry: REGISTRY });
     }
     // Revoked.
     {
-        const [made, gone] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}b` } }, user, {}, 100),
+        const [made, gone] = await chain(create({ memeplexGrant: { ...grant, request: `${request}b` } }, user, {}, 100),
             previous => revoke(previous, 200));
         await add('revoked', [{ operation: made, block: 100 }, { operation: gone, block: 200 }],
             valid([{ block: 100 }], { ended: 200 }),
@@ -198,14 +199,14 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // A revocation that is not anchored has no effect yet.
     {
-        const [made, gone] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}c` } }, user, {}, 100),
+        const [made, gone] = await chain(create({ memeplexGrant: { ...grant, request: `${request}c` } }, user, {}, 100),
             previous => revoke(previous));
         await add('revocation not anchored', [{ operation: made, block: 100 }, { operation: gone }],
             valid([{ block: 100 }], { pending: 1 }), [at(150, 'permitted'), at(9000, 'permitted')]);
     }
     // Scope narrowed, then widened again.
     {
-        const scoped = { ...grant, nonce: `${nonce}d` };
+        const scoped = { ...grant, request: `${request}d` };
         const [made, narrowed, widened] = await chain(create({ memeplexGrant: scoped }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...scoped, actions: ['memeplex:tag'] } } }, 200),
             previous => update(previous, { didDocumentData: { memeplexGrant: scoped } }, 300));
@@ -221,7 +222,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // Expiry, set at creation and then extended.
     {
-        const expiring = { ...grant, nonce: `${nonce}e`, expiresAt: blockTime(200) };
+        const expiring = { ...grant, request: `${request}e`, expiresAt: blockTime(200) };
         const [made, extended] = await chain(create({ memeplexGrant: expiring }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...expiring, expiresAt: blockTime(400) } } }, 150));
         await add('expiry extended',
@@ -230,35 +231,35 @@ export async function build(): Promise<{ description: string; registry: string; 
             [at(120, 'permitted'), at(199, 'permitted'), at(200, 'permitted'), at(399, 'permitted'), at(400, 'expired'), at(401, 'expired')]);
     }
     {
-        const expiring = { ...grant, nonce: `${nonce}f`, expiresAt: blockTime(200) };
+        const expiring = { ...grant, request: `${request}f`, expiresAt: blockTime(200) };
         const [made] = await chain(create({ memeplexGrant: expiring }, user, {}, 100));
         await add('expired', [{ operation: made, block: 100 }], valid([{ block: 100, expiresAt: blockTime(200) }]),
             [at(199, 'permitted'), at(200, 'expired'), at(201, 'expired'), { block: 150, time: blockTime(300), expect: 'expired' }]);
     }
     // Anything but a scope update ends the grant.
     {
-        const base = { ...grant, nonce: `${nonce}g` };
+        const base = { ...grant, request: `${request}g` };
         const [made, changed] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...base, client: other.did } } }, 200));
         await add('client changed', [{ operation: made, block: 100 }, { operation: changed, block: 200 }],
             valid([{ block: 100 }], { ended: 200 }), [at(199, 'permitted'), at(200, 'after-end')]);
     }
     {
-        const base = { ...grant, nonce: `${nonce}h` };
+        const base = { ...grant, request: `${request}h` };
         const [made, changed] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: base, note: 'added' } }, 200));
         await add('other data added', [{ operation: made, block: 100 }, { operation: changed, block: 200 }],
             valid([{ block: 100 }], { ended: 200 }));
     }
     {
-        const base = { ...grant, nonce: `${nonce}i` };
+        const base = { ...grant, request: `${request}i` };
         const [made, changed] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...base, actions: [] } } }, 200));
         await add('scope update that is not a valid grant', [{ operation: made, block: 100 }, { operation: changed, block: 200 }],
             valid([{ block: 100 }], { ended: 200 }));
     }
     {
-        const base = { ...grant, nonce: `${nonce}j` };
+        const base = { ...grant, request: `${request}j` };
         const [made, changed] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: {} }, 200));
         await add('grant removed from its data', [{ operation: made, block: 100 }, { operation: changed, block: 200 }],
@@ -266,7 +267,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // A scope update ends nothing, and one after the end is not read.
     {
-        const base = { ...grant, nonce: `${nonce}k` };
+        const base = { ...grant, request: `${request}k` };
         const [made, gone, late] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...base, client: other.did } } }, 200),
             previous => update(previous, { didDocumentData: { memeplexGrant: base } }, 300));
@@ -277,7 +278,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     // An update as a Keymaster writes it, with every component, is a scope update
     // when only the scope differs.
     {
-        const base = { ...grant, nonce: `${nonce}n` };
+        const base = { ...grant, request: `${request}n` };
         const made = create({ memeplexGrant: base }, user, {}, 100);
         const did = `did:cid:${await cid(made)}`;
         const whole = (data: Record<string, unknown>, document: Record<string, unknown> = {}) => ({
@@ -295,7 +296,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // A transfer ends the grant, to the client included.
     {
-        const base = { ...grant, nonce: `${nonce}o` };
+        const base = { ...grant, request: `${request}o` };
         const made = create({ memeplexGrant: base }, user, {}, 100);
         const did = `did:cid:${await cid(made)}`;
         const [, moved] = await chain(made, previous => update(previous, {
@@ -306,7 +307,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // So does a change of registry.
     {
-        const base = { ...grant, nonce: `${nonce}p` };
+        const base = { ...grant, request: `${request}p` };
         const [made, moved] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentRegistration: { version: 1, type: 'asset', registry: 'ZEC:mainnet' } }, 200));
         await add('registry changed', [{ operation: made, block: 100 }, { operation: moved, block: 200 }],
@@ -314,7 +315,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // A scope update that is not anchored changes nothing yet.
     {
-        const base = { ...grant, nonce: `${nonce}q` };
+        const base = { ...grant, request: `${request}q` };
         const [made, narrowed] = await chain(create({ memeplexGrant: base }, user, {}, 100),
             previous => update(previous, { didDocumentData: { memeplexGrant: { ...base, actions: ['memeplex:tag'] } } }));
         await add('scope update not anchored', [{ operation: made, block: 100 }, { operation: narrowed }],
@@ -322,7 +323,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
     // Created by someone else and handed to the user: the grant is the creator's.
     {
-        const made = create({ memeplexGrant: { ...grant, nonce: `${nonce}r` } }, other, {}, 100);
+        const made = create({ memeplexGrant: { ...grant, request: `${request}r` } }, other, {}, 100);
         const did = `did:cid:${await cid(made)}`;
         const [, moved] = await chain(made, previous => update(previous, {
             didDocument: { '@context': ['https://www.w3.org/ns/did/v1'], id: did, controller: user.did },
@@ -336,11 +337,11 @@ export async function build(): Promise<{ description: string; registry: string; 
         await add('names its own creator as client', [{ operation: made, block: 100 }], { status: 'void', reason: 'client-is-user' });
     }
     {
-        const [made] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}l` } }, user, { validUntil: '2099-01-01T00:00:00Z' }, 100));
+        const [made] = await chain(create({ memeplexGrant: { ...grant, request: `${request}l` } }, user, { validUntil: '2099-01-01T00:00:00Z' }, 100));
         await add('created with validUntil', [{ operation: made, block: 100 }], { status: 'void', reason: 'expires-by-registration' });
     }
     {
-        const [made] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}m` } }, user, { registry: 'BTC:signet' }, 100));
+        const [made] = await chain(create({ memeplexGrant: { ...grant, request: `${request}m` } }, user, { registry: 'BTC:signet' }, 100));
         await add('on a testnet', [{ operation: made, block: 100, registry: 'BTC:signet' }], { status: 'void', reason: 'registry' });
     }
     {

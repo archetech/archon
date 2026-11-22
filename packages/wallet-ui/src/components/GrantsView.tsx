@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { VerifiedUser } from "@mui/icons-material";
 import type { KeymasterInterface } from "@didcid/clients/keymaster-types";
-import { PERMITTED_REGISTRIES, decodeGrantLink, positionOn, validateGrant } from "@didcid/memeplex";
+import { PERMITTED_REGISTRIES, parseGrantLink, positionOn, readGrantRequest, validateGrant } from "@didcid/memeplex";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";
 
@@ -64,8 +64,8 @@ const ACTION_NAMES: Record<string, string> = {
 type GrantData = {
     v: 1;
     client: string;
+    request?: string;
     actions?: string[];
-    nonce?: string;
     expiresAt?: string;
     [other: string]: unknown;
 };
@@ -212,10 +212,12 @@ function isExpired(grant: GrantData): boolean {
 }
 
 const LINK_ERRORS: Record<string, string> = {
-    "not-a-grant-link": "This is not a grant link. A grant link begins with archon://grant?request=",
-    "too-long": "This grant link is longer than a wallet accepts.",
-    "undecodable": "This grant link's request cannot be read.",
-    "invalid-request": "This grant link does not carry a valid grant request.",
+    "not-a-grant-link": "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.",
+    "not-found": "This node cannot find the request this link names. A request lasts an hour: ask the client for a new link.",
+    "deactivated": "The request this link names was withdrawn.",
+    "not-an-asset": "This link does not name a grant request.",
+    "changed": "The request this link names was changed after it was made, so it does not say who is asking.",
+    "invalid-request": "This link does not name a valid grant request.",
 };
 
 const REVOCATION_TEXT: Record<RevocationState, string> = {
@@ -238,6 +240,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     // read failed, with what, and how many of its entries could not be read.
     const heldRead = useRef<{ error?: unknown; failed: boolean; unread: number }>({ failed: false, unread: 0 });
     const [link, setLink] = useState("");
+    const linkRef = useRef(link);
+    linkRef.current = link;
     const [request, setRequest] = useState<Record<string, any> | null>(null);
     const [linkError, setLinkError] = useState("");
     const [scope, setScope] = useState<Scope>(scopeOf(undefined, undefined));
@@ -450,20 +454,46 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         };
     }, [refresh, pollMs]);
 
-    function readLink() {
-        const decoded = decodeGrantLink(link.trim());
+    // The request a link names is an asset its client created. Who is asking
+    // is read from the request as the node resolves it.
+    async function readLink() {
+        const reading = link;
+        const did = parseGrantLink(reading);
 
-        if ("error" in decoded) {
+        if (!did) {
             setRequest(null);
-            setLinkError(LINK_ERRORS[decoded.error]);
+            setLinkError(LINK_ERRORS["not-a-grant-link"]);
             return;
         }
 
-        setLinkError("");
-        setRequest(decoded.request);
-        setScope(scopeOf(decoded.request.actions, decoded.request.expiresAt));
+        setBusy(true);
+        let read: ReturnType<typeof readGrantRequest>;
 
-        const listed: string[] = decoded.request.registries;
+        try {
+            read = readGrantRequest(await keymaster.resolveDID(did));
+        }
+        catch {
+            read = { error: "not-found" };
+        }
+        finally {
+            setBusy(false);
+        }
+        if (linkRef.current !== reading) {
+            return;
+        }
+        if ("error" in read) {
+            setRequest(null);
+            setLinkError(LINK_ERRORS[read.error]);
+            return;
+        }
+
+        const asked: Record<string, any> = { ...read.request, client: read.client, did: read.did };
+
+        setLinkError("");
+        setRequest(asked);
+        setScope(scopeOf(asked.actions, asked.expiresAt));
+
+        const listed: string[] = asked.registries;
         const choices = supported.filter(name => listed.includes(name));
 
         setRegistry(current => (choices.includes(current as typeof choices[number]) ? current : choices[0] ?? ""));
@@ -485,8 +515,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         const memeplexGrant: GrantData = {
             v: 1,
             client: request.client,
+            request: request.did,
             ...(actions ? { actions } : {}),
-            nonce: request.nonce,
             ...(expiresAt ? { expiresAt } : {}),
         };
 
@@ -501,7 +531,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 throw new Error("A local identity cannot make a grant: its assets cannot be created on a chain registry");
             }
             if (grantor.didDocument?.id === request.client) {
-                throw new Error("This request names this identity as the client. An identity cannot grant itself.");
+                throw new Error("This request is this identity's own. An identity cannot grant itself.");
             }
 
             await keymaster.createAsset({ memeplexGrant }, { registry, controller: identity });
@@ -646,7 +676,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                             helperText={linkError || "Paste the link the client shows."}
                             sx={{ flex: 1, minWidth: 240 }}
                         />
-                        <Button variant="contained" onClick={readLink} disabled={!link.trim()}>
+                        <Button variant="contained" onClick={readLink} disabled={busy || !link.trim()}>
                             Review
                         </Button>
                     </Box>

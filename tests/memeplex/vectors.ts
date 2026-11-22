@@ -156,7 +156,8 @@ export async function build(): Promise<Vectors> {
     const aliceClient = await agent(0x12);
     const widget = await agent(0x13);
 
-    const nonce = (key: number) => Buffer.from(new Uint8Array(18).fill(key)).toString('base64url');
+    // The DID of a request a grant answers.
+    const asked = (key: number) => `did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequestr${key}`;
     const cid = (key: number) => generateCID({ fixture: key });
 
     const image = await asset(dave, {
@@ -172,18 +173,18 @@ export async function build(): Promise<Vectors> {
         cases.push({ name: `grant: ${name}`, schema: 'grant', member: 'memeplexGrant', expect, ...created });
         return created;
     };
-    const aliceGrant = await grantCase('every core kind', alice, 'valid', { v: 1, client: memepool.did, nonce: nonce(1) });
-    const aliceOwnGrant = await grantCase('without a nonce', alice, 'valid', { v: 1, client: aliceClient.did });
+    const aliceGrant = await grantCase('every core kind', alice, 'valid', { v: 1, client: memepool.did, request: asked(1) });
+    const aliceOwnGrant = await grantCase('without a request', alice, 'valid', { v: 1, client: aliceClient.did });
     const bobGrant = await grantCase('some actions', bob, 'valid', {
-        v: 1, client: memepool.did, actions: ['memeplex:post', 'memeplex:reply', 'memeplex:tag'], nonce: nonce(2),
+        v: 1, client: memepool.did, actions: ['memeplex:post', 'memeplex:reply', 'memeplex:tag'], request: asked(2),
     });
     const carolGrant = await grantCase('expires', carol, 'valid', {
-        v: 1, client: memepool.did, nonce: nonce(3), expiresAt: '2028-02-29T23:59:59.5Z',
+        v: 1, client: memepool.did, request: asked(3), expiresAt: '2028-02-29T23:59:59.5Z',
     });
     const daveGrant = await grantCase('one action and an extension kind', dave, 'valid', {
-        v: 1, client: widget.did, actions: ['memeplex:tag', 'memeplex:rate', pinned], nonce: nonce(4),
+        v: 1, client: widget.did, actions: ['memeplex:tag', 'memeplex:rate', pinned], request: asked(4),
     });
-    const grant = { v: 1, client: memepool.did, nonce: nonce(5) };
+    const grant = { v: 1, client: memepool.did, request: asked(5) };
     await grantCase('an unknown field is ignored', alice, 'valid', { ...grant, label: 'phone' });
     await grantCase('lacks client', alice, 'schema', without(grant, 'client'));
     await grantCase('client is not a DID', alice, 'schema', { ...grant, client: 'memepool' });
@@ -191,8 +192,7 @@ export async function build(): Promise<Vectors> {
     await grantCase('an action twice', alice, 'schema', { ...grant, actions: ['memeplex:tag', 'memeplex:tag'] });
     await grantCase('an unknown action', alice, 'schema', { ...grant, actions: ['memeplex:delete'] });
     await grantCase('an extension kind that is not pinned', alice, 'schema', { ...grant, actions: [image.did] });
-    await grantCase('a nonce of fewer than 128 bits', alice, 'schema', { ...grant, nonce: nonce(5).slice(0, 21) });
-    await grantCase('a nonce that is not base64url', alice, 'schema', { ...grant, nonce: `${nonce(5).slice(0, 23)}+` });
+    await grantCase('a request that is not a DID', alice, 'schema', { ...grant, request: 'the request' });
     await grantCase('an expiry with an offset', alice, 'schema', { ...grant, expiresAt: '2026-12-31T00:00:00+00:00' });
     await grantCase('an expiry without a time', alice, 'schema', { ...grant, expiresAt: '2026-12-31' });
     await grantCase('an expiry on a day that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-02-30T00:00:00Z' });
@@ -203,7 +203,7 @@ export async function build(): Promise<Vectors> {
     await grantCase('lacks v', alice, 'version', without(grant, 'v'));
     await grantCase('v as a string', alice, 'version', { ...grant, v: '1' });
 
-    const request = { v: 1, client: memepool.did, name: 'Memepool', nonce: nonce(6), registries: ['BTC:mainnet'] };
+    const request = { v: 1, name: 'Memepool', registries: ['BTC:mainnet'] };
     const requestCase = (name: string, expect: Validity, memeplexGrantRequest: Record<string, unknown>) => {
         cases.push({ name: `grant request: ${name}`, schema: 'grant-request', member: 'memeplexGrantRequest', expect, request: memeplexGrantRequest });
     };
@@ -213,8 +213,7 @@ export async function build(): Promise<Vectors> {
     });
     requestCase('a name of 100 code points', 'valid', { ...request, name: codePoints(100) });
     requestCase('lacks name', 'schema', without(request, 'name'));
-    requestCase('lacks nonce', 'schema', without(request, 'nonce'));
-    requestCase('lacks client', 'schema', without(request, 'client'));
+    requestCase('an unknown field is ignored', 'valid', { ...request, client: memepool.did });
     requestCase('an empty name', 'schema', { ...request, name: '' });
     requestCase('a name of 101 code points', 'schema', { ...request, name: codePoints(101) });
     requestCase('an expiry on a day that does not exist', 'expiry-instant', { ...request, expiresAt: '2027-02-29T00:00:00Z' });

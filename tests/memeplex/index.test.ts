@@ -10,7 +10,7 @@ import type { Signer } from './grant-vectors.ts';
 
 let alice: Signer, bob: Signer, carol: Signer, web: Signer, bot: Signer;
 let agents: Signer[];
-let nonces = 0;
+let requests = 0;
 
 // Every history the tests hand to an index: each DID's, at each length it had.
 const evidence = new Map<string, ResolvedVersion[][]>();
@@ -36,7 +36,7 @@ const filled = (dids: Iterable<string> = evidence.keys()) => {
 };
 
 const grantTo = (user: Signer, client: Signer, more: Record<string, unknown> = {}) => History.create(user, {
-    memeplexGrant: { v: 1, client: client.did, nonce: Buffer.from(new Uint8Array(18).fill(nonces++)).toString('base64url'), ...more },
+    memeplexGrant: { v: 1, client: client.did, request: `did:cid:request${requests++}`, ...more },
 }, 100);
 
 let aliceGrant: History, bobGrant: History, carolGrant: History, revokedGrant: History;

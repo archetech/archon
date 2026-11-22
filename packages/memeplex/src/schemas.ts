@@ -612,8 +612,8 @@ export const schemas = {
             "actions": {
                 "$ref": "#/$defs/actions"
             },
-            "nonce": {
-                "$ref": "#/$defs/nonce"
+            "request": {
+                "$ref": "#/$defs/did"
             },
             "expiresAt": {
                 "$ref": "#/$defs/expiresAt"
@@ -651,11 +651,6 @@ export const schemas = {
                     "$ref": "#/$defs/action"
                 }
             },
-            "nonce": {
-                "type": "string",
-                "minLength": 22,
-                "pattern": "^[A-Za-z0-9_-]+$"
-            },
             "expiresAt": {
                 "type": "string",
                 "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
@@ -668,17 +663,12 @@ export const schemas = {
         "type": "object",
         "required": [
             "v",
-            "client",
             "name",
-            "nonce",
             "registries"
         ],
         "properties": {
             "v": {
                 "const": 1
-            },
-            "client": {
-                "$ref": "#/$defs/did"
             },
             "name": {
                 "type": "string",
@@ -687,9 +677,6 @@ export const schemas = {
             },
             "actions": {
                 "$ref": "#/$defs/actions"
-            },
-            "nonce": {
-                "$ref": "#/$defs/nonce"
             },
             "expiresAt": {
                 "$ref": "#/$defs/expiresAt"
@@ -709,10 +696,6 @@ export const schemas = {
             }
         },
         "$defs": {
-            "did": {
-                "type": "string",
-                "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$"
-            },
             "pinnedDidUrl": {
                 "type": "string",
                 "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+\\?versionId=b[a-z2-7]{20,}$"
@@ -739,11 +722,6 @@ export const schemas = {
                 "items": {
                     "$ref": "#/$defs/action"
                 }
-            },
-            "nonce": {
-                "type": "string",
-                "minLength": 22,
-                "pattern": "^[A-Za-z0-9_-]+$"
             },
             "expiresAt": {
                 "type": "string",

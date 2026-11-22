@@ -7,10 +7,13 @@ A user does two things with a wallet, once each:
 
 1. **Signs in.** The service issues a challenge, the wallet answers it, and the
    service knows which DID it is talking to.
-2. **Grants the service.** The service shows a grant link naming its own DID; the
-   wallet creates the grant from the user's identity.
+2. **Grants the service.** The service creates a grant request, an asset of its own
+   as a challenge is, and shows a grant link naming it; the wallet resolves the
+   request, reads from it that the service is asking, and creates the grant from the
+   user's identity. A session is shown one request, which lasts an hour, and a new
+   one when that nears its end.
 
-The grant link lists the registries the service can publish on: the permitted ones
+The request lists the registries the service can publish on: the permitted ones
 its node supports. A wallet offers the user those, so the grant is one the service
 can use, and the service does not take a grant on any other as one to publish under. On a
 node that supports none of them the service asks for no grant, and `GET /me` says why
