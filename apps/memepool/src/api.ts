@@ -36,6 +36,8 @@ export interface Me {
     registry?: string;
     link?: string;
     pending?: string[];
+    // Why the service can ask for no grant, when it cannot.
+    unavailable?: string;
 }
 
 export class ApiError extends Error {

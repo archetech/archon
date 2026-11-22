@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -7,6 +7,10 @@ import request from 'supertest';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import WalletJson from '@didcid/keymaster/wallet/json';
 import { createGatekeeperApp } from '../../services/gatekeeper/server/src/gatekeeper-api.ts';
 import { startMemepool } from '../../services/memepool/src/service.ts';
 import type { MemepoolSettings } from '../../services/memepool/src/service.ts';
@@ -19,6 +23,7 @@ let settings: MemepoolSettings;
 let dirs: string[];
 let running: Server[];
 let warned: string[];
+let logged: string[];
 
 const dataDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'memepool-'));
@@ -28,7 +33,7 @@ const dataDir = () => {
 
 async function start(overrides: Partial<MemepoolSettings> = {}) {
     const started = await startMemepool({ ...settings, ...overrides }, { version: 'test', commit: 'test' }, {
-        log: () => undefined,
+        log: (message: string) => { logged.push(message); },
         warn: (message: string) => { warned.push(message); },
     });
 
@@ -37,15 +42,24 @@ async function start(overrides: Partial<MemepoolSettings> = {}) {
     return { ...started, url: `http://127.0.0.1:${(started.server.address() as AddressInfo).port}` };
 }
 
+async function connected() {
+    const client = new GatekeeperClient();
+
+    await client.connect({ url: settings.gatekeeperURL, waitUntilReady: true, intervalSeconds: 1, chatty: false });
+
+    return client;
+}
+
 beforeEach(async () => {
     dirs = [];
     running = [];
     const gatekeeper = new Gatekeeper({
-        db: new DbJsonMemory('memepool-service'), ipfs: new MemoryClient(), registries: ['hyperswarm', 'BTC:mainnet'],
+        db: new DbJsonMemory('memepool-service'), ipfs: new MemoryClient(), registries: ['local', 'hyperswarm', 'BTC:mainnet'],
         console: { log: () => undefined, error: () => undefined, time: () => undefined, timeEnd: () => undefined } as never,
     });
 
     warned = [];
+    logged = [];
     const { app } = createGatekeeperApp({ gatekeeper, httpLogging: false, ready: true });
 
     node = await new Promise<Server>(resolve => { const listening = app.listen(0, '127.0.0.1', () => resolve(listening)); });
@@ -83,6 +97,8 @@ it('makes its wallet and identity on a first start, and serves as that identity'
     expect((await request(url).get('/api/v1/version')).body).toStrictEqual({ version: 'test', commit: 'test' });
     expect((await request(url).get('/api/v1/challenge')).body.challenge).toMatch(/^did:/);
     expect(warned).toStrictEqual([expect.stringContaining('creating one')]);
+    // Of the registries its node has, the ones a grant may be on.
+    expect(logged).toContain('Memepool can publish on BTC:mainnet');
 }, 60_000);
 
 it('is the same client at the next start, and another with another data directory', async () => {
@@ -94,6 +110,22 @@ it('is the same client at the next start, and another with another data director
     expect(warned).toHaveLength(2);
     expect(elsewhere.did).not.toBe(first.did);
 }, 60_000);
+
+it('does not start when told to make its identity on local, and makes no wallet', async () => {
+    await expect(start({ registry: 'local' })).rejects.toThrow(/ARCHON_MEMEPOOL_REGISTRY cannot be local/);
+    expect(existsSync(join(settings.dataDir, 'wallet.json'))).toBe(false);
+});
+
+it('does not start with a wallet whose identity is on local', async () => {
+    const wallet = new Keymaster({
+        gatekeeper: await connected(), wallet: new WalletJson('wallet.json', settings.dataDir), cipher: new CipherNode(), passphrase: settings.passphrase,
+    });
+
+    await wallet.newWallet();
+    await wallet.createId(settings.name, { registry: 'local' });
+
+    await expect(start()).rejects.toThrow(/registered on local/);
+});
 
 it('does not start with no passphrase, or with the wrong one for its wallet', async () => {
     await expect(start({ passphrase: '' })).rejects.toThrow('ARCHON_MEMEPOOL_WALLET_PASSPHRASE is not set');

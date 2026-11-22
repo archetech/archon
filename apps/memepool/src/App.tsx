@@ -152,6 +152,30 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: strin
     );
 }
 
+// A button that puts a link on the clipboard, and says whether it did. Where a
+// page may not write to the clipboard, the link beside it is selected for the
+// reader to copy by hand.
+function Copy({ text, label }: { text: string; label: string }) {
+    const [said, setSaid] = useState('');
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setSaid('Copied');
+        }
+        catch {
+            setSaid('Could not copy. Select the link and copy it.');
+        }
+    };
+
+    return (
+        <>
+            <button className="quiet" onClick={copy}>{label}</button>
+            {said && <span className="muted" role="status"> {said}</span>}
+        </>
+    );
+}
+
 function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
     return (
         <section className="card">
@@ -175,9 +199,12 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
                                 Or copy the grant link
                                 <input readOnly value={me.link} onFocus={event => event.target.select()} />
                             </label>
+                            <p><Copy text={me.link} label="Copy grant link" /></p>
                         </>
                     )}
-                    <button onClick={onChecked}>I have approved it</button>
+                    {me.unavailable
+                        ? <p role="alert" className="error">Memepool cannot be granted here: {me.unavailable}.</p>
+                        : <button onClick={onChecked}>I have approved it</button>}
                 </>
             )}
         </section>

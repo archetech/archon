@@ -670,7 +670,8 @@ export const schemas = {
             "v",
             "client",
             "name",
-            "nonce"
+            "nonce",
+            "registries"
         ],
         "properties": {
             "v": {
@@ -692,6 +693,19 @@ export const schemas = {
             },
             "expiresAt": {
                 "$ref": "#/$defs/expiresAt"
+            },
+            "registries": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                    "enum": [
+                        "BTC:mainnet",
+                        "ZEC:mainnet",
+                        "ETH:mainnet",
+                        "SOL:mainnet-beta"
+                    ]
+                }
             }
         },
         "$defs": {

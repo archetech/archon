@@ -48,7 +48,7 @@ function holding(docs: Record<string, unknown>) {
 }
 
 function linkFor(request: Record<string, unknown> = {}) {
-    return encodeGrantLink({ v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, ...request });
+    return encodeGrantLink({ v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE, registries: ['BTC:mainnet', 'ZEC:mainnet'], ...request });
 }
 
 async function review(link: string) {
@@ -167,6 +167,61 @@ describe('Grants view: a grant link', () => {
 
         expect(screen.getAllByRole('option').map(option => option.textContent)).toStrictEqual(['BTC:mainnet', 'ZEC:mainnet']);
         await user.click(screen.getByRole('option', { name: 'ZEC:mainnet' }));
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
+    });
+
+    it('offers, of the registries this node supports, only those the client can publish on', async () => {
+        view();
+        const user = await review(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }));
+
+        await user.click(screen.getByRole('combobox', { name: 'Registry' }));
+        expect(screen.getAllByRole('option').map(option => option.textContent)).toStrictEqual(['ZEC:mainnet']);
+        await user.keyboard('{Escape}');
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        const [data, options] = keymaster.createAsset.mock.calls[0];
+        expect(options.registry).toBe('ZEC:mainnet');
+        // The grant says nothing of registries: it is on one.
+        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE } });
+    });
+
+    it('creates nothing, and says why, when the client can publish on no registry this node supports', async () => {
+        view();
+        await review(linkFor({ registries: ['SOL:mainnet-beta'] }));
+
+        expect(screen.getByText(/This client can publish only on SOL:mainnet-beta, and this node supports\s+none of them/)).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('follows the node when a registry it was offering goes', async () => {
+        const shown = view();
+        const user = await review(linkFor({ registries: ['BTC:mainnet', 'ZEC:mainnet'] }));
+        const props = { keymaster: keymaster as any, identity: 'Alice', notify };
+
+        shown.rerender(<GrantsView {...props} registries={['hyperswarm', 'ZEC:mainnet']} />);
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
+    });
+
+    it('creates nothing once the node supports none of the registries it was offering', async () => {
+        const shown = view();
+        await review(linkFor({ registries: ['BTC:mainnet'] }));
+
+        shown.rerender(<GrantsView keymaster={keymaster as any} identity="Alice" notify={notify} registries={['hyperswarm', 'ZEC:mainnet']} />);
+        expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('does not carry one request\'s registry over to another that does not list it', async () => {
+        view();
+        const user = await review(linkFor({ registries: ['BTC:mainnet'] }));
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        await review(linkFor({ registries: ['ZEC:mainnet'] }));
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
 
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));

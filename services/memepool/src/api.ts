@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { actionFor } from '@didcid/memeplex';
+import { PERMITTED_REGISTRIES, actionFor } from '@didcid/memeplex';
 import { MemeplexClientError, allows, liveGrants } from '@didcid/memeplex/client';
 import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 
@@ -29,6 +29,15 @@ export interface MemepoolOptions {
     // its answer there. Without it, a user carries the answer back by hand.
     publicURL?: string;
     version: { version: string; commit: string };
+    // The registries the service's node supports, as a list or as a way to ask
+    // the node. The permitted ones among them are where the service can
+    // publish: a grant request lists them, and a grant on another is not one the
+    // service can use. With none, the service can ask for no grant.
+    //
+    // A node drops a registry while that registry's queue is full and takes it
+    // back afterwards, so the service asks each time it needs to know and
+    // counts a registry it has seen as one it can publish on.
+    registries: string[] | (() => Promise<string[]>);
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -105,6 +114,22 @@ type Signed = Request & { user: string };
 
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const { client, keymaster, name, version } = options;
+    const seen = new Set<string>();
+    const registriesNow = async (): Promise<string[]> => {
+        try {
+            const supported = typeof options.registries === 'function' ? await options.registries() : options.registries;
+
+            supported.forEach(registry => seen.add(registry));
+        }
+        catch {
+            // The node did not say. What it has said before stands.
+        }
+
+        return PERMITTED_REGISTRIES.filter(registry => seen.has(registry));
+    };
+    // Whether a grant is on a registry the service's node supports. One that
+    // is not is in force and of no use here.
+    const reachable = (registries: string[]) => (grant: { registry: string }) => registries.includes(grant.registry);
     const callback = options.publicURL ? `${options.publicURL.replace(/\/+$/, '')}/api/v1/callback` : undefined;
     const now = options.now ?? Date.now;
     // A challenge's browser mark, and the challenge a mark was set with.
@@ -374,7 +399,8 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.get('/me', async (req, res) => {
         const { user } = req as Signed;
         const found = await client.grantsFrom(user);
-        const [grant, ...others] = liveGrants(found, new Date(now()));
+        const registries = await registriesNow();
+        const [grant, ...others] = liveGrants(found, new Date(now())).filter(reachable(registries));
 
         if (grant) {
             const live = [grant, ...others];
@@ -392,8 +418,20 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return;
         }
 
-        const pending = found.filter(each => each.grant.status === 'pending').map(each => each.did);
-        const { link } = await client.requestGrant({ name });
+        // A grant waiting to be anchored is worth waiting for only when it is
+        // on a registry the service can publish on.
+        const pending = found
+            .filter(each => each.grant.status === 'pending' && reachable(registries)(each.grant))
+            .map(each => each.did);
+
+        // A request names where the service can publish. On a node with no
+        // registry a grant may be on, there is nothing to ask for.
+        if (registries.length === 0) {
+            res.json({ did: user, pending, unavailable: 'this node supports no registry a grant may be made on' });
+            return;
+        }
+
+        const { link } = await client.requestGrant({ name, registries });
 
         res.json({ did: user, pending, link });
     });
@@ -402,7 +440,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // the object was published under, which is the only one it counts under.
     const publishing = (act: (req: Signed, grant: UsableGrant) => Promise<unknown>, of?: (req: Request) => string) =>
         async (req: Request, res: Response) => {
-            const live = liveGrants(await client.grantsFrom((req as Signed).user), new Date(now()));
+            const live = liveGrants(await client.grantsFrom((req as Signed).user), new Date(now())).filter(reachable(await registriesNow()));
 
             if (live.length === 0) {
                 res.status(403).json({ error: 'no grant to publish under' });

@@ -989,7 +989,10 @@
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "Memepool",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1002,6 +1005,9 @@
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "Memepool",
     "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ],
     "actions": [
      "memeplex:post",
      "memeplex:reply",
@@ -1019,7 +1025,10 @@
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "🙂🙂🙂🙂🙂🙂🙂🙂aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1030,7 +1039,10 @@
    "request": {
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1041,7 +1053,10 @@
    "request": {
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
-    "name": "Memepool"
+    "name": "Memepool",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1052,7 +1067,10 @@
    "request": {
     "v": 1,
     "name": "Memepool",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1064,7 +1082,10 @@
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1076,7 +1097,10 @@
     "v": 1,
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "🙂🙂🙂🙂🙂🙂🙂🙂aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ]
    }
   },
   {
@@ -1089,7 +1113,114 @@
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "Memepool",
     "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet"
+    ],
     "expiresAt": "2027-02-29T00:00:00Z"
+   }
+  },
+  {
+   "name": "grant request: several registries the client can publish on",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "valid",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet",
+     "SOL:mainnet-beta"
+    ]
+   }
+  },
+  {
+   "name": "grant request: lacks registries",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "schema",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
+   }
+  },
+  {
+   "name": "grant request: every permitted registry",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "valid",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet",
+     "ZEC:mainnet",
+     "ETH:mainnet",
+     "SOL:mainnet-beta"
+    ]
+   }
+  },
+  {
+   "name": "grant request: no registries listed",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "schema",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": []
+   }
+  },
+  {
+   "name": "grant request: a registry twice",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "schema",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet",
+     "BTC:mainnet"
+    ]
+   }
+  },
+  {
+   "name": "grant request: a registry that is not permitted",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "schema",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": [
+     "BTC:mainnet",
+     "BTC:signet"
+    ]
+   }
+  },
+  {
+   "name": "grant request: registries that are not a list",
+   "schema": "grant-request",
+   "member": "memeplexGrantRequest",
+   "expect": "schema",
+   "request": {
+    "v": 1,
+    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "name": "Memepool",
+    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
+    "registries": "BTC:mainnet"
    }
   },
   {

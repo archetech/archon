@@ -35,7 +35,7 @@ const config = {
     dataDir: env.ARCHON_MEMEPOOL_DATA_DIR || 'data',
     // The passphrase that encrypts that wallet. Required.
     passphrase: env.ARCHON_MEMEPOOL_WALLET_PASSPHRASE || '',
-    // The registry the service's own identity is created on.
+    // The registry the service's own identity is created on. Not `local`.
     registry: env.ARCHON_MEMEPOOL_REGISTRY || 'hyperswarm',
     challengesPerMinute: positiveInt('ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE', env.ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE, 60),
     // Hours a session lasts.
