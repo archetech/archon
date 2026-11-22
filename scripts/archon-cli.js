@@ -97,6 +97,23 @@ async function claimPaidCashuQuote(quote, mint, id) {
 // `archon create-id alice && next` runs `next` after alice failed, and no
 // script or CI step can tell. exitCode rather than exit(1), so stdout a
 // partially-completed command already wrote still flushes.
+// The registry a grant was created on, for a command that did not have to name
+// one. The grant exists whether or not the node can be asked.
+async function grantRegistry(did) {
+    try {
+        const doc = await keymaster.resolveDID(did);
+        return doc.didDocumentRegistration?.registry ?? 'an unknown registry';
+    }
+    catch {
+        return 'an unknown registry';
+    }
+}
+
+// The actions a comma-separated option names.
+function splitActions(actions) {
+    return actions.split(',').map(action => action.trim()).filter(Boolean);
+}
+
 function fail(detail) {
     console.error(detail);
     process.exitCode = 1;
@@ -1333,6 +1350,95 @@ program
         }
         catch (error) {
             fail(error.error || error);
+        }
+    });
+
+program
+    .command('create-grant <request>')
+    .description('Create the grant a client app asks for with a grant request')
+    .option('-a, --alias <alias>', 'DID alias')
+    .option('-r, --registry <registry>', 'registry to use, one the request lists (default: the first it lists that the node supports)')
+    .option('--actions <actions>', 'comma-separated actions, from those the request lists (default: all of them)')
+    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the request asks for)')
+    .option('--no-expiry', 'make a grant with no expiry')
+    .action(async (request, options) => {
+        try {
+            const { alias, registry, actions, expires, expiry } = options;
+
+            if (expires !== undefined && !expiry) {
+                fail('--expires and --no-expiry cannot be used together');
+                return;
+            }
+
+            const did = await keymaster.createGrant(request, {
+                alias,
+                registry,
+                actions: actions === undefined ? undefined : splitActions(actions),
+                expiresAt: expiry ? expires : null,
+            });
+            console.log(did);
+            note(`Created on ${await grantRegistry(did)}`);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-grants')
+    .description('List grants made by current ID')
+    .action(async () => {
+        try {
+            const grants = await keymaster.listGrants();
+            console.log(JSON.stringify(grants, null, 4));
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('update-grant <id>')
+    .description('Change the actions or expiry of a grant')
+    .option('--actions <actions>', 'comma-separated actions the grant permits')
+    .option('--all-actions', 'remove the list of actions')
+    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z')
+    .option('--no-expiry', 'remove the expiry')
+    .action(async (id, options) => {
+        try {
+            const { actions, allActions, expires, expiry } = options;
+
+            if (actions !== undefined && allActions) {
+                fail('--actions and --all-actions cannot be used together');
+                return;
+            }
+            if (expires !== undefined && !expiry) {
+                fail('--expires and --no-expiry cannot be used together');
+                return;
+            }
+
+            const changes = {
+                ...(allActions ? { actions: null } : actions === undefined ? {} : { actions: splitActions(actions) }),
+                ...(!expiry ? { expiresAt: null } : expires === undefined ? {} : { expiresAt: expires }),
+            };
+            const ok = await keymaster.updateGrant(id, changes);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('revoke-grant <id>')
+    .description('Revoke a grant')
+    .action(async (id) => {
+        try {
+            const ok = await keymaster.revokeGrant(id);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
         }
     });
 

@@ -32,6 +32,7 @@ describe('mcp server CLI parity', () => {
             archon_revoke_did: { did: 'did:cid:alice' },
             archon_repair_did: { did: 'did:cid:alice' },
             archon_revoke_credential: { did: 'did:cid:credential' },
+            archon_revoke_grant: { id: 'did:cid:grant' },
             archon_remove_id: { name: 'alice' },
             archon_new_wallet: {},
             archon_import_wallet: { recoveryPhrase: 'seed words' },

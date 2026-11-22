@@ -701,6 +701,26 @@ async def list_revocations(owner: str | None = None) -> dict[str, Any]:
     return {"revocations": await service.list_revocations(owner)}
 
 
+@protected_api.post("/grants")
+async def create_grant(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_grant(body.get("request"), body.get("options") or {})}
+
+
+@protected_api.get("/grants")
+async def list_grants(owner: str | None = None) -> dict[str, Any]:
+    return {"grants": await service.list_grants(owner)}
+
+
+@protected_api.put("/grants/{identifier:path}")
+async def update_grant(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.update_grant(identifier, body.get("changes"))}
+
+
+@protected_api.delete("/grants/{identifier:path}")
+async def revoke_grant(identifier: str) -> dict[str, bool]:
+    return {"ok": await service.revoke_grant(identifier)}
+
+
 @protected_api.post("/assets")
 async def create_asset(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_asset(body["data"], body.get("options") or {})}

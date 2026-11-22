@@ -1286,6 +1286,60 @@ async def cmd_list_assets(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.list_assets())
 
 
+# Grants ----------------------------------------------------------------------
+
+def _split_actions(actions: str) -> list[str]:
+    return [action.strip() for action in actions.split(",") if action.strip()]
+
+
+async def cmd_create_grant(km: Keymaster, args: argparse.Namespace) -> None:
+    if args.expires is not None and args.no_expiry:
+        raise CommandError("--expires and --no-expiry cannot be used together")
+    opts: dict[str, Any] = _asset_opts(args) or {}
+    if args.actions is not None:
+        opts["actions"] = _split_actions(args.actions)
+    if args.no_expiry:
+        opts["expiresAt"] = None
+    elif args.expires is not None:
+        opts["expiresAt"] = args.expires
+    did = await km.create_grant(args.request, opts)
+    print(did)
+    # The registry is named for a command that did not have to name one. The
+    # grant exists whether or not the node can be asked.
+    try:
+        registry = ((await km.resolve_did(did)).get("didDocumentRegistration") or {}).get("registry")
+    except Exception:
+        registry = None
+    print(f"Created on {registry or 'an unknown registry'}", file=sys.stderr)
+
+
+async def cmd_list_grants(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.list_grants())
+
+
+async def cmd_update_grant(km: Keymaster, args: argparse.Namespace) -> None:
+    if args.actions is not None and args.all_actions:
+        raise CommandError("--actions and --all-actions cannot be used together")
+    if args.expires is not None and args.no_expiry:
+        raise CommandError("--expires and --no-expiry cannot be used together")
+    changes: dict[str, Any] = {}
+    if args.all_actions:
+        changes["actions"] = None
+    elif args.actions is not None:
+        changes["actions"] = _split_actions(args.actions)
+    if args.no_expiry:
+        changes["expiresAt"] = None
+    elif args.expires is not None:
+        changes["expiresAt"] = args.expires
+    ok = await km.update_grant(args.id, changes)
+    print(UPDATE_OK if ok else UPDATE_FAILED)
+
+
+async def cmd_revoke_grant(km: Keymaster, args: argparse.Namespace) -> None:
+    ok = await km.revoke_grant(args.id)
+    print(UPDATE_OK if ok else UPDATE_FAILED)
+
+
 # Polls -----------------------------------------------------------------------
 
 async def cmd_create_poll_template(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1918,6 +1972,24 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("key")
     sp.add_argument("value", nargs="?")
     add("list-assets", "List assets owned by current ID", cmd_list_assets)
+
+    # Grants
+    sp = add("create-grant", "Create the grant a client app asks for with a grant request", cmd_create_grant)
+    sp.add_argument("request", help="the request's DID, an alias for it, or a link archon://grant?request=<did>")
+    sp.add_argument("-a", "--alias", help="DID alias")
+    sp.add_argument("-r", "--registry", help="registry to use, one the request lists (default: the first it lists that the node supports)")
+    sp.add_argument("--actions", help="comma-separated actions, from those the request lists (default: all of them)")
+    sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z (default: what the request asks for)")
+    sp.add_argument("--no-expiry", action="store_true", help="make a grant with no expiry")
+    add("list-grants", "List grants made by current ID", cmd_list_grants)
+    sp = add("update-grant", "Change the actions or expiry of a grant", cmd_update_grant)
+    sp.add_argument("id")
+    sp.add_argument("--actions", help="comma-separated actions the grant permits")
+    sp.add_argument("--all-actions", action="store_true", help="remove the list of actions")
+    sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z")
+    sp.add_argument("--no-expiry", action="store_true", help="remove the expiry")
+    sp = add("revoke-grant", "Revoke a grant", cmd_revoke_grant)
+    sp.add_argument("id")
 
     # Polls
     add("create-poll-template", "Create a poll template", cmd_create_poll_template)

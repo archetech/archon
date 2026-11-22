@@ -129,12 +129,16 @@ describe('CLI parity across entry points', () => {
         expect(mismatches).toEqual([]);
     });
 
+    // The options one command declares in the Python CLI, from its add( to the next.
+    const pythonOptions = (command: string) => {
+        const start = pythonCli.indexOf(`add("${command}"`);
+        const next = /\n {4}(?:sp = )?add\(/.exec(pythonCli.slice(start + 1));
+        const block = pythonCli.slice(start, next ? start + 1 + next.index : undefined);
+        return [...block.matchAll(/add_argument\((?:"-\w", )?"(--[a-z-]+)"/g)].map(match => match[1]).sort();
+    };
+    const withoutTypes = (block: string) => block.replace(/error: any/g, 'error').replace(/\n\s*\n/g, '\n').trimEnd();
+
     it('gives the Cashu commands the same options in the Python CLI', () => {
-        const pythonOptions = (command: string) => {
-            const start = pythonCli.indexOf(`add("${command}"`);
-            const block = pythonCli.slice(start, pythonCli.indexOf('    sp = add(', start + 1));
-            return [...block.matchAll(/add_argument\((?:"-\w", )?"(--[a-z-]+)"/g)].map(match => match[1]).sort();
-        };
         const commands = expected.filter(command => command.includes('cashu'));
 
         expect(commands).toHaveLength(21);
@@ -145,10 +149,33 @@ describe('CLI parity across entry points', () => {
     });
 
     it('runs the same Cashu handlers in both JS CLIs', () => {
-        const withoutTypes = (block: string) => block.replace(/error: any/g, 'error').replace(/\n\s*\n/g, '\n').trimEnd();
-
         for (const command of expected.filter(name => name.includes('cashu'))) {
             expect(withoutTypes(commandBlock(packageCli, command))).toBe(withoutTypes(commandBlock(scriptCli, command)));
+        }
+    });
+
+    const grantCommands = ['create-grant', 'list-grants', 'update-grant', 'revoke-grant'];
+
+    it('gives the grant commands the same options in the Python CLI', () => {
+        for (const command of grantCommands) {
+            const options = optionsFor(packageCli, command).map(option => option.split(' ')[0]);
+            expect({ command, options: pythonOptions(command) }).toEqual({ command, options });
+        }
+        expect(pythonOptions('create-grant')).toEqual(['--actions', '--alias', '--expires', '--no-expiry', '--registry']);
+        expect(pythonOptions('update-grant')).toEqual(['--actions', '--all-actions', '--expires', '--no-expiry']);
+    });
+
+    it('runs the same grant handlers in both JS CLIs', () => {
+        // A command's own source, without what introduces the command after it.
+        const handler = (source: string, command: string) => {
+            const block = commandBlock(source, command);
+            return withoutTypes(block.slice(0, block.lastIndexOf('\n    });')));
+        };
+
+        for (const command of grantCommands) {
+            expect(expected).toContain(command);
+            expect(handler(packageCli, command)).toBe(handler(scriptCli, command));
+            expect(handler(packageCli, command)).toContain('keymaster.');
         }
     });
 

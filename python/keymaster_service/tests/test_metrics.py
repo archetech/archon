@@ -31,6 +31,14 @@ def test_normalize_path_replaces_dynamic_segments() -> None:
     )
 
 
+def test_normalize_path_gives_every_grant_one_label() -> None:
+    assert normalize_path("/api/v1/grants") == "/api/v1/grants"
+    assert normalize_path("/api/v1/grants?owner=Alice") == "/api/v1/grants"
+    assert normalize_path("/api/v1/grants/did:cid:abcdef") == "/api/v1/grants/:id"
+    assert normalize_path("/api/v1/grants/clients/memepool") == "/api/v1/grants/:id"
+    assert normalize_path("/api/v1/grants/Alice / grant") == "/api/v1/grants/:id"
+
+
 def test_normalize_path_passthrough_for_static_routes() -> None:
     assert normalize_path("/api/v1/ready") == "/api/v1/ready"
     assert normalize_path("/metrics") == "/metrics"

@@ -62,6 +62,36 @@ def test_resolve_and_fetch_helpers_forward_query_options(monkeypatch):
     ]
 
 
+def test_grant_helpers_call_the_grant_routes(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+    replies = iter([{"did": "did:test:grant"}, {"did": "did:test:grant"}, {"grants": []}, {"grants": []}, {"ok": True}, {"ok": True}])
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return next(replies)
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+    request = "archon://grant?request=did:cid:request"
+    options = {"registry": "ETH:mainnet", "actions": ["example:tag"], "expiresAt": None}
+    changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
+
+    assert sdk.create_grant(request) == "did:test:grant"
+    assert sdk.create_grant(request, options) == "did:test:grant"
+    assert sdk.list_grants() == []
+    assert sdk.list_grants("Alice") == []
+    assert sdk.update_grant("clients/example", changes) is True
+    assert sdk.revoke_grant("clients/example") is True
+    assert calls == [
+        ("POST", "http://unit.test/api/v1/grants", {"json": {"request": request, "options": {}}}),
+        ("POST", "http://unit.test/api/v1/grants", {"json": {"request": request, "options": options}}),
+        ("GET", "http://unit.test/api/v1/grants", {}),
+        ("GET", "http://unit.test/api/v1/grants?owner=Alice", {}),
+        ("PUT", "http://unit.test/api/v1/grants/clients%2Fexample", {"json": {"changes": changes}}),
+        ("DELETE", "http://unit.test/api/v1/grants/clients%2Fexample", {}),
+    ]
+
+
 def test_list_revocations_names_the_owner_asked_for(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
     revocations = [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]

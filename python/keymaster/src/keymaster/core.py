@@ -16,6 +16,15 @@ import httpx
 
 from .cashu import CashuStateError, CashuWallet, has_cashu_state
 from .errors import KeymasterError
+from .grant import (
+    grant_in,
+    grant_member,
+    grant_request_fault,
+    grant_request_id,
+    grant_request_in,
+    is_date_time,
+    is_name_list,
+)
 from .net import fetch_public_https, is_private_hostname
 from bolt11 import decode as decode_bolt11
 from cryptography.exceptions import InvalidTag
@@ -2565,6 +2574,277 @@ class Keymaster:
                 await self._save_loaded_wallet(wallet, overwrite=True)
 
         return revocations
+
+    def _anchored_on(self, doc: dict[str, Any], registry: str) -> bool:
+        """Whether a resolved version is anchored on a registry: it names that
+        registry as its chain and has the height and time of a block.
+        ``confirmed`` is not that, since a creation is confirmed from the start.
+        """
+        timestamp = (doc.get("didDocumentMetadata") or {}).get("timestamp")
+        timestamp = timestamp if isinstance(timestamp, dict) else {}
+        upper_bound = timestamp.get("upperBound")
+        upper_bound = upper_bound if isinstance(upper_bound, dict) else {}
+        height = upper_bound.get("height")
+        return (
+            timestamp.get("chain") == registry
+            and isinstance(height, int)
+            and not isinstance(height, bool)
+            and abs(height) <= MAX_SAFE_INTEGER
+            and isinstance(upper_bound.get("timeISO"), str)
+        )
+
+    def _grant_actions(self, actions: Any, label: str) -> list[str]:
+        """The actions a caller names for a grant: a list of at least one, none
+        empty and none twice. What an action means is the app's."""
+        if not is_name_list(actions):
+            raise KeymasterError(f"Invalid parameter: {label}: a list of at least one action, each once, is needed")
+        return actions
+
+    def _grant_expiry(self, expires_at: Any, label: str) -> str:
+        if not is_date_time(expires_at):
+            raise KeymasterError(f"Invalid parameter: {label}: not a date-time such as 2027-01-31T00:00:00Z")
+        return expires_at
+
+    async def _read_grant_request(self, named: Any) -> tuple[str, str, str, dict[str, Any]]:
+        """The DID, the app, the client and the request of a grant request,
+        which is an asset the client created. Refuses one that cannot be read
+        as that.
+
+        Who asks is the request's controller, and only while the request is as
+        it was created. An asset's owner can transfer it to any identity, which
+        signs nothing, and can replace its contents first. The creation is
+        signed by its controller and holds the contents that controller gave
+        it, so a request that has had any version after its first does not say
+        who asks for what it holds. Nothing in the data is read for who asks.
+        """
+        identifier = grant_request_id(named) if isinstance(named, str) else ""
+        if not identifier:
+            raise KeymasterError("Invalid parameter: request: a DID, an alias or an archon://grant link is needed")
+        try:
+            doc = await self.resolve_did(identifier)
+        except KeymasterError:
+            raise KeymasterError("Invalid parameter: request: not found") from None
+
+        document = doc.get("didDocument") or {}
+        metadata = doc.get("didDocumentMetadata") or {}
+        did, client = document.get("id"), document.get("controller")
+        if metadata.get("deactivated"):
+            raise KeymasterError("Invalid parameter: request: deleted")
+        if (doc.get("didDocumentRegistration") or {}).get("type") != "asset" or not did or not client:
+            raise KeymasterError("Invalid parameter: request: not an asset")
+        if str(metadata.get("versionSequence")) != "1":
+            raise KeymasterError(
+                "Invalid parameter: request: changed since it was created, so who asks is not established"
+            )
+
+        held = grant_request_in(doc.get("didDocumentData"))
+        if held is None:
+            raise KeymasterError("Invalid parameter: request: not a grant request")
+        app, request = held
+        fault = grant_request_fault(request)
+        if fault:
+            raise KeymasterError(f"Invalid parameter: request: invalid ({fault})")
+        return did, app, client, request
+
+    async def create_grant(self, named: str, options: dict[str, Any] | None = None) -> str:
+        """Creates the grant a grant request asks for, as an asset of the
+        granting identity, and returns its DID.
+
+        The request is named by its DID, by an alias for it, or by a link,
+        ``archon://grant?request=<did>``. The grant's data is one member, named
+        for the app the request names: a request held as
+        ``exampleGrantRequest`` makes a grant held as ``exampleGrant``.
+
+        The grant has the request's ``v``, its ``client``, which is the
+        identity that created the request, the DID of the ``request``, and the
+        request's ``actions`` and ``expiresAt``, each when the request has it.
+        ``options["actions"]`` narrows the actions the request lists, and
+        ``options["expiresAt"]`` changes the expiry or, as ``None``, removes it.
+
+        The grant is created on a registry the request lists and the node
+        supports: ``options["registry"]``, or the first such in the request's
+        order when none is named. Whether the grant is valid under the app's
+        rules is for the app's verifier, which this does not consult.
+        """
+        options = options or {}
+        request_did, app, client, request = await self._read_grant_request(named)
+        actions = request.get("actions")
+        if options.get("actions") is not None:
+            chosen = self._grant_actions(options["actions"], "options.actions")
+            offered = request.get("actions") or []
+            if not all(action in offered for action in chosen):
+                if offered:
+                    raise KeymasterError(
+                        f"Invalid parameter: options.actions: every action must be one of {', '.join(offered)}"
+                    )
+                raise KeymasterError("Invalid parameter: options.actions: the request lists no actions to choose from")
+            actions = [action for action in offered if action in chosen]
+
+        requested = options["expiresAt"] if "expiresAt" in options else request.get("expiresAt")
+        expires_at = None if requested is None else self._grant_expiry(requested, "options.expiresAt")
+
+        id_info = await self.fetch_id_info(options.get("controller"))
+        grantor = await self.resolve_did(id_info["did"], {"confirm": True})
+        if (grantor.get("didDocument") or {}).get("id") == client:
+            raise KeymasterError(
+                "Invalid parameter: request: the granting identity made the request, and cannot grant itself"
+            )
+
+        listed = request["registries"]
+        supported = await self.list_registries()
+        registry = options.get("registry")
+
+        # create_asset puts a local identity's assets on `local` whatever
+        # registry is asked for, so that is where its grant would be.
+        if (grantor.get("didDocumentRegistration") or {}).get("registry") == "local":
+            if "local" not in listed or (registry and registry != "local"):
+                raise KeymasterError(
+                    "Invalid parameter: options.controller: a local identity's grant is created on local,"
+                    f" and the request lists {', '.join(listed)}"
+                )
+            registry = "local"
+
+        if not registry:
+            registry = next((name for name in listed if name in supported), None)
+            if not registry:
+                raise KeymasterError(
+                    f"Invalid parameter: options.registry: the request lists {', '.join(listed)}"
+                    " and this node supports none of them"
+                )
+        elif registry not in listed:
+            raise KeymasterError(
+                f"Invalid parameter: options.registry: the request lists {', '.join(listed)}, not {registry}"
+            )
+        elif registry not in supported:
+            raise KeymasterError(f"Invalid parameter: options.registry: this node does not support {registry}")
+
+        grant: dict[str, Any] = {}
+        if "v" in request:
+            # A whole number is written as one, as JSON.stringify writes it.
+            version = request["v"]
+            grant["v"] = int(version) if isinstance(version, float) and version.is_integer() else version
+        grant["client"] = client
+        grant["request"] = request_did
+        if actions is not None:
+            grant["actions"] = actions
+        if expires_at is not None:
+            grant["expiresAt"] = expires_at
+
+        # The identity checked is named as the controller, so that it is the
+        # one that owns and signs the grant whatever the current ID is by then.
+        asset_options = {"registry": registry, "controller": id_info["did"]}
+        if options.get("alias"):
+            asset_options["alias"] = options["alias"]
+        return await self.create_asset({grant_member(app): grant}, asset_options)
+
+    async def list_grants(self, owner: str | None = None) -> list[dict[str, Any]]:
+        """The grants among the assets of an identity, each as its latest
+        version states it, with the app it names.
+
+        A grant whose deletion a node has accepted is not among them:
+        list_revocations has it until the deletion is anchored. An asset the
+        node cannot resolve is listed as ``unresolved``, since it may be a
+        grant.
+
+        The identity's revocations are read first. A revocation that another
+        change displaced left the grant live, and reading them is what puts
+        such an asset back among those list_assets returns: without it a grant
+        the client can still act under would be missing here.
+        """
+        grants: list[dict[str, Any]] = []
+        await self.list_revocations(owner)
+        for did in await self.list_assets(owner):
+            try:
+                doc = await self.resolve_did(did)
+            except Exception:
+                grants.append({"did": did, "status": "unresolved"})
+                continue
+
+            held = grant_in(doc.get("didDocumentData"))
+            metadata = doc.get("didDocumentMetadata") or {}
+            if metadata.get("deactivated") or held is None:
+                continue
+
+            app, _, grant = held
+            registry = (doc.get("didDocumentRegistration") or {}).get("registry") or ""
+            try:
+                sequence = int(metadata.get("versionSequence") or 1)
+            except (TypeError, ValueError):
+                sequence = 2
+            entry = {
+                "did": did,
+                "status": "anchored" if self._anchored_on(doc, registry) else "pending",
+                "app": app,
+                "grant": grant,
+            }
+            if isinstance(grant.get("request"), str):
+                entry["request"] = grant["request"]
+            grants.append({**entry, "registry": registry, "created": sequence <= 1})
+        return grants
+
+    async def _own_grant(self, identifier: str) -> tuple[str, str, dict[str, Any], dict[str, Any]]:
+        """A live asset of the current ID that holds a grant: its DID, the
+        member of its data the grant is, the grant, and the version of the
+        asset it was read from."""
+        owner = await self.fetch_id_info()
+        did = await self.lookup_did(identifier)
+        doc = await self.resolve_did(did)
+        held = grant_in(doc.get("didDocumentData"))
+        if (
+            (doc.get("didDocumentMetadata") or {}).get("deactivated")
+            or (doc.get("didDocumentRegistration") or {}).get("type") != "asset"
+            or held is None
+        ):
+            raise KeymasterError("Invalid parameter: id: not a grant")
+        if not self.did_match((doc.get("didDocument") or {}).get("controller") or "", owner["did"]):
+            raise KeymasterError("Invalid parameter: id: not a grant of the current ID")
+        return did, held[1], held[2], doc
+
+    async def update_grant(self, identifier: str, changes: dict[str, Any]) -> bool:
+        """Changes the scope of a grant of the current ID in place.
+
+        ``changes`` holds ``actions``, ``expiresAt`` or both. ``None`` removes
+        the member, which an app reads as it reads a grant made without one.
+        Nothing is written when the change leaves the grant as it is.
+
+        The update states the asset's whole data with the grant replaced, and
+        every other member of the grant and of the data as it was. merge_data
+        is not used: it drops a member whose value is None, and an app may read
+        any other change to a grant's asset as the end of the grant.
+
+        The update is signed as the successor of the version the grant was
+        read from. If the grant has changed since, the node refuses it: writing
+        it would put back the scope that change took away.
+        """
+        if not isinstance(changes, dict) or ("actions" not in changes and "expiresAt" not in changes):
+            raise KeymasterError("Invalid parameter: changes: actions or expiresAt is needed")
+
+        did, member, grant, doc = await self._own_grant(identifier)
+        updated = dict(grant)
+
+        if "actions" in changes:
+            updated.pop("actions", None)
+            if changes["actions"] is not None:
+                updated["actions"] = self._grant_actions(changes["actions"], "changes.actions")
+
+        if "expiresAt" in changes:
+            updated.pop("expiresAt", None)
+            if changes["expiresAt"] is not None:
+                updated["expiresAt"] = self._grant_expiry(changes["expiresAt"], "changes.expiresAt")
+
+        if updated == grant:
+            return True
+        data = {**doc["didDocumentData"], member: updated}
+        return await self._update_from_document(did, {"didDocumentData": data}, doc)
+
+    async def revoke_grant(self, identifier: str) -> bool:
+        """Revokes a grant of the current ID by deleting its asset.
+
+        On a chain registry the deletion takes effect once it is anchored;
+        list_revocations says whether it is.
+        """
+        did, _, _, _ = await self._own_grant(identifier)
+        return await self.revoke_did(did)
 
     async def change_registry(self, identifier: str, registry: str) -> bool:
         if not isinstance(registry, str) or not registry:

@@ -32,6 +32,9 @@ import {
     CheckDIDResult,
     RepairDIDResult,
     CreateAssetOptions,
+    CreateGrantOptions,
+    GrantChanges,
+    GrantInfo,
     DidCommReceivedMessage,
     DidCommUnpackResult,
     DmailItem,
@@ -1224,6 +1227,46 @@ export default class KeymasterClient implements KeymasterInterface {
     async mergeData(id: string, data: Record<string, unknown>): Promise<boolean> {
         try {
             const response = await this.axios.put(`${this.API}/assets/${id}`, { data });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createGrant(request: string, options?: CreateGrantOptions): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/grants`, { request, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listGrants(owner?: string): Promise<GrantInfo[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/grants`, owner ? { params: { owner } } : undefined);
+            return response.data.grants;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateGrant(id: string, changes: GrantChanges): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/grants/${encodeURIComponent(id)}`, { changes });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async revokeGrant(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/grants/${encodeURIComponent(id)}`);
             return response.data.ok;
         }
         catch (error) {

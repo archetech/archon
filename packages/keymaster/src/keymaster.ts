@@ -2,6 +2,7 @@ import { attachedJson, isCashuTokenMessage, issueCredentialMessage, type DidComm
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { CashuWallet, hasCashuState } from './cashu.js';
+import { grantIn, grantMember, grantRequestFault, grantRequestId, grantRequestIn, isDateTime, isNameList } from './grant.js';
 import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
@@ -43,7 +44,11 @@ import {
     AssetRevocation,
     CheckDIDResult,
     RepairDIDResult,
+    AppGrant,
     CreateAssetOptions,
+    CreateGrantOptions,
+    GrantChanges,
+    GrantInfo,
     EncryptedMessage,
     FileAssetOptions,
     CreateResponseOptions,
@@ -2068,6 +2073,299 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return revocations;
+    }
+
+    // Whether a resolved version is anchored on a registry: it names that
+    // registry as its chain and has the height and time of a block. `confirmed`
+    // is not that, since a creation is confirmed from the start.
+    private anchoredOn(doc: DidCidDocument, registry: string): boolean {
+        const timestamp = doc.didDocumentMetadata?.timestamp;
+        const { height, timeISO } = timestamp?.upperBound ?? {};
+
+        return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string';
+    }
+
+    // The actions a caller names for a grant: a list of at least one, none
+    // empty and none twice. What an action means is the app's.
+    private grantActions(actions: unknown, label: string): string[] {
+        if (!isNameList(actions)) {
+            throw new InvalidParameterError(`${label}: a list of at least one action, each once, is needed`);
+        }
+
+        return actions;
+    }
+
+    private grantExpiry(expiresAt: unknown, label: string): string {
+        if (!isDateTime(expiresAt)) {
+            throw new InvalidParameterError(`${label}: not a date-time such as 2027-01-31T00:00:00Z`);
+        }
+
+        return expiresAt;
+    }
+
+    // The app, the client and the request of a grant request, which is an
+    // asset the client created. Refuses one that cannot be read as that.
+    //
+    // Who asks is the request's controller, and only while the request is as
+    // it was created. An asset's owner can transfer it to any identity, which
+    // signs nothing, and can replace its contents first. The creation is signed
+    // by its controller and holds the contents that controller gave it, so a
+    // request that has had any version after its first does not say who asks
+    // for what it holds. Nothing in the data is read for who asks.
+    private async readGrantRequest(named: unknown): Promise<{ did: string; app: string; client: string; request: Record<string, any> }> {
+        const id = typeof named === 'string' ? grantRequestId(named) : '';
+
+        if (!id) {
+            throw new InvalidParameterError('request: a DID, an alias or an archon://grant link is needed');
+        }
+
+        let doc: DidCidDocument;
+
+        try {
+            doc = await this.resolveDID(id);
+        }
+        catch (error) {
+            if (error instanceof ArchonError) {
+                throw new InvalidParameterError('request: not found');
+            }
+            throw error;
+        }
+
+        const did = doc.didDocument?.id;
+        const client = doc.didDocument?.controller;
+
+        if (doc.didDocumentMetadata?.deactivated) {
+            throw new InvalidParameterError('request: deleted');
+        }
+        if (doc.didDocumentRegistration?.type !== 'asset' || !did || !client) {
+            throw new InvalidParameterError('request: not an asset');
+        }
+        if (Number(doc.didDocumentMetadata?.versionSequence) !== 1) {
+            throw new InvalidParameterError('request: changed since it was created, so who asks is not established');
+        }
+
+        const held = grantRequestIn(doc.didDocumentData);
+
+        if (!held) {
+            throw new InvalidParameterError('request: not a grant request');
+        }
+
+        const fault = grantRequestFault(held.request);
+
+        if (fault) {
+            throw new InvalidParameterError(`request: invalid (${fault})`);
+        }
+
+        return { did, app: held.app, client, request: held.request as Record<string, any> };
+    }
+
+    // Creates the grant a grant request asks for, as an asset of the granting
+    // identity, and returns its DID. The request is named by its DID, by an
+    // alias for it, or by a link, `archon://grant?request=<did>`. The grant's
+    // data is one member, named for the app the request names: a request held
+    // as `exampleGrantRequest` makes a grant held as `exampleGrant`.
+    //
+    // The grant has the request's `v`, its `client`, which is the identity
+    // that created the request, the DID of the `request`, and the request's
+    // `actions` and `expiresAt`, each when the request has it.
+    // `options.actions` narrows the actions the request lists, and
+    // `options.expiresAt` changes or removes the expiry.
+    //
+    // The grant is created on a registry the request lists and the node
+    // supports: the first such in the request's order when none is named.
+    // Whether the grant is valid under the app's rules is for the app's
+    // verifier, which this does not consult.
+    async createGrant(named: string, options: CreateGrantOptions = {}): Promise<string> {
+        const { did: requestDid, app, client, request } = await this.readGrantRequest(named);
+        const { alias } = options;
+        let actions: string[] | undefined = request.actions;
+
+        if (options.actions !== undefined && options.actions !== null) {
+            const chosen = this.grantActions(options.actions, 'options.actions');
+            const offered: string[] = request.actions ?? [];
+
+            if (!chosen.every(action => offered.includes(action))) {
+                throw new InvalidParameterError(offered.length > 0
+                    ? `options.actions: every action must be one of ${offered.join(', ')}`
+                    : 'options.actions: the request lists no actions to choose from');
+            }
+
+            actions = offered.filter(action => chosen.includes(action));
+        }
+
+        const requested = options.expiresAt === undefined ? request.expiresAt : options.expiresAt;
+        const expiresAt = requested === undefined || requested === null
+            ? undefined
+            : this.grantExpiry(requested, 'options.expiresAt');
+
+        const id = await this.fetchIdInfo(options.controller);
+        const grantor = await this.resolveDID(id.did, { confirm: true });
+
+        if (grantor.didDocument?.id === client) {
+            throw new InvalidParameterError('request: the granting identity made the request, and cannot grant itself');
+        }
+
+        const listed: string[] = request.registries;
+        const supported = await this.listRegistries();
+        let { registry } = options;
+
+        // createAsset puts a local identity's assets on `local` whatever
+        // registry is asked for, so that is where its grant would be.
+        if (grantor.didDocumentRegistration?.registry === 'local') {
+            if (!listed.includes('local') || (registry && registry !== 'local')) {
+                throw new InvalidParameterError(`options.controller: a local identity's grant is created on local, and the request lists ${listed.join(', ')}`);
+            }
+
+            registry = 'local';
+        }
+
+        if (!registry) {
+            registry = listed.find(name => supported.includes(name));
+
+            if (!registry) {
+                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports none of them`);
+            }
+        }
+        else if (!listed.includes(registry)) {
+            throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')}, not ${registry}`);
+        }
+        else if (!supported.includes(registry)) {
+            throw new InvalidParameterError(`options.registry: this node does not support ${registry}`);
+        }
+
+        const grant: AppGrant = {
+            ...(request.v === undefined ? {} : { v: request.v }),
+            client,
+            request: requestDid,
+            ...(actions === undefined ? {} : { actions }),
+            ...(expiresAt === undefined ? {} : { expiresAt }),
+        };
+
+        // The identity checked is named as the controller, so that it is the
+        // one that owns and signs the grant whatever the current ID is by then.
+        return this.createAsset({ [grantMember(app)]: grant }, { registry, controller: id.did, alias });
+    }
+
+    // The grants among the assets of an identity, each as its latest version
+    // states it, with the app it names. A grant whose deletion a node has
+    // accepted is not among them: listRevocations has it until the deletion is
+    // anchored. An asset the node cannot resolve is listed as `unresolved`,
+    // since it may be a grant.
+    //
+    // The identity's revocations are read first. A revocation that another
+    // change displaced left the grant live, and reading them is what puts such
+    // an asset back among those listAssets returns: without it a grant the
+    // client can still act under would be missing here.
+    async listGrants(owner?: string): Promise<GrantInfo[]> {
+        const grants: GrantInfo[] = [];
+
+        await this.listRevocations(owner);
+
+        for (const did of await this.listAssets(owner)) {
+            let doc: DidCidDocument;
+
+            try {
+                doc = await this.resolveDID(did);
+            }
+            catch {
+                grants.push({ did, status: 'unresolved' });
+                continue;
+            }
+
+            const held = grantIn(doc.didDocumentData);
+
+            if (doc.didDocumentMetadata?.deactivated || !held) {
+                continue;
+            }
+
+            const registry = doc.didDocumentRegistration?.registry ?? '';
+
+            grants.push({
+                did,
+                status: this.anchoredOn(doc, registry) ? 'anchored' : 'pending',
+                app: held.app,
+                grant: held.grant as AppGrant,
+                ...(typeof held.grant.request === 'string' ? { request: held.grant.request } : {}),
+                registry,
+                created: Number(doc.didDocumentMetadata?.versionSequence ?? 1) <= 1,
+            });
+        }
+
+        return grants;
+    }
+
+    // A live asset of the current ID that holds a grant, with the member of
+    // its data the grant is and the version of the asset it was read from.
+    private async ownGrant(id: string): Promise<{ did: string; member: string; grant: AppGrant; doc: DidCidDocument }> {
+        const owner = await this.fetchIdInfo();
+        const did = await this.lookupDID(id);
+        const doc = await this.resolveDID(did);
+        const held = grantIn(doc.didDocumentData);
+
+        if (doc.didDocumentMetadata?.deactivated || doc.didDocumentRegistration?.type !== 'asset' || !held) {
+            throw new InvalidParameterError('id: not a grant');
+        }
+        if (!this.didMatch(doc.didDocument?.controller ?? '', owner.did)) {
+            throw new InvalidParameterError('id: not a grant of the current ID');
+        }
+
+        return { did, member: held.member, grant: held.grant as AppGrant, doc };
+    }
+
+    // Changes the scope of a grant of the current ID in place: its `actions`,
+    // its `expiresAt` or both. `null` removes the member, which an app reads
+    // as it reads a grant made without one. Nothing is written when the change
+    // leaves the grant as it is.
+    //
+    // The update states the asset's whole data with the grant replaced, and
+    // every other member of the grant and of the data as it was. mergeData is
+    // not used: it drops a member whose value is null, and an app may read any
+    // other change to a grant's asset as the end of the grant.
+    //
+    // The update is signed as the successor of the version the grant was read
+    // from. If the grant has changed since, the node refuses it: writing it
+    // would put back the scope that change took away.
+    async updateGrant(id: string, changes: GrantChanges): Promise<boolean> {
+        if (!changes || typeof changes !== 'object'
+            || (changes.actions === undefined && changes.expiresAt === undefined)) {
+            throw new InvalidParameterError('changes: actions or expiresAt is needed');
+        }
+
+        const { did, member, grant, doc } = await this.ownGrant(id);
+        const data = doc.didDocumentData as Record<string, unknown>;
+        const updated: AppGrant = { ...grant };
+
+        if (changes.actions !== undefined) {
+            delete updated.actions;
+            if (changes.actions !== null) {
+                updated.actions = this.grantActions(changes.actions, 'changes.actions');
+            }
+        }
+
+        if (changes.expiresAt !== undefined) {
+            delete updated.expiresAt;
+            if (changes.expiresAt !== null) {
+                updated.expiresAt = this.grantExpiry(changes.expiresAt, 'changes.expiresAt');
+            }
+        }
+
+        // As objects, so that a member that is absent differs from one that is null.
+        const scopeOf = ({ actions, expiresAt }: AppGrant) => JSON.stringify({ actions, expiresAt });
+
+        if (scopeOf(updated) === scopeOf(grant)) {
+            return true;
+        }
+
+        return this.updateFromDocument(did, { didDocumentData: { ...data, [member]: updated } }, doc);
+    }
+
+    // Revokes a grant of the current ID by deleting its asset. On a chain
+    // registry the deletion takes effect once it is anchored; listRevocations
+    // says whether it is.
+    async revokeGrant(id: string): Promise<boolean> {
+        const { did } = await this.ownGrant(id);
+
+        return this.revokeDID(did);
     }
 
     async changeRegistry(id: string, registry: string): Promise<boolean> {

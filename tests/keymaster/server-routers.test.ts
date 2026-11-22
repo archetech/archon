@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
@@ -118,6 +119,10 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/assets', 400],
     ['GET', '/assets', 400],
     ['GET', '/revocations', 400],
+    ['POST', '/grants', 400],
+    ['GET', '/grants', 400],
+    ['PUT', '/grants/test-id', 400],
+    ['DELETE', '/grants/test-id', 400],
     ['GET', '/assets/test-id', 404],
     ['PUT', '/assets/test-id', 400],
     ['POST', '/assets/test-id/transfer', 400],
@@ -767,3 +772,47 @@ test.each(['Alice / backup', 'Alice/check', 'Alice/repair', 'did:cid:alice'])(
         expect(keymaster.repairDID).toHaveBeenCalledWith(identifier);
     },
 );
+
+test.each(['clients/example', 'Alice / grant', 'did:cid:grant'])(
+    'grant routes preserve encoded identifier %s', async identifier => {
+        const { app, keymaster } = mount();
+        const path = `/grants/${encodeURIComponent(identifier)}`;
+        const changes = { actions: null, expiresAt: '2028-01-01T00:00:00Z' };
+
+        expect((await request(app).put(path).send({ changes })).status).toBe(200);
+        expect((await request(app).delete(path)).status).toBe(200);
+        expect(keymaster.updateGrant).toHaveBeenCalledWith(identifier, changes);
+        expect(keymaster.revokeGrant).toHaveBeenCalledWith(identifier);
+    },
+);
+
+// The rules of the service's metric labels, as its source states them.
+function metricLabel(path: string): string {
+    const source = readFileSync('services/keymaster/server/src/keymaster-api.ts', 'utf-8');
+    const body = source.slice(source.indexOf('function normalizePath'), source.indexOf('const app = express()'));
+    const rules = [...body.matchAll(/\.replace\(\/(.+)\/g, '([^']+)'\)/g)];
+
+    expect(rules.length).toBeGreaterThan(20);
+    return rules.reduce((label, [, pattern, replacement]) => label.replace(new RegExp(pattern, 'g'), replacement), path.split('?')[0]);
+}
+
+test('metric labels give every asset, and every grant, one label', () => {
+    expect(metricLabel('/api/v1/assets/did:cid:abcdef')).toBe('/api/v1/assets/:id');
+    expect(metricLabel('/api/v1/grants')).toBe('/api/v1/grants');
+    expect(metricLabel('/api/v1/grants?owner=Alice')).toBe('/api/v1/grants');
+    expect(metricLabel('/api/v1/grants/did:cid:abcdef')).toBe('/api/v1/grants/:id');
+    expect(metricLabel(`/api/v1/grants/${encodeURIComponent('clients/example')}`)).toBe('/api/v1/grants/:id');
+});
+
+test('grant routes pass the request, its options and the owner', async () => {
+    const { app, keymaster } = mount();
+    const named = 'archon://grant?request=did:cid:request';
+    const options = { registry: 'ETH:mainnet', actions: ['example:read'], expiresAt: null };
+
+    expect((await request(app).post('/grants').send({ request: named, options })).status).toBe(200);
+    expect((await request(app).get('/grants')).status).toBe(200);
+    expect((await request(app).get('/grants').query({ owner: 'Alice' })).status).toBe(200);
+    expect(keymaster.createGrant).toHaveBeenCalledWith(named, options);
+    expect(keymaster.listGrants).toHaveBeenNthCalledWith(1, undefined);
+    expect(keymaster.listGrants).toHaveBeenNthCalledWith(2, 'Alice');
+});

@@ -71,6 +71,8 @@ Apply a supported repair explicitly with `archon_repair_did` and
 `{ "did": "Alice", "confirm": true }`. Inspection never submits an operation;
 repair reports `submitted` separately from `confirmed`.
 
+Use `archon_create_grant` with `{ "request": "did:cid:…" }` to let a client application act in an identity's name. A client asks with a grant request, an asset it created whose data holds one `<app>GrantRequest` member; `request` is that asset's DID, an alias for it, or a link `archon://grant?request=<did>`. The grant is an asset holding the matching `<app>Grant`, to the identity that created the request. Keymaster applies no app's rules: it refuses a request that is missing, deleted, changed since it was created or not of the shape of a request, and leaves whether the grant is valid to the app. `registry` must be one the request lists, and defaults to the first it lists that the node supports; the result is `{ "did", "registry" }`. `actions` picks from the actions the request lists, and `expiresAt` sets the expiry, or as `null` leaves out the one the request asks for. `archon_list_grants` lists an identity's grants with the app of each, `archon_update_grant` changes a grant's `actions` or `expiresAt` (`null` removes either), and `archon_revoke_grant` revokes one with `"confirm": true`.
+
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
 ### Structured inputs
@@ -432,6 +434,10 @@ Pay a Lightning invoice:
 | `get-property` | `archon_get_property` |
 | `set-property` | `archon_set_property` |
 | `list-assets` | `archon_list_assets` |
+| `create-grant` | `archon_create_grant` |
+| `list-grants` | `archon_list_grants` |
+| `update-grant` | `archon_update_grant` |
+| `revoke-grant` | `archon_revoke_grant` |
 | `create-poll-template` | `archon_create_poll_template` |
 | `create-poll` | `archon_create_poll` |
 | `add-poll-voter` | `archon_add_poll_voter` |

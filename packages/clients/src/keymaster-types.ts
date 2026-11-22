@@ -669,6 +669,60 @@ export interface AssetRevocation {
     status: 'pending' | 'displaced' | 'unresolved';
 }
 
+// A grant: what an identity lets a client application do in its name. It is the
+// one member of an asset's data named `<app>Grant`, where `<app>` is the app
+// whose client it is for. Keymaster reads only the members named here; what
+// they permit is for the app to say.
+export interface AppGrant {
+    v?: number;
+    // The DID of the client the grant is to.
+    client: string;
+    // The DID of the request the grant answers.
+    request?: string;
+    actions?: string[];
+    expiresAt?: string;
+    [other: string]: unknown;
+}
+
+export interface CreateGrantOptions {
+    // One of the registries the request lists. Defaults to the first of them,
+    // in the request's order, that the node supports.
+    registry?: string;
+    // The identity that grants. Defaults to the current ID.
+    controller?: string;
+    alias?: string;
+    // Some of the actions the request lists. Defaults to all it lists.
+    actions?: string[];
+    // Defaults to the expiry the request asks for; `null` for a grant with
+    // none.
+    expiresAt?: string | null;
+}
+
+// A change to a grant's scope. A member left out is kept as it is, and `null`
+// removes it from the grant.
+export interface GrantChanges {
+    actions?: string[] | null;
+    expiresAt?: string | null;
+}
+
+// One of an identity's assets, read as a grant.
+export interface GrantInfo {
+    did: string;
+    // `anchored`: the latest version of the grant is anchored on its registry.
+    // `pending`: it is not. `unresolved`: the node could not resolve the
+    // asset, which may or may not be a grant.
+    status: 'anchored' | 'pending' | 'unresolved';
+    // The app the grant names: `example` for a grant held as `exampleGrant`.
+    app?: string;
+    // The grant as its latest version states it.
+    grant?: AppGrant;
+    // The DID of the request the grant answers, when the grant names one.
+    request?: string;
+    registry?: string;
+    // Whether the latest version is the grant's creation.
+    created?: boolean;
+}
+
 export interface CheckDIDResult {
     did: string;
     type?: string;
@@ -813,6 +867,12 @@ export interface KeymasterInterface {
     listRevocations(owner?: string): Promise<AssetRevocation[]>;
     resolveAsset(did: string, options?: ResolveDIDOptions): Promise<unknown | null>;
     mergeData(did: string, data: Record<string, unknown>): Promise<boolean>;
+
+    // Grants
+    createGrant(request: string, options?: CreateGrantOptions): Promise<string>;
+    listGrants(owner?: string): Promise<GrantInfo[]>;
+    updateGrant(did: string, changes: GrantChanges): Promise<boolean>;
+    revokeGrant(did: string): Promise<boolean>;
 
     // Encryption
     encryptMessage(msg: string, receiver: string, options?: EncryptOptions): Promise<string>;
