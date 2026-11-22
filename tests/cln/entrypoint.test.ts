@@ -33,10 +33,12 @@ beforeEach(() => {
     // STUB_<NAME>=when:N exits with 0 once socat has recorded N calls: the
     // script stops its relays when lightningd exits, so a lightningd that
     // exits at once can end a relay before it has recorded that it started.
-    // STUB_<NAME>_DELAY is how many seconds the stub takes to start.
+    // STUB_<NAME>_DELAY is how many seconds the stub takes to start, and
+    // `never` is a stub that does not get as far as recording that it started.
     for (const name of ['lightningd', 'socat']) {
         const control = `STUB_${name.toUpperCase()}`;
         stub(name, `
+[[ "\${${control}_DELAY:-0}" == never ]] && while :; do sleep 0.05; done
 sleep "\${${control}_DELAY:-0}"
 printf '%s\\n' "$@" > "${log}/${name}.args"
 echo "$*" >> "${log}/${name}.calls"
@@ -336,8 +338,8 @@ describe('RPC share', () => {
 
     it('stops a relay that has not started yet when lightningd exits at once', () => {
         // What the tests above wait out: nothing is recorded by a relay the
-        // script stopped before it began.
-        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_SOCAT_DELAY: '0.3' })).status).toBe(0);
+        // script stopped before it began. The script does not wait for one.
+        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_SOCAT_DELAY: 'never' })).status).toBe(0);
         expect(calls()).toEqual([]);
     });
 
