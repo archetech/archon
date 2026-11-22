@@ -250,7 +250,7 @@ def test_create_grant_refuses_a_permitted_registry_the_node_does_not_support(nod
 def test_create_grant_refuses_when_the_node_supports_no_permitted_registry(node):
     node.gatekeeper.registries = ["local", "hyperswarm", "BTC:signet"]
 
-    with refuses(f"options.registry: the request lists {PERMITTED} and this node supports local, hyperswarm, BTC:signet$"):
+    with refuses(f"options.registry: the request lists {PERMITTED} and this node supports none of {PERMITTED}$"):
         run(node.keymaster.create_grant(link_for(node)))
 
 
@@ -301,7 +301,7 @@ def test_create_grant_refuses_a_registry_the_request_does_not_list(node):
 def test_create_grant_refuses_when_the_node_supports_none_of_the_registries_the_request_lists(node):
     message = (
         "options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta"
-        " and this node supports local, hyperswarm, BTC:mainnet, ETH:mainnet$"
+        " and this node supports BTC:mainnet, ETH:mainnet$"
     )
     with refuses(message):
         run(node.keymaster.create_grant(link_for(node, registries=["ZEC:mainnet", "SOL:mainnet-beta"])))
@@ -505,6 +505,30 @@ def test_list_grants_does_not_list_a_revoked_grant_which_list_revocations_has(no
     assert run(node.keymaster.list_revocations()) == [{"did": revoked, "registry": BTC, "status": "pending"}]
 
 
+def test_list_grants_lists_a_grant_again_after_a_revocation_that_did_not_take_effect(node):
+    did = run(node.keymaster.create_grant(link_for(node, actions=["memeplex:tag"])))
+    live = deepcopy(node.gatekeeper.docs[did])
+
+    assert run(node.keymaster.revoke_grant(did)) is True
+    assert run(node.keymaster.list_grants()) == []
+    assert run(node.keymaster.fetch_id_info("Alice")).get("revoking") == [did]
+
+    # Another change took the deletion's place: the node resolves the grant as live.
+    node.gatekeeper.docs[did] = live
+    run(node.keymaster.create_id("Bob", {"registry": "hyperswarm"}))
+
+    assert run(node.keymaster.list_grants()) == []
+    assert run(node.keymaster.list_grants("Alice")) == [{
+        "did": did,
+        "status": "pending",
+        "grant": {"v": 1, "client": node.client, "actions": ["memeplex:tag"], "nonce": NONCE},
+        "registry": BTC,
+        "created": True,
+    }]
+    assert run(node.keymaster.list_assets("Alice")) == [did]
+    assert run(node.keymaster.fetch_id_info("Alice")).get("revoking") is None
+
+
 # update_grant
 
 
@@ -695,9 +719,9 @@ def test_revoke_grant_deletes_the_grant(node):
 
     assert run(node.keymaster.revoke_grant(did)) is True
     assert run(node.keymaster.resolve_did(did))["didDocumentMetadata"]["deactivated"] is True
-    assert run(node.keymaster.list_grants()) == []
     # The fake Gatekeeper keeps the creation's anchor on the deleted version.
     del node.gatekeeper.docs[did]["didDocumentMetadata"]["timestamp"]
+    assert run(node.keymaster.list_grants()) == []
     assert run(node.keymaster.list_revocations()) == [{"did": did, "registry": BTC, "status": "pending"}]
 
 

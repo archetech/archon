@@ -2657,9 +2657,12 @@ class Keymaster:
                 None,
             )
             if not registry:
+                # Of the registries a grant may be created on, those the node has.
+                offered = [name for name in PERMITTED_GRANT_REGISTRIES if name in supported]
+                has = ", ".join(offered) if offered else f"none of {permitted}"
                 raise KeymasterError(
                     f"Invalid parameter: options.registry: the request lists {', '.join(listed)}"
-                    f" and this node supports {', '.join(supported)}"
+                    f" and this node supports {has}"
                 )
         elif registry not in PERMITTED_GRANT_REGISTRIES:
             raise KeymasterError(f"Invalid parameter: options.registry: a grant may be created on {permitted}")
@@ -2702,8 +2705,14 @@ class Keymaster:
         list_revocations has it until the deletion is anchored. An asset the
         node cannot resolve is listed as ``unresolved``, since it may be a
         grant.
+
+        The identity's revocations are read first. A revocation that another
+        change displaced left the grant live, and reading them is what puts
+        such an asset back among those list_assets returns: without it a grant
+        the client can still publish under would be missing here.
         """
         grants: list[dict[str, Any]] = []
+        await self.list_revocations(owner)
         for did in await self.list_assets(owner):
             try:
                 doc = await self.resolve_did(did)

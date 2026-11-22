@@ -291,7 +291,7 @@ describe('createGrant', () => {
         jest.spyOn(gatekeeper, 'listRegistries').mockResolvedValue(['local', 'hyperswarm', 'BTC:signet']);
 
         await expect(keymaster.createGrant(linkFor())).rejects.toThrow(
-            'Invalid parameter: options.registry: the request lists BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta and this node supports local, hyperswarm, BTC:signet');
+            'Invalid parameter: options.registry: the request lists BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta and this node supports none of BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta');
     });
 
     it('refuses a request that lists no registries', async () => {
@@ -336,7 +336,7 @@ describe('createGrant', () => {
 
     it('refuses when the node supports none of the registries the request lists', async () => {
         await expect(keymaster.createGrant(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }))).rejects.toThrow(
-            'Invalid parameter: options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta and this node supports local, hyperswarm, BTC:mainnet, ETH:mainnet');
+            'Invalid parameter: options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta and this node supports BTC:mainnet, ETH:mainnet');
         expect(await keymaster.listAssets()).toStrictEqual([]);
     });
 
@@ -526,6 +526,29 @@ describe('listGrants', () => {
         expect(await keymaster.revokeGrant(revoked)).toBe(true);
         expect((await keymaster.listGrants()).map(each => each.did)).toStrictEqual([kept]);
         expect(await keymaster.listRevocations()).toStrictEqual([{ did: revoked, registry: BTC, status: 'pending' }]);
+    });
+});
+
+describe('listGrants after a revocation that did not take effect', () => {
+    it('lists the grant again, for the identity that made it', async () => {
+        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
+        const live = await gatekeeper.resolveDID(did);
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+
+        expect(await keymaster.revokeGrant(did)).toBe(true);
+        expect(await keymaster.listGrants()).toStrictEqual([]);
+        expect((await keymaster.fetchIdInfo('Alice')).revoking).toStrictEqual([did]);
+
+        // Another change took the deletion's place: the node resolves the grant as live.
+        jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (id, options) => id === did ? live : resolve(id, options));
+        await keymaster.createId('Bob', { registry: 'hyperswarm' });
+
+        expect(await keymaster.listGrants()).toStrictEqual([]);
+        expect(await keymaster.listGrants('Alice')).toStrictEqual([{
+            did, status: 'pending', grant: { v: 1, client, actions: ['memeplex:tag'], nonce: NONCE }, registry: BTC, created: true,
+        }]);
+        expect(await keymaster.listAssets('Alice')).toStrictEqual([did]);
+        expect((await keymaster.fetchIdInfo('Alice')).revoking).toBeUndefined();
     });
 });
 

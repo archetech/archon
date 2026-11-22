@@ -2158,7 +2158,11 @@ export default class Keymaster implements KeymasterInterface {
                 .find(permitted => supported.includes(permitted) && listed.includes(permitted));
 
             if (!registry) {
-                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${supported.join(', ')}`);
+                // Of the registries a grant may be created on, those the node has.
+                const offered = PERMITTED_GRANT_REGISTRIES.filter(permitted => supported.includes(permitted));
+                const has = offered.length > 0 ? offered.join(', ') : `none of ${PERMITTED_GRANT_REGISTRIES.join(', ')}`;
+
+                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${has}`);
             }
         }
         else if (!PERMITTED_GRANT_REGISTRIES.includes(registry)) {
@@ -2201,8 +2205,15 @@ export default class Keymaster implements KeymasterInterface {
     // states it. A grant whose deletion a node has accepted is not among them:
     // listRevocations has it until the deletion is anchored. An asset the node
     // cannot resolve is listed as `unresolved`, since it may be a grant.
+    //
+    // The identity's revocations are read first. A revocation that another
+    // change displaced left the grant live, and reading them is what puts such
+    // an asset back among those listAssets returns: without it a grant the
+    // client can still publish under would be missing here.
     async listGrants(owner?: string): Promise<GrantInfo[]> {
         const grants: GrantInfo[] = [];
+
+        await this.listRevocations(owner);
 
         for (const did of await this.listAssets(owner)) {
             let doc: DidCidDocument;
