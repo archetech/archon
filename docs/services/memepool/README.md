@@ -8,8 +8,8 @@ A user does two things with a wallet, once each:
 1. **Signs in.** The service issues a challenge, the wallet answers it, and the
    service knows which DID it is talking to.
 2. **Grants the service.** The service creates a grant request, an asset of its own
-   as a challenge is, and shows a link naming it, of the kind that names a
-   challenge, which a wallet opens, scans or is given pasted; the wallet resolves the
+   as a challenge is, and shows a grant link naming it (`archon://auth?grant=<DID>`),
+   which a wallet opens, scans or is given pasted; the wallet resolves the
    request, reads from it that the service is asking, and creates the grant from the
    user's identity. A session is shown one request, which lasts an hour, and a new
    one when that nears its end.
@@ -43,7 +43,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `POST /callback` | Where a wallet sends `{ "response": "did:cid:…" }`, its answer, when the challenge names this as its callback. Signs nobody in: the answer is kept for the browser that asked |
 | `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it asks whether a wallet has sent an answer to the callback: `202` with `{ "waiting": true }` until one has, then `{ "answered": "did:cid:…" }`, which is who answered and not yet a session. With `{ "confirm": "did:cid:…" }` naming that identity it signs the browser in. Sets the session cookie and returns the DID signed in |
 | `POST /logout` | Ends the session |
-| `GET /me` | The DID signed in, with its `grant` and `registry`, any `others` in force, and the `actions` those grants allow when every one of them is narrowed; or with the grant `link` to show and any grants still `pending` |
+| `GET /me` | The DID signed in, with its `grant` and `registry`, any `others` in force, and the `actions` those grants allow when every one of them is narrowed; or with the grant `link` to show and any grants still `pending`; or, on a node with no registry a grant may be on, with `unavailable` saying so in place of a link |
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`; returns its `did` |
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |

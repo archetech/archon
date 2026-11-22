@@ -867,14 +867,32 @@ There is no central moderator. Viewers choose which judgments to apply:
 
 ### Wallet
 
-The wallet lists active grants with their scope ("all core kinds" or the listed
-actions) and expiry. It grants what a client requests, including any requested
-`expiresAt`, unless the user narrows the scope or changes the expiry; lets the user
-choose each grant's registry from the permitted mainnets; changes a grant's scope or
-expiry in place with a scope update; and makes revoking a grant a single action. It shows a revocation in three states: **requested** (signed by the wallet),
+The wallets have grants in their Auth tab, beside signing in. A grant request
+reaches it pasted, as a link or a DID, or by opening or scanning a grant link
+(`archon://auth?grant=<DID>`), and is shown for review: nothing is created until the
+user approves.
+
+A wallet knows no app, Memeplex included: it reads a request and a grant by the
+rules Keymaster uses for any app's (`@didcid/keymaster/grant`), and the Memeplex
+rules are the verifier's. So it:
+
+- shows the client's DID, the app, and the client's name as the client's own claim;
+- shows the actions a request lists as the request names them (`memeplex:post`), and
+  for a request that lists none says that the grant allows whatever the app allows;
+- grants what the request asks, including any requested `expiresAt`, unless the user
+  leaves out some of the actions it lists or changes the expiry;
+- offers the registries the request lists that its node supports, and creates
+  nothing when there are none;
+- lists the identity's grants, of any app, with their actions, expiry and registry;
+- changes a grant's actions or expiry in place with a scope update. It can leave out
+  an action the grant lists and cannot add one, since it does not know what else the
+  app has: a wider grant is a new grant, or a change made with `update-grant`;
+- makes revoking a grant a single action.
+
+It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). Until it is effective, the wallet warns the user that the client can
-still publish.
+still act under the grant.
 
 ## Content availability
 
@@ -979,7 +997,7 @@ until the verifier exists.
 5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The wallets (`packages/wallet-ui`) have grants in their Auth tab, beside signing in: it takes a pasted grant link, resolves the request it names and reads it with Keymaster's `grantRequestOf` (`@didcid/keymaster/grant`), as it would any app's. The wallet knows no app, so it shows a request's actions as the request names them and can narrow a grant's actions but not add one. An agent, which acts through the CLI and the MCP tools and cannot paste a link into a wallet, uses Keymaster's grants: `create-grant <request>`, `list-grants`, `update-grant <id>` and `revoke-grant <id>` in the three CLIs (`scripts/archon-cli.js`, the TypeScript and the Python Keymaster CLI), the MCP tools `archon_create_grant` and the rest, and `/grants` on the Keymaster service. Those grants are not Memeplex's alone. Keymaster knows no app: a client of any app asks with a grant request, an asset it creates holding `<app>GrantRequest`, and Keymaster answers with an asset holding `<app>Grant`, to the identity that created the request (`packages/keymaster/README.md`, "Grants"). Memeplex is the app `memeplex`. Keymaster checks only the shape every request has, so a grant it makes is not thereby valid under these rules: the verifier says. `tests/keymaster/grant.test.ts` has the verifier read the grants Keymaster makes for a `memeplexGrantRequest`. Still to do:
    - A wallet shows a revocation's state only until it is closed.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
-7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge. The service does not publish content by reference yet: when it does, for an article or a paper, it pins what it publishes (see Content availability).
+7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge. The service takes an object that references content by its CID, as the client library does, and neither stores the bytes nor pins them: a caller has to have put them on IPFS already, and the pages offer no way to. Storing an article's or a paper's body, and pinning what the service publishes (see Content availability), are still to do.
 8. **Moderation:** block lists and labels.
 
 ## References

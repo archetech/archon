@@ -2,7 +2,9 @@
 
 The verifier for [Memeplex](../../docs/plans/memeplex-1436.md), a protocol for publishing on Archon in which every object is a DID.
 
-It is given evidence and returns a verdict. It makes no network requests, so the same code runs in a wallet, a command line and an indexer, and the caller chooses which node's evidence to trust.
+It is given evidence and returns a verdict. It makes no network requests, so the same code runs in a browser, a command line and an indexer, and the caller chooses which node's evidence to trust.
+
+A second entry, `@didcid/memeplex/client`, is what a client does to ask for a grant and publish under it. It is at the end of this page.
 
 ## Validity
 
@@ -17,6 +19,27 @@ validateGrantRequest(request);
 Each returns `'valid'`, `'unsupported'` for a `v` this version does not know, or the reason the value is invalid: `'version'`, `'kind'`, `'schema'`, `'rating-bounds'`, `'paper-authors'` or `'expiry-instant'`.
 
 Validity says nothing about who published an object. That is attribution, below.
+
+## Asking for a grant
+
+A client asks by creating a grant request, an asset whose data is `{ "memeplexGrantRequest": { … } }`, and showing a wallet a link that names it.
+
+```js
+import { grantLink, parseGrantLink, readGrantRequest } from '@didcid/memeplex';
+
+grantLink(requestDid);                    // 'archon://auth?grant=did:cid:…'
+parseGrantLink(text);                     // the DID a link names, or a DID alone; undefined otherwise
+
+const read = readGrantRequest(resolved);  // the request's DID, as a node resolves it
+if (!('error' in read)) {
+    read.client;                          // who is asking: the request's controller
+    read.request;                         // what is asked: name, registries, actions, expiresAt
+}
+```
+
+`readGrantRequest` gives `error` for a request that is `not-found`, `deactivated`, `not-an-asset`, `invalid-request` (with `validity`) or `changed`. Who asks is the request's controller, and only at its first version: an asset can be given new contents and transferred to an identity that signed nothing, so a later version does not say who asks.
+
+An Archon wallet does not use these. It reads any app's request with Keymaster's own rules, and what Memeplex makes of the grant is for this verifier.
 
 ## Grants
 
@@ -110,3 +133,26 @@ index.coauthors(paper);
 
 Because every view is a function of the versions held, an index filled in any order, or filled again from nothing, answers the same as one kept up to date. `snapshot()` returns every publication by DID, for comparing two indexes.
 
+## A client
+
+```js
+import { MemeplexClient, IndexerClient, usable, allows } from '@didcid/memeplex/client';
+
+const client = new MemeplexClient({ keymaster, gatekeeper, identity: 'memepool' });
+
+const { did, link } = await client.requestGrant({ name: 'Memepool', registries: ['BTC:mainnet'] });
+// show `link` to the user's wallet, then:
+const grant = usable(await client.findGrants(did));     // undefined until one grant answers and is anchored
+
+if (grant && allows(grant, 'post')) {
+    const post = await client.publish(grant, { kind: 'post', text: 'Hello.' });
+    await client.edit(post, grant, { kind: 'post', text: 'Hello, world.' });
+    await client.withdraw(post, grant);
+}
+```
+
+`MemeplexClient` acts through a Keymaster that holds the client's identity and a Gatekeeper it reads from, both handed to it, so this entry adds no dependency. `requestGrant` creates the request, on `hyperswarm` and valid for an hour unless told otherwise. `findGrants` returns each grant that answers a request, as the verifier reads it; `grantsFrom(user)` returns a known user's grants, whatever request they answer. A client checks a kind against the grant's scope with `allows` before it creates anything: an object outside the scope is accepted by the node and never attributed.
+
+The client that publishes an object [pins the content](../../docs/plans/memeplex-reference-1436.md#content-availability) the object references. `publish` and `edit` take a reference as given and do not pin it.
+
+`IndexerClient` reads an indexer over HTTP: whether it is `ready`, a `publication`, a `timeline` and a `thread`.
