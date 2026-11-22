@@ -20,8 +20,11 @@ import math
 import re
 from typing import Any
 
-# What a link to a grant request begins with. The request's DID follows.
-GRANT_LINK_PREFIX = "archon://grant?request="
+# What a link to a grant request begins with. The request's DID follows. It is
+# an auth link, as a challenge's is (``archon://auth?challenge=<DID>``): both
+# name a DID that a service made and a wallet answers, and the parameter says
+# which.
+GRANT_LINK_PREFIX = "archon://auth?grant="
 
 GRANT_REQUEST_SUFFIX = "GrantRequest"
 GRANT_SUFFIX = "Grant"
@@ -80,7 +83,10 @@ def grant_request_id(named: str) -> str:
     with the white space around it removed. Empty for what begins as a DID and
     is not one alone."""
     text = named.strip(JS_WHITESPACE)
-    identifier = text[len(GRANT_LINK_PREFIX):] if text.startswith(GRANT_LINK_PREFIX) else text
+    identifier = text
+    if text.startswith(GRANT_LINK_PREFIX):
+        # A link built with a URL library has the DID's colons percent-encoded.
+        identifier = re.sub("%3[Aa]", ":", text[len(GRANT_LINK_PREFIX):])
     if identifier.startswith("did:") and not _BARE_DID.fullmatch(identifier):
         return ""
     return identifier

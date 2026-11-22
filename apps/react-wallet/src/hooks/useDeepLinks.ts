@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { takeDeepLink } from "../utils/deepLinkQueue";
-import { extractAlias, extractDid } from "../utils/utils";
+import { extractAlias, extractDid, extractGrant } from "../utils/utils";
 
 // Deep links are this wallet's alone: it is the Capacitor app the OS can launch
 // with an archon:// URL, so the shared WalletProvider carries none of this.
@@ -43,6 +43,15 @@ export function useDeepLinks() {
         const handleQueued = () => {
             const url = takeDeepLink();
             if (!url) {
+                return;
+            }
+
+            // A grant request goes to the Auth tab as one, and not as the
+            // challenge a DID in an auth link otherwise is.
+            const grant = extractGrant(url);
+
+            if (grant) {
+                openEvent({ did: grant }, "archon:openGrant");
                 return;
             }
 

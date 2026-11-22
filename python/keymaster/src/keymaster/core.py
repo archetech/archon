@@ -2612,7 +2612,7 @@ class Keymaster:
         """
         identifier = grant_request_id(named) if isinstance(named, str) else ""
         if not identifier:
-            raise KeymasterError("Invalid parameter: request: a DID, an alias or an archon://grant link is needed")
+            raise KeymasterError("Invalid parameter: request: a DID, an alias or an archon://auth link is needed")
         try:
             doc = await self.resolve_did(identifier)
         except KeymasterError:
@@ -2629,7 +2629,7 @@ class Keymaster:
         granting identity, and returns its DID.
 
         The request is named by its DID, by an alias for it, or by a link,
-        ``archon://grant?request=<did>``. The grant's data is one member, named
+        ``archon://auth?grant=<did>``. The grant's data is one member, named
         for the app the request names: a request held as
         ``exampleGrantRequest`` makes a grant held as ``exampleGrant``.
 

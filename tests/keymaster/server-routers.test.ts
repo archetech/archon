@@ -806,7 +806,7 @@ test('metric labels give every asset, and every grant, one label', () => {
 
 test('grant routes pass the request, its options and the owner', async () => {
     const { app, keymaster } = mount();
-    const named = 'archon://grant?request=did:cid:request';
+    const named = 'archon://auth?grant=did:cid:request';
     const options = { registry: 'ETH:mainnet', actions: ['example:read'], expiresAt: null };
 
     expect((await request(app).post('/grants').send({ request: named, options })).status).toBe(200);

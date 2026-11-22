@@ -12,6 +12,7 @@ import { Capacitor } from '@capacitor/core';
 
 type PendingWalletAction =
     | { type: 'auth'; challenge: string; deepLinkUrl: string }
+    | { type: 'grant'; grant: string; deepLinkUrl: string }
     | { type: 'credential'; credential: string; deepLinkUrl: string }
     | { type: 'alias'; alias: string; did: string; deepLinkUrl: string };
 
@@ -28,6 +29,15 @@ function getPendingWalletAction(): PendingWalletAction | null {
             type: 'auth',
             challenge,
             deepLinkUrl: `archon://auth?challenge=${encodeURIComponent(challenge)}`,
+        };
+    }
+
+    const grant = params.get('grant');
+    if (grant?.startsWith('did:')) {
+        return {
+            type: 'grant',
+            grant,
+            deepLinkUrl: `archon://auth?grant=${encodeURIComponent(grant)}`,
         };
     }
 
@@ -116,6 +126,7 @@ async function tryExtensionHandoff(action: PendingWalletAction): Promise<boolean
         requestId: openRequestId,
         action: action.type,
         challenge: action.type === 'auth' ? action.challenge : undefined,
+        grant: action.type === 'grant' ? action.grant : undefined,
         credential: action.type === 'credential' ? action.credential : undefined,
         alias: action.type === 'alias' ? action.alias : undefined,
         did: action.type === 'alias' ? action.did : undefined,
