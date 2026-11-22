@@ -10,6 +10,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import * as memeplex from '@didcid/memeplex';
 import type { ResolvedVersion } from '@didcid/memeplex';
+import { MemeplexClient } from '@didcid/memeplex/client';
 import * as grants from '../../packages/keymaster/src/grant.ts';
 
 // Grants from a Keymaster: docs/plans/memeplex-reference-1436.md, "Grant request
@@ -23,7 +24,7 @@ import * as grants from '../../packages/keymaster/src/grant.ts';
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 const read = (name: string) => JSON.parse(readFileSync(path.join(FIXTURES, name), 'utf-8'));
 
-type LinkCase = { name: string; link: string; expect: Record<string, unknown>; verifier?: 'pending' };
+type LinkCase = { name: string; link: string; expect: Record<string, unknown> };
 type ValidityCase = { name: string; member: string; expect: string; request?: unknown; operation?: { data: Record<string, unknown> } };
 
 const linkCases: LinkCase[] = read('memeplex-grant-link-vectors.json').cases;
@@ -46,34 +47,23 @@ describe('the rules Keymaster states', () => {
             .toStrictEqual(['expiry-instant', 'schema', 'unsupported', 'valid', 'version']);
     });
 
-    // What Keymaster makes of a vector. A request needs `registries`, so one
-    // without them that would otherwise reach the schema fails it.
-    const expected = (each: ValidityCase) => {
-        const unlisted = each.member === 'memeplexGrantRequest' && !Object.hasOwn(each.request as object, 'registries');
-
-        return unlisted && ['valid', 'expiry-instant'].includes(each.expect) ? 'schema' : each.expect;
-    };
-
     it.each(validityCases.map(each => [each.name, each] as const))('judge %s as its vector states', (_name, each) => {
         const value = each.request ?? each.operation!.data[each.member];
         const [ours, theirs] = each.member === 'memeplexGrant'
             ? [grants.validateGrant(value), memeplex.validateGrant(value)]
             : [grants.validateGrantRequest(value), memeplex.validateGrantRequest(value)];
 
-        expect(ours).toBe(expected(each));
+        expect(ours).toBe(each.expect);
         expect(theirs).toBe(each.expect);
     });
 
     it.each(linkCases.map(each => [each.name, each] as const))('decode a link with %s as its vector states', (_name, each) => {
         expect(grants.decodeGrantLink(each.link)).toStrictEqual(each.expect);
-        if (each.verifier !== 'pending') {
-            expect(memeplex.decodeGrantLink(each.link)).toStrictEqual(each.expect);
-        }
+        expect(memeplex.decodeGrantLink(each.link)).toStrictEqual(each.expect);
     });
 
     it('judge the request each link vector carries as the verifier does, as a grant too', () => {
         const carried = linkCases
-            .filter(each => each.verifier !== 'pending')
             .map(each => {
                 try {
                     return JSON.parse(Buffer.from(each.link.slice(grants.GRANT_LINK_PREFIX.length), 'base64url').toString('utf8'));
@@ -89,13 +79,6 @@ describe('the rules Keymaster states', () => {
             expect(grants.validateGrant(value)).toBe(memeplex.validateGrant(value));
             expect(grants.validateGrantRequest(value)).toBe(memeplex.validateGrantRequest(value));
         }
-    });
-
-    it('leave to the verifier only the registries a request lists', () => {
-        expect(linkCases.filter(each => each.verifier === 'pending').map(each => each.name)).toStrictEqual([
-            'no registries', 'no registries listed', 'a registry twice', 'a registry a grant may not be created on',
-            'a testnet registry', 'registries that are not a list', 'a registry that is not a string',
-        ]);
     });
 
     it('allow a grant a registries member, which is no field of a grant', () => {
@@ -202,6 +185,18 @@ describe('createGrant', () => {
 
         await anchor(100);
         expect(await verified(did)).toMatchObject({ status: 'valid', user: alice, client, registry: BTC, pending: 0 });
+    });
+
+    it('creates, from the link a client makes, a grant that client finds', async () => {
+        const asking = new MemeplexClient({ keymaster, gatekeeper, identity: 'Memepool' } as never);
+        const { request, link } = await asking.requestGrant({ name: 'Memepool', registries: [ETH], actions: ['memeplex:post'] });
+
+        await keymaster.setCurrentId('Alice');
+        const did = await keymaster.createGrant(link);
+
+        expect((await keymaster.resolveDID(did)).didDocumentRegistration).toMatchObject({ registry: ETH });
+        await anchor(100, ETH);
+        expect(await asking.findGrants(request)).toMatchObject([{ did, grant: { status: 'valid', user: alice, registry: ETH } }]);
     });
 
     it('grants the actions and the expiry the link asks for', async () => {

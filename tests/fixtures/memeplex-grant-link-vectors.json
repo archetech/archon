@@ -604,8 +604,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "no registries listed",
@@ -613,8 +612,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "a registry twice",
@@ -622,8 +620,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "a registry a grant may not be created on",
@@ -631,8 +628,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "a testnet registry",
@@ -640,8 +636,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "registries that are not a list",
@@ -649,8 +644,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "a registry that is not a string",
@@ -658,8 +652,7 @@
             "expect": {
                 "error": "invalid-request",
                 "validity": "schema"
-            },
-            "verifier": "pending"
+            }
         },
         {
             "name": "an expiry with an offset",

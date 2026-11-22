@@ -60,19 +60,12 @@ def test_there_are_vectors_for_grants_and_for_grant_requests():
     ]
 
 
-def expected(case):
-    """What Keymaster makes of a vector. A request needs ``registries``, so one
-    without them that would otherwise reach the schema fails it."""
-    unlisted = case["member"] == "memeplexGrantRequest" and "registries" not in case["request"]
-    return "schema" if unlisted and case["expect"] in ("valid", "expiry-instant") else case["expect"]
-
-
 @pytest.mark.parametrize("case", named(VALIDITY_CASES))
 def test_a_grant_or_a_request_is_judged_as_its_vector_states(case):
     if case["member"] == "memeplexGrant":
         assert grants.validate_grant(case["operation"]["data"]["memeplexGrant"]) == case["expect"]
     else:
-        assert grants.validate_grant_request(case["request"]) == expected(case)
+        assert grants.validate_grant_request(case["request"]) == case["expect"]
 
 
 @pytest.mark.parametrize("case", named(LINK_CASES))

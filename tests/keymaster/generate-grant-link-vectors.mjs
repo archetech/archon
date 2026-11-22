@@ -5,9 +5,7 @@
 //
 //   node tests/keymaster/generate-grant-link-vectors.mjs
 //
-// The expectations are stated here, not computed by a decoder. A case marked
-// `verifier: 'pending'` states a rule the verifier does not apply, and the test
-// does not ask the verifier about it.
+// The expectations are stated here, not computed by a decoder.
 
 import { writeFileSync } from 'fs';
 import path from 'path';
@@ -29,8 +27,6 @@ const valid = (name, memeplexGrantRequest) => accepted(name, carrying(memeplexGr
 const refused = (name, link, error) => ({ name, link, expect: { error } });
 const invalid = (name, memeplexGrantRequest, validity) =>
     ({ name, link: carrying(memeplexGrantRequest), expect: { error: 'invalid-request', validity } });
-
-const pending = vector => ({ ...vector, verifier: 'pending' });
 
 const long = carrying(request);
 const text = JSON.stringify({ memeplexGrantRequest: request });
@@ -105,13 +101,13 @@ const cases = [
     invalid('an action that is not a string', { ...request, actions: [1] }, 'schema'),
     invalid('an extension kind that is not pinned', { ...request, actions: [EXTENSION.split('?')[0]] }, 'schema'),
     invalid('an extension kind followed by a line feed', { ...request, actions: [`${EXTENSION}\n`] }, 'schema'),
-    pending(invalid('no registries', { v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE }, 'schema')),
-    pending(invalid('no registries listed', { ...request, registries: [] }, 'schema')),
-    pending(invalid('a registry twice', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] }, 'schema')),
-    pending(invalid('a registry a grant may not be created on', { ...request, registries: ['BTC:mainnet', 'hyperswarm'] }, 'schema')),
-    pending(invalid('a testnet registry', { ...request, registries: ['BTC:signet'] }, 'schema')),
-    pending(invalid('registries that are not a list', { ...request, registries: 'BTC:mainnet' }, 'schema')),
-    pending(invalid('a registry that is not a string', { ...request, registries: [1] }, 'schema')),
+    invalid('no registries', { v: 1, client: CLIENT, name: 'Memepool', nonce: NONCE }, 'schema'),
+    invalid('no registries listed', { ...request, registries: [] }, 'schema'),
+    invalid('a registry twice', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] }, 'schema'),
+    invalid('a registry a grant may not be created on', { ...request, registries: ['BTC:mainnet', 'hyperswarm'] }, 'schema'),
+    invalid('a testnet registry', { ...request, registries: ['BTC:signet'] }, 'schema'),
+    invalid('registries that are not a list', { ...request, registries: 'BTC:mainnet' }, 'schema'),
+    invalid('a registry that is not a string', { ...request, registries: [1] }, 'schema'),
     invalid('an expiry with an offset', { ...request, expiresAt: '2026-12-31T00:00:00+00:00' }, 'schema'),
     invalid('an expiry without a time', { ...request, expiresAt: '2026-12-31' }, 'schema'),
     invalid('an expiry followed by a line feed', { ...request, expiresAt: '2026-12-31T00:00:00Z\n' }, 'schema'),
