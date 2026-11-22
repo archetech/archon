@@ -529,6 +529,20 @@ describe('updateGrant', () => {
         expect(await grantOf(did)).toStrictEqual({ client, request });
     });
 
+    it('removes a member whose value is null, which is not the same as having none', async () => {
+        const did = await keymaster.createAsset({ exampleGrant: { client, actions: null, expiresAt: null } }, { registry: BTC });
+        const before = await sequenceOf(did);
+
+        expect(await keymaster.updateGrant(did, { expiresAt: null })).toBe(true);
+        expect(await dataOf(did)).toStrictEqual({ exampleGrant: { client, actions: null } });
+        expect(await sequenceOf(did)).toBe('2');
+
+        expect(await keymaster.updateGrant(did, { actions: null })).toBe(true);
+        expect(await dataOf(did)).toStrictEqual({ exampleGrant: { client } });
+        expect(await sequenceOf(did)).toBe('3');
+        expect(before).toBe('1');
+    });
+
     it('writes nothing when the change leaves the grant as it is', async () => {
         const did = await keymaster.createGrant(await requestOf({ actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' }));
         const before = await sequenceOf(did);

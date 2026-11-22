@@ -2349,7 +2349,10 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        if (JSON.stringify([updated.actions, updated.expiresAt]) === JSON.stringify([grant.actions, grant.expiresAt])) {
+        // As objects, so that a member that is absent differs from one that is null.
+        const scopeOf = ({ actions, expiresAt }: AppGrant) => JSON.stringify({ actions, expiresAt });
+
+        if (scopeOf(updated) === scopeOf(grant)) {
             return true;
         }
 

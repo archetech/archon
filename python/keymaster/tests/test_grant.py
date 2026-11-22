@@ -616,6 +616,20 @@ def test_update_grant_removes_the_actions_or_the_expiry_with_none_and_sets_eithe
     assert grant_of(node, did) == plain
 
 
+def test_update_grant_removes_a_member_whose_value_is_none_which_is_not_the_same_as_having_none(node):
+    by_hand = {"exampleGrant": {"client": node.client, "actions": None, "expiresAt": None}}
+    did = run(node.keymaster.create_asset(by_hand, {"registry": BTC}))
+    assert sequence_of(node, did) == 1
+
+    assert run(node.keymaster.update_grant(did, {"expiresAt": None})) is True
+    assert data_of(node, did) == {"exampleGrant": {"client": node.client, "actions": None}}
+    assert sequence_of(node, did) == 2
+
+    assert run(node.keymaster.update_grant(did, {"actions": None})) is True
+    assert data_of(node, did) == {"exampleGrant": {"client": node.client}}
+    assert sequence_of(node, did) == 3
+
+
 def test_update_grant_writes_nothing_when_the_change_leaves_the_grant_as_it_is(node):
     request = request_of(node, actions=["example:read"], expiresAt="2028-01-01T00:00:00Z")
     did = run(node.keymaster.create_grant(request))
