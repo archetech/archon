@@ -129,6 +129,10 @@ function SignIn() {
             };
             const responseData = decrypted.response;
 
+            if (arrival !== arrivals.current) {
+                return;
+            }
+
             setAutoLogin({
                 responseDID,
                 callbackUrl,

@@ -181,6 +181,27 @@ describe('the Auth tab', () => {
         expect(screen.getByText(/Login Request/)).toBeTruthy();
     });
 
+    it('does not let an answer that was slow to read replace the one that came after it', async () => {
+        const read = (challenge: string, requested: number) => ({ response: { challenge, credentials: [], requested, fulfilled: 0, match: true } });
+        let release!: (value: unknown) => void;
+
+        keymaster.resolveAsset.mockResolvedValue({ challenge: { callback: '' } });
+        keymaster.createResponse.mockImplementation(async (challenge: string) => `${challenge}:response`);
+        keymaster.decryptJSON.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+        keymaster.decryptJSON.mockResolvedValue(read('did:cid:second', 2));
+        navigation.pendingChallenge = 'did:cid:first';
+        const shown = render(<AuthTab />);
+        await waitFor(() => expect(keymaster.decryptJSON).toHaveBeenCalledTimes(1));
+
+        navigation.pendingChallenge = 'did:cid:second';
+        await act(async () => { shown.rerender(<AuthTab />); });
+        expect(await screen.findByText('0 of 2 credential(s) matched')).toBeTruthy();
+
+        await act(async () => { release(read('did:cid:first', 1)); });
+        expect(screen.getByText('0 of 2 credential(s) matched')).toBeTruthy();
+        expect(screen.queryByText('0 of 1 credential(s) matched')).toBeNull();
+    });
+
     it('comes back to signing in when a challenge arrives by a link', async () => {
         const user = userEvent.setup();
         const shown = render(<AuthTab />);
