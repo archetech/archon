@@ -61,6 +61,7 @@ const ABSENT_FROM_CLIENTS: Record<string, string> = {
     getSchema: 'The clients read schemas through resolveAsset, as they do groups.',
     listAssets: 'How the Auth tab\'s Grants section finds an identity\'s grants among its assets. Granting a client is a wallet\'s job: it is where a user approves a grant link. The clients can make the same asset with their own asset controls.',
     listRevocations: 'How the Grants section shows a grant\'s revocation as awaiting anchoring after the wallet is reopened. The clients have no Grants section; their asset lists show what listAssets returns.',
+    updateGrant: 'How the Grants section narrows a grant\'s actions and changes its expiry, keeping whatever else the asset holds. The clients have no Grants section; they can change the same asset\'s data with their own asset controls.',
     signNostrEvent: 'The NIP-07 approval flow in the browser extension, which signs on behalf of a visited page. A client demo has no page asking it to sign.',
 };
 

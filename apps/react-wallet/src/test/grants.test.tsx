@@ -9,7 +9,7 @@ const REQUEST = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequ
 const SCHEMA = `did:cid:bagaaieraschema?versionId=b${'a'.repeat(58)}`;
 
 const keymaster = {
-    createAsset: vi.fn(), listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), mergeData: vi.fn(), revokeDID: vi.fn(),
+    createAsset: vi.fn(), listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), updateGrant: vi.fn(), revokeDID: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn() };
 
@@ -84,7 +84,7 @@ beforeEach(() => {
     holding({});
     keymaster.listRevocations.mockResolvedValue([]);
     keymaster.createAsset.mockResolvedValue(GRANT);
-    keymaster.mergeData.mockResolvedValue(true);
+    keymaster.updateGrant.mockResolvedValue(true);
     keymaster.revokeDID.mockResolvedValue(true);
 });
 
@@ -391,13 +391,11 @@ describe('Grants view: the grants an identity holds', () => {
         await user.click(within(dialog).getByLabelText('memeplex:tag'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({
-            memeplexGrant: {
-                v: 1, client: CLIENT, request: REQUEST, note: 'kept',
-                actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate'], expiresAt: '2030-01-02T03:04:59.500Z',
-            },
-        });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        // Keymaster is told the two members to set, and keeps the rest.
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([
+            GRANT, { actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate'], expiresAt: '2030-01-02T03:04:59.500Z' },
+        ]);
     });
 
     it('will not save a change to a grant that has changed since it was shown', async () => {
@@ -412,7 +410,7 @@ describe('Grants view: the grants an identity holds', () => {
 
         await waitFor(() => expect(notify.error).toHaveBeenCalled());
         expect(String(notify.error.mock.calls[0][0])).toMatch(/has changed since/);
-        expect(keymaster.mergeData).not.toHaveBeenCalled();
+        expect(keymaster.updateGrant).not.toHaveBeenCalled();
         expect(await screen.findByText('memeplex:post')).toBeTruthy();
     });
 
@@ -438,7 +436,7 @@ describe('Grants view: the grants an identity holds', () => {
     });
 
     it('keeps the editor open and says so when the node refuses a change', async () => {
-        keymaster.mergeData.mockResolvedValue(false);
+        keymaster.updateGrant.mockResolvedValue(false);
         holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:tag'] } }) });
         view();
         const user = userEvent.setup();
@@ -467,12 +465,10 @@ describe('Grants view: the grants an identity holds', () => {
         await user.clear(within(dialog).getByLabelText('Expires'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        const [did, data] = keymaster.mergeData.mock.calls[0];
-        expect(did).toBe(GRANT);
-        expect(data).toStrictEqual({
-            memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], request: REQUEST },
-        });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([
+            GRANT, { actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], expiresAt: null },
+        ]);
     });
 
     it('offers, to change a grant, the actions it lists and no others', async () => {
@@ -486,8 +482,8 @@ describe('Grants view: the grants an identity holds', () => {
         await user.click(within(dialog).getByLabelText(SCHEMA));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post'] } });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { actions: ['memeplex:post'], expiresAt: null }]);
     });
 
     it('changes the expiry of a grant that lists no actions, and leaves it listing none', async () => {
@@ -501,8 +497,46 @@ describe('Grants view: the grants an identity holds', () => {
         await user.clear(within(dialog).getByLabelText('Expires'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT } });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { expiresAt: null }]);
+    });
+
+    it('lists a grant whose actions it cannot read without failing, and will revoke it but not change it', async () => {
+        holding({
+            [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: 'read' } }),
+            'did:cid:empty': doc({ exampleGrant: { client: CLIENT, actions: [] } }),
+        });
+        view();
+        const [odd, empty] = await screen.findAllByTestId('grant');
+
+        expect(within(odd).getByText('Actions in a form this wallet cannot read')).toBeTruthy();
+        expect((within(odd).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((within(odd).getByRole('button', { name: 'Revoke' }) as HTMLButtonElement).disabled).toBe(false);
+        expect(within(empty).getByText('No actions')).toBeTruthy();
+    });
+
+    it('leaves a grant that lists an empty set of actions listing it, when only the expiry changes', async () => {
+        holding({ [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: [], expiresAt: '2030-01-02T03:04:00Z' } }) });
+        view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Change' }));
+        await user.clear(within(screen.getByRole('dialog')).getByLabelText('Expires'));
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { expiresAt: null }]);
+    });
+
+    it('shows a grant on a registry that is no chain as active, with no anchoring to wait for', async () => {
+        holding({ [GRANT]: doc({ exampleGrant: { client: CLIENT } }, pending(), 'hyperswarm') });
+        view();
+        const user = userEvent.setup();
+        const card = await screen.findByTestId('grant');
+
+        expect(within(card).getByText('Active')).toBeTruthy();
+        expect(within(card).queryByText(/anchored/)).toBeNull();
+        await user.click(within(card).getByRole('button', { name: 'Change' }));
+        expect(within(screen.getByRole('dialog')).queryByText(/anchored/)).toBeNull();
     });
 
     it('lists a grant of any app, and changes it under its own name', async () => {
@@ -517,8 +551,8 @@ describe('Grants view: the grants an identity holds', () => {
         await user.click(within(screen.getByRole('dialog')).getByLabelText('write'));
         await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({ exampleGrant: { client: CLIENT, actions: ['read'] } });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { actions: ['read'], expiresAt: null }]);
     });
 });
 

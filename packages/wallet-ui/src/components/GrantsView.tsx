@@ -30,7 +30,7 @@ import EmptyState from "./layout/EmptyState";
 // the app's to say. packages/keymaster/README.md, "Grants".
 
 export type GrantsKeymaster = Pick<KeymasterInterface,
-    "createAsset" | "listAssets" | "listRevocations" | "resolveDID" | "mergeData"
+    "createAsset" | "listAssets" | "listRevocations" | "resolveDID" | "updateGrant"
 > & {
     revokeDID(id: string): Promise<boolean>;
 };
@@ -148,8 +148,26 @@ function expiryOf(scope: Scope): string | undefined {
 
 type Resolved = Awaited<ReturnType<GrantsKeymaster["resolveDID"]>>;
 
+// The registries that are no chain. What is made on one is never anchored, and
+// has nothing to wait for.
+const NO_CHAIN = ["local", "hyperswarm", "pin"];
+
+const hasChain = (registry: string) => !NO_CHAIN.includes(registry);
+
+// Whether a resolved version has the standing its registry gives: anchored, on
+// a chain, and accepted by the node, which resolving it shows, on a registry
+// that is none.
 function isAnchored(doc: Resolved, registry: string): boolean {
-    return anchoredOn(doc as Parameters<typeof anchoredOn>[0], registry);
+    return !hasChain(registry) || anchoredOn(doc as Parameters<typeof anchoredOn>[0], registry);
+}
+
+// Whether a grant's actions are ones this view can show and change: a list of
+// names, or none. Keymaster takes an asset as a grant on its client alone, so
+// the rest of what a grant holds may be anything.
+function readable(grant: GrantData): boolean {
+    const { actions } = grant as { actions?: unknown };
+
+    return actions === undefined || (Array.isArray(actions) && actions.every(action => typeof action === "string"));
 }
 
 // The `actions` a scope stands for: none when none are listed, which a grant
@@ -198,7 +216,14 @@ function ScopeEditor({ scope, onChange, disabled }: { scope: Scope; onChange: (s
 }
 
 function describeScope(held: HeldGrant): string {
-    return held.grant.actions ? held.grant.actions.join(", ") : `Whatever ${held.app} allows a client`;
+    if (!readable(held.grant)) {
+        return "Actions in a form this wallet cannot read";
+    }
+    if (!held.grant.actions) {
+        return `Whatever ${held.app} allows a client`;
+    }
+
+    return held.grant.actions.length > 0 ? held.grant.actions.join(", ") : "No actions";
 }
 
 function isExpired(grant: GrantData): boolean {
@@ -553,19 +578,6 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         const { grant: held, scope: edited } = editing;
         const actions = actionsOf(edited);
         const expiresAt = expiryOf(edited);
-        // Everything else the grant holds is kept: a change to anything but
-        // `actions` and `expiresAt` would end the grant.
-        const grant: GrantData = { ...held.grant };
-
-        delete grant.actions;
-        delete grant.expiresAt;
-
-        if (actions) {
-            grant.actions = actions;
-        }
-        if (expiresAt) {
-            grant.expiresAt = expiresAt;
-        }
 
         setBusy(true);
         try {
@@ -579,7 +591,10 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 throw new Error("This grant has changed since it was shown. Review it and make the change again.");
             }
 
-            if (!await keymaster.mergeData(held.did, { [held.member]: grant })) {
+            // Keymaster changes these two members and keeps everything else the
+            // asset holds. Actions are named only when there were some to
+            // choose among, so a grant that lists none is left listing none.
+            if (!await keymaster.updateGrant(held.did, { ...(actions ? { actions } : {}), expiresAt: expiresAt ?? null })) {
                 throw new Error("The node did not accept the change");
             }
             setEditing(null);
@@ -626,7 +641,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         }
 
         if (accepted) {
-            mark("submitted", uncertain);
+            // On a registry that is no chain, a deletion the node is known to
+            // have accepted has nothing more to wait for.
+            mark(uncertain || hasChain(held.registry) ? "submitted" : "effective", uncertain);
             return;
         }
 
@@ -747,7 +764,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     )}
                     {(state === "requested" || state === "submitted") && (
                         <Typography variant="body2">
-                            The client can still act under this grant until the revocation is anchored on {held.registry}.
+                            The client can still act under this grant until the revocation is {hasChain(held.registry) ? `anchored on ${held.registry}` : "accepted"}.
                         </Typography>
                     )}
                 </Alert>
@@ -815,6 +832,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     <Box sx={{ display: "flex", gap: 1 }}>
                         <Button
                             size="small"
+                            disabled={!readable(held.grant)}
                             onClick={() => setEditing({
                                 grant: held,
                                 scope: scopeOf(held.grant.actions, held.grant.expiresAt),
@@ -830,9 +848,11 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             <Dialog open={editing !== null} onClose={() => !busy && setEditing(null)}>
                 <DialogTitle>Change grant</DialogTitle>
                 <DialogContent>
-                    <DialogContentText sx={{ mb: 1 }}>
-                        A change takes effect once it is anchored on {editing?.grant.registry}.
-                    </DialogContentText>
+                    {editing && hasChain(editing.grant.registry) && (
+                        <DialogContentText sx={{ mb: 1 }}>
+                            A change takes effect once it is anchored on {editing.grant.registry}.
+                        </DialogContentText>
+                    )}
                     {editing && (
                         <ScopeEditor
                             scope={editing.scope}
@@ -858,8 +878,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 <DialogContent>
                     <DialogContentText>
                         The client will no longer be able to act for this identity once the
-                        revocation is anchored on {revoking?.registry}. What it did under the grant
-                        stands. A revocation cannot be undone.
+                        revocation is {revoking && hasChain(revoking.registry) ? `anchored on ${revoking.registry}` : "accepted"}.
+                        What it did under the grant stands. A revocation cannot be undone.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
