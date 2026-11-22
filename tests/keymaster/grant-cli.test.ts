@@ -59,6 +59,7 @@ beforeEach(() => {
     routes = {
         'POST /grants': () => ({ body: { did: 'did:cid:grant' } }),
         'GET /grants': () => ({ body: { grants: GRANTS } }),
+        'GET /did/did:cid:grant': () => ({ body: { docs: { didDocumentRegistration: { registry: 'BTC:mainnet' } } } }),
         'PUT /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
         'DELETE /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
         'DELETE /grants/clients%2Fmemepool': () => ({ body: { ok: true } }),
@@ -77,12 +78,26 @@ function run(...args: string[]): Promise<{ status: number, stdout: string, stder
 }
 
 describe('create-grant', () => {
-    it('sends the link alone and prints the DID', async () => {
-        const { status, stdout } = await run('create-grant', LINK);
+    it('sends the link alone, prints the DID alone, and says which registry was used', async () => {
+        const { status, stdout, stderr } = await run('create-grant', LINK);
 
         expect(status).toBe(0);
         expect(stdout).toBe('did:cid:grant');
-        expect(requests).toEqual([{ route: 'POST /grants', body: { link: LINK, options: {} } }]);
+        expect(stderr).toBe('Created on BTC:mainnet');
+        expect(requests).toEqual([
+            { route: 'POST /grants', body: { link: LINK, options: {} } },
+            { route: 'GET /did/did:cid:grant', body: undefined },
+        ]);
+    });
+
+    it('succeeds when the grant is made and the node cannot then say where', async () => {
+        routes['GET /did/did:cid:grant'] = () => ({ status: 500, body: { error: 'unreachable' } });
+
+        const { status, stdout, stderr } = await run('create-grant', LINK);
+
+        expect(status).toBe(0);
+        expect(stdout).toBe('did:cid:grant');
+        expect(stderr).toBe('Created on an unknown registry');
     });
 
     it('sends its options', async () => {

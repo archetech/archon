@@ -473,8 +473,13 @@ describe('mcp server tools', () => {
         const link = 'archon://grant?request=abc';
         const call = (name: string, args: Record<string, unknown>) => server.tools.get(name)!.handler(args);
 
-        expect(expectOk(await call('archon_create_grant', { link }))).toBe('did:cid:grant');
+        runtime.keymaster.resolveDID.mockResolvedValue({ didDocumentRegistration: { registry: 'BTC:mainnet' } });
+        expect(expectOk(await call('archon_create_grant', { link }))).toStrictEqual({ did: 'did:cid:grant', registry: 'BTC:mainnet' });
         expect(runtime.keymaster.createGrant).toHaveBeenLastCalledWith(link, undefined);
+        expect(runtime.keymaster.resolveDID).toHaveBeenLastCalledWith('did:cid:grant');
+
+        runtime.keymaster.resolveDID.mockRejectedValueOnce(new Error('unreachable'));
+        expect(expectOk(await call('archon_create_grant', { link }))).toStrictEqual({ did: 'did:cid:grant' });
 
         expectOk(await call('archon_create_grant', { link, registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null }));
         expect(runtime.keymaster.createGrant)

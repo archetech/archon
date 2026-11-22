@@ -73,9 +73,21 @@ def _is_integer(value: Any) -> bool:
     return isinstance(value, float) and value.is_integer()
 
 
+def _is_registry_list(registries: Any) -> bool:
+    """The registries a grant request lists, when it limits where the client
+    can publish: at least one of the permitted registries, each once."""
+    return (
+        isinstance(registries, list)
+        and len(registries) >= 1
+        and all(isinstance(registry, str) and registry in PERMITTED_GRANT_REGISTRIES for registry in registries)
+        and len(set(registries)) == len(registries)
+    )
+
+
 def _matches_schema(value: dict[str, Any], request: bool) -> bool:
     """The grant schema, and the grant request schema, which also requires
-    ``name`` and ``nonce``. A field neither schema names is allowed."""
+    ``name`` and ``nonce`` and reads ``registries``. A field neither schema
+    names is allowed, so ``registries`` in a grant is one of those."""
     client = value.get("client")
     if not isinstance(client, str) or not _DID.fullmatch(client):
         return False
@@ -86,6 +98,8 @@ def _matches_schema(value: dict[str, Any], request: bool) -> bool:
         if not isinstance(name, str) or not 1 <= len(name) <= 100:
             return False
         if "nonce" not in value:
+            return False
+        if "registries" in value and not _is_registry_list(value["registries"]):
             return False
 
     if "actions" in value:

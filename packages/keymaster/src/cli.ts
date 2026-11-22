@@ -196,6 +196,18 @@ async function offerToSave(file: string, passphrase: string): Promise<void> {
 // `keymaster create-id alice && next` runs `next` after alice failed, and no
 // script or CI step can tell. exitCode rather than exit(1), so stdout a
 // partially-completed command already wrote still flushes.
+// The registry a grant was created on, for a command that did not have to name
+// one. The grant exists whether or not the node can be asked.
+async function grantRegistry(did: string): Promise<string> {
+    try {
+        const doc = await keymaster.resolveDID(did);
+        return doc.didDocumentRegistration?.registry ?? 'an unknown registry';
+    }
+    catch {
+        return 'an unknown registry';
+    }
+}
+
 // The actions a comma-separated option names.
 function splitActions(actions: string): string[] {
     return actions.split(',').map(action => action.trim()).filter(Boolean);
@@ -2129,7 +2141,7 @@ program
     .command('create-grant <link>')
     .description('Create a Memeplex grant from a grant link')
     .option('-a, --alias <alias>', 'DID alias')
-    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports)')
+    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports and the link allows)')
     .option('--actions <actions>', 'comma-separated actions, from those the link asks for (default: all of them)')
     .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)')
     .option('--no-expiry', 'make a grant that lasts until it is revoked')
@@ -2149,6 +2161,7 @@ program
                 expiresAt: expiry ? expires : null,
             });
             console.log(did);
+            note(`Created on ${await grantRegistry(did)}`);
         }
         catch (error: any) {
             fail(error.error || error.message || error);

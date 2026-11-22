@@ -5,7 +5,9 @@
 //
 //   node tests/keymaster/generate-grant-link-vectors.mjs
 //
-// The expectations are stated here, not computed by a decoder.
+// The expectations are stated here, not computed by a decoder. A case marked
+// `verifier: 'pending'` states a rule the verifier does not apply, and the test
+// does not ask the verifier about it.
 
 import { writeFileSync } from 'fs';
 import path from 'path';
@@ -27,6 +29,8 @@ const refused = (name, link, error) => ({ name, link, expect: { error } });
 const invalid = (name, memeplexGrantRequest, validity) =>
     ({ name, link: carrying(memeplexGrantRequest), expect: { error: 'invalid-request', validity } });
 
+const pending = vector => ({ ...vector, verifier: 'pending' });
+
 const long = carrying(request);
 const text = JSON.stringify({ memeplexGrantRequest: request });
 
@@ -37,6 +41,8 @@ const cases = [
     valid('a name outside ASCII', { ...request, name: 'Mémépool 模因池 🌊' }),
     valid('a name of 100 code points outside the basic plane', { ...request, name: '🌊'.repeat(100) }),
     valid('a field the schema does not name', { ...request, label: 'phone' }),
+    valid('the registries the client can publish on', { ...request, registries: ['ETH:mainnet', 'BTC:mainnet'] }),
+    valid('every permitted registry', { ...request, registries: ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'] }),
     accepted('v written as 1.0', linkOf(text.replace('"v":1', '"v":1.0')), request),
     accepted('white space around the JSON', linkOf(` \n\t${text}\r\n `), request),
     accepted('a byte order mark before the JSON', PREFIX + encode([0xef, 0xbb, 0xbf, ...Buffer.from(text, 'utf8')]), request),
@@ -98,6 +104,12 @@ const cases = [
     invalid('an action that is not a string', { ...request, actions: [1] }, 'schema'),
     invalid('an extension kind that is not pinned', { ...request, actions: [EXTENSION.split('?')[0]] }, 'schema'),
     invalid('an extension kind followed by a line feed', { ...request, actions: [`${EXTENSION}\n`] }, 'schema'),
+    pending(invalid('no registries listed', { ...request, registries: [] }, 'schema')),
+    pending(invalid('a registry twice', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] }, 'schema')),
+    pending(invalid('a registry a grant may not be created on', { ...request, registries: ['BTC:mainnet', 'hyperswarm'] }, 'schema')),
+    pending(invalid('a testnet registry', { ...request, registries: ['BTC:signet'] }, 'schema')),
+    pending(invalid('registries that are not a list', { ...request, registries: 'BTC:mainnet' }, 'schema')),
+    pending(invalid('a registry that is not a string', { ...request, registries: [1] }, 'schema')),
     invalid('an expiry with an offset', { ...request, expiresAt: '2026-12-31T00:00:00+00:00' }, 'schema'),
     invalid('an expiry without a time', { ...request, expiresAt: '2026-12-31' }, 'schema'),
     invalid('an expiry followed by a line feed', { ...request, expiresAt: '2026-12-31T00:00:00Z\n' }, 'schema'),

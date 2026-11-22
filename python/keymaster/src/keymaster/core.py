@@ -2638,15 +2638,35 @@ class Keymaster:
         requested = options["expiresAt"] if "expiresAt" in options else request.get("expiresAt")
         expires_at = None if requested is None else self._grant_expiry(requested, "options.expiresAt")
 
+        # A request may list the registries its client can publish on. The
+        # grant is created on one of them, since the client's objects go on
+        # the grant's registry.
+        listed = request.get("registries")
         supported = await self.list_registries()
         registry = options.get("registry")
         permitted = ", ".join(PERMITTED_GRANT_REGISTRIES)
         if not registry:
-            registry = next((name for name in PERMITTED_GRANT_REGISTRIES if name in supported), None)
+            registry = next(
+                (
+                    name
+                    for name in PERMITTED_GRANT_REGISTRIES
+                    if name in supported and (not listed or name in listed)
+                ),
+                None,
+            )
+            if not registry and listed:
+                raise KeymasterError(
+                    f"Invalid parameter: options.registry: the request lists {', '.join(listed)}"
+                    f" and this node supports {', '.join(supported)}"
+                )
             if not registry:
                 raise KeymasterError(f"Invalid parameter: options.registry: this node supports none of {permitted}")
         elif registry not in PERMITTED_GRANT_REGISTRIES:
             raise KeymasterError(f"Invalid parameter: options.registry: a grant may be created on {permitted}")
+        elif listed and registry not in listed:
+            raise KeymasterError(
+                f"Invalid parameter: options.registry: the request lists {', '.join(listed)}, not {registry}"
+            )
         elif registry not in supported:
             raise KeymasterError(f"Invalid parameter: options.registry: this node does not support {registry}")
 
@@ -2667,9 +2687,9 @@ class Keymaster:
         if expires_at:
             memeplex_grant["expiresAt"] = expires_at
 
-        asset_options = {"registry": registry}
-        if controller:
-            asset_options["controller"] = controller
+        # The identity checked is named as the controller, so that it is the
+        # one that owns and signs the grant whatever the current ID is by then.
+        asset_options = {"registry": registry, "controller": id_info["did"]}
         if options.get("alias"):
             asset_options["alias"] = options["alias"]
         return await self.create_asset({"memeplexGrant": memeplex_grant}, asset_options)
@@ -2711,8 +2731,9 @@ class Keymaster:
             })
         return grants
 
-    async def _own_grant(self, identifier: str) -> tuple[str, dict[str, Any]]:
-        """A live asset of the current ID that holds a valid grant."""
+    async def _own_grant(self, identifier: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        """A live asset of the current ID that holds a valid grant: its DID,
+        the grant, and the data the grant is a member of."""
         owner = await self.fetch_id_info()
         did = await self.lookup_did(identifier)
         doc = await self.resolve_did(did)
@@ -2726,7 +2747,7 @@ class Keymaster:
             raise KeymasterError("Invalid parameter: id: not a grant")
         if not self.did_match((doc.get("didDocument") or {}).get("controller") or "", owner["did"]):
             raise KeymasterError("Invalid parameter: id: not a grant of the current ID")
-        return did, grant
+        return did, grant, data
 
     async def update_grant(self, identifier: str, changes: dict[str, Any]) -> bool:
         """Changes the scope of a grant of the current ID in place.
@@ -2737,11 +2758,16 @@ class Keymaster:
         kept, since a change to any other ends the grant. The actions on offer
         are the core actions and the extension kinds the grant lists. Nothing
         is written when the change leaves the grant as it is.
+
+        The update states the asset's whole data with ``memeplexGrant``
+        replaced. merge_data is not used: it drops a member whose value is
+        None, and a change to the data outside the grant's scope ends the
+        grant too.
         """
         if not isinstance(changes, dict) or ("actions" not in changes and "expiresAt" not in changes):
             raise KeymasterError("Invalid parameter: changes: actions or expiresAt is needed")
 
-        did, grant = await self._own_grant(identifier)
+        did, grant, data = await self._own_grant(identifier)
         updated = dict(grant)
 
         if "actions" in changes:
@@ -2761,7 +2787,7 @@ class Keymaster:
 
         if updated == grant:
             return True
-        return await self.merge_data(did, {"memeplexGrant": updated})
+        return await self.update_did(did, {"didDocumentData": {**data, "memeplexGrant": updated}})
 
     async def revoke_grant(self, identifier: str) -> bool:
         """Revokes a grant of the current ID by deleting its asset.
@@ -2769,7 +2795,7 @@ class Keymaster:
         The client can publish until the deletion is anchored on the grant's
         registry; list_revocations says whether it is.
         """
-        did, _ = await self._own_grant(identifier)
+        did, _, _ = await self._own_grant(identifier)
         return await self.revoke_did(did)
 
     async def change_registry(self, identifier: str, registry: str) -> bool:

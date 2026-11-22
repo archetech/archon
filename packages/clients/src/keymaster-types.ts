@@ -683,8 +683,8 @@ export interface MemeplexGrant {
 }
 
 export interface CreateGrantOptions {
-    // One of the registries a grant may be created on. Defaults to the first of
-    // them the node supports.
+    // One of the registries a grant may be created on, and of those the request
+    // lists when it lists any. Defaults to the first of them the node supports.
     registry?: string;
     // The identity that grants. Defaults to the current ID.
     controller?: string;

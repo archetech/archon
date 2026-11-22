@@ -247,6 +247,67 @@ def test_create_grant_takes_the_next_permitted_registry_when_the_node_lacks_the_
     assert run(node.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == ETH
 
 
+def test_create_grant_uses_a_registry_the_request_lists_and_leaves_the_list_out_of_the_grant(node):
+    did = run(node.keymaster.create_grant(link_for(node, registries=[ETH])))
+
+    assert run(node.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == ETH
+    assert grant_of(node, did) == {"v": 1, "client": node.client, "nonce": NONCE}
+
+    first = run(node.keymaster.create_grant(link_for(node, registries=[ETH, BTC])))
+    assert run(node.keymaster.resolve_did(first))["didDocumentRegistration"]["registry"] == BTC
+
+    named = run(node.keymaster.create_grant(link_for(node, registries=[ETH, BTC]), {"registry": ETH}))
+    assert run(node.keymaster.resolve_did(named))["didDocumentRegistration"]["registry"] == ETH
+
+
+def test_create_grant_refuses_a_registry_the_request_does_not_list(node):
+    with refuses("options.registry: the request lists ETH:mainnet, SOL:mainnet-beta, not BTC:mainnet$"):
+        run(node.keymaster.create_grant(link_for(node, registries=[ETH, "SOL:mainnet-beta"]), {"registry": BTC}))
+    with refuses("options.registry: this node does not support ZEC:mainnet$"):
+        run(node.keymaster.create_grant(link_for(node, registries=["ZEC:mainnet"]), {"registry": "ZEC:mainnet"}))
+    with refuses("options.registry: a grant may be created on"):
+        run(node.keymaster.create_grant(link_for(node, registries=[ETH]), {"registry": "hyperswarm"}))
+    assert run(node.keymaster.list_assets()) == []
+
+
+def test_create_grant_refuses_when_the_node_supports_none_of_the_registries_the_request_lists(node):
+    message = (
+        "options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta"
+        " and this node supports local, hyperswarm, BTC:mainnet, ETH:mainnet$"
+    )
+    with refuses(message):
+        run(node.keymaster.create_grant(link_for(node, registries=["ZEC:mainnet", "SOL:mainnet-beta"])))
+    assert run(node.keymaster.list_assets()) == []
+
+
+def test_a_grant_may_have_a_registries_member_which_is_no_field_of_a_grant():
+    assert grants.validate_grant({"v": 1, "client": "did:cid:bagaaieraclient", "registries": "anything"}) == "valid"
+
+
+def test_create_grant_creates_and_signs_as_the_identity_it_checked_whatever_the_current_id_becomes(node):
+    resolve = node.gatekeeper.resolve_did
+    switched = []
+
+    # The current ID changes to the client while the grantor is being checked.
+    async def switching(did, options=None):
+        if did == node.alice and (options or {}).get("confirm") and not switched:
+            switched.append(True)
+            await node.keymaster.set_current_id("Memepool")
+        return await resolve(did, options)
+
+    node.gatekeeper.resolve_did = switching
+
+    did = run(node.keymaster.create_grant(link_for(node)))
+
+    assert switched == [True]
+    assert run(node.keymaster.get_current_id()) == "Memepool"
+    assert run(node.keymaster.resolve_did(did))["didDocument"]["controller"] == node.alice
+    assert run(node.keymaster.list_assets("Alice")) == [did]
+    assert run(node.keymaster.list_assets("Memepool")) == []
+    # Signed with a key of the identity checked.
+    assert node.gatekeeper.operations[-1]["proof"]["verificationMethod"].startswith(node.alice)
+
+
 def test_create_grant_refuses_a_local_identity_whose_assets_are_created_on_local(node):
     run(node.keymaster.create_id("Larry", {"registry": "local"}))
 
@@ -435,6 +496,18 @@ def test_update_grant_changes_the_actions_and_keeps_every_other_field(node):
     assert after["didDocumentRegistration"] == before["didDocumentRegistration"]
     # The operation changes the data and nothing else.
     assert list(node.gatekeeper.operations[-1]["doc"]) == ["didDocumentData"]
+
+
+def test_update_grant_keeps_a_member_of_the_data_whose_value_is_none(node):
+    scope = {"v": 1, "client": node.client, "nonce": NONCE}
+    data = {"memeplexGrant": scope, "note": None, "kept": {"deep": None}}
+    did = run(node.keymaster.create_asset(data, {"registry": BTC}))
+
+    assert run(node.keymaster.update_grant(did, {"actions": ["memeplex:tag"]})) is True
+
+    expected = {"memeplexGrant": {**scope, "actions": ["memeplex:tag"]}, "note": None, "kept": {"deep": None}}
+    assert node.gatekeeper.docs[did]["didDocumentData"] == expected
+    assert node.gatekeeper.operations[-1]["doc"] == {"didDocumentData": expected}
 
 
 def test_update_grant_widens_to_every_core_kind_by_none_or_by_naming_the_core_actions(node):

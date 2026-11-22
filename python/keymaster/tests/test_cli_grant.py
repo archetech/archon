@@ -57,42 +57,56 @@ def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, argv: list[str], keyma
     return cli.main(argv)
 
 
-def test_create_grant_passes_the_link_alone_and_prints_the_did(monkeypatch, tmp_path, capsys) -> None:
-    stub = _keymaster(create_grant="did:cid:grant")
+RESOLVED = {"didDocumentRegistration": {"registry": "BTC:mainnet"}}
+
+
+def test_create_grant_prints_the_did_alone_and_says_which_registry_was_used(monkeypatch, tmp_path, capsys) -> None:
+    stub = _keymaster(create_grant="did:cid:grant", resolve_did=RESOLVED)
 
     assert _run(monkeypatch, tmp_path, ["create-grant", LINK], stub) == 0
-    assert capsys.readouterr().out.strip() == "did:cid:grant"
-    assert stub.calls == [("create_grant", (LINK, {}))]
+    captured = capsys.readouterr()
+    assert captured.out == "did:cid:grant\n"
+    assert captured.err == "Created on BTC:mainnet\n"
+    assert stub.calls == [("create_grant", (LINK, {})), ("resolve_did", ("did:cid:grant",))]
+
+
+def test_create_grant_succeeds_when_the_node_cannot_then_say_where(monkeypatch, tmp_path, capsys) -> None:
+    stub = _keymaster(create_grant="did:cid:grant", resolve_did=RuntimeError("unreachable"))
+
+    assert _run(monkeypatch, tmp_path, ["create-grant", LINK], stub) == 0
+    captured = capsys.readouterr()
+    assert captured.out == "did:cid:grant\n"
+    assert captured.err == "Created on an unknown registry\n"
 
 
 def test_create_grant_passes_its_options(monkeypatch, tmp_path, capsys) -> None:
-    stub = _keymaster(create_grant="did:cid:grant")
+    stub = _keymaster(create_grant="did:cid:grant", resolve_did=RESOLVED)
     argv = [
         "create-grant", LINK, "-r", "ETH:mainnet", "-a", "memepool-grant",
         "--actions", "memeplex:post, memeplex:tag,", "--expires", "2028-01-01T00:00:00Z",
     ]
 
     assert _run(monkeypatch, tmp_path, argv, stub) == 0
-    assert stub.calls == [("create_grant", (LINK, {
+    assert stub.calls[0] == ("create_grant", (LINK, {
         "alias": "memepool-grant",
         "registry": "ETH:mainnet",
         "actions": ["memeplex:post", "memeplex:tag"],
         "expiresAt": "2028-01-01T00:00:00Z",
-    }))]
+    }))
 
 
 def test_create_grant_no_expiry_passes_none(monkeypatch, tmp_path, capsys) -> None:
-    stub = _keymaster(create_grant="did:cid:grant")
+    stub = _keymaster(create_grant="did:cid:grant", resolve_did=RESOLVED)
 
     assert _run(monkeypatch, tmp_path, ["create-grant", LINK, "--no-expiry"], stub) == 0
-    assert stub.calls == [("create_grant", (LINK, {"expiresAt": None}))]
+    assert stub.calls[0] == ("create_grant", (LINK, {"expiresAt": None}))
 
 
 def test_create_grant_passes_an_empty_list_of_actions_for_keymaster_to_refuse(monkeypatch, tmp_path, capsys) -> None:
-    stub = _keymaster(create_grant="did:cid:grant")
+    stub = _keymaster(create_grant="did:cid:grant", resolve_did=RESOLVED)
 
     assert _run(monkeypatch, tmp_path, ["create-grant", LINK, "--actions", ""], stub) == 0
-    assert stub.calls == [("create_grant", (LINK, {"actions": []}))]
+    assert stub.calls[0] == ("create_grant", (LINK, {"actions": []}))
 
 
 def test_a_refusal_fails_the_command_and_is_printed(monkeypatch, tmp_path, capsys) -> None:

@@ -23,7 +23,7 @@ import * as grants from '../../packages/keymaster/src/grant.ts';
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 const read = (name: string) => JSON.parse(readFileSync(path.join(FIXTURES, name), 'utf-8'));
 
-type LinkCase = { name: string; link: string; expect: Record<string, unknown> };
+type LinkCase = { name: string; link: string; expect: Record<string, unknown>; verifier?: 'pending' };
 type ValidityCase = { name: string; member: string; expect: string; request?: unknown; operation?: { data: Record<string, unknown> } };
 
 const linkCases: LinkCase[] = read('memeplex-grant-link-vectors.json').cases;
@@ -58,11 +58,14 @@ describe('the rules Keymaster states', () => {
 
     it.each(linkCases.map(each => [each.name, each] as const))('decode a link with %s as its vector states', (_name, each) => {
         expect(grants.decodeGrantLink(each.link)).toStrictEqual(each.expect);
-        expect(memeplex.decodeGrantLink(each.link)).toStrictEqual(each.expect);
+        if (each.verifier !== 'pending') {
+            expect(memeplex.decodeGrantLink(each.link)).toStrictEqual(each.expect);
+        }
     });
 
     it('judge the request each link vector carries as the verifier does, as a grant too', () => {
         const carried = linkCases
+            .filter(each => each.verifier !== 'pending')
             .map(each => {
                 try {
                     return JSON.parse(Buffer.from(each.link.slice(grants.GRANT_LINK_PREFIX.length), 'base64url').toString('utf8'));
@@ -78,6 +81,20 @@ describe('the rules Keymaster states', () => {
             expect(grants.validateGrant(value)).toBe(memeplex.validateGrant(value));
             expect(grants.validateGrantRequest(value)).toBe(memeplex.validateGrantRequest(value));
         }
+    });
+
+    it('leave to the verifier only the registries a request lists', () => {
+        expect(linkCases.filter(each => each.verifier === 'pending').map(each => each.name)).toStrictEqual([
+            'no registries listed', 'a registry twice', 'a registry a grant may not be created on',
+            'a testnet registry', 'registries that are not a list', 'a registry that is not a string',
+        ]);
+    });
+
+    it('allow a grant a registries member, which is no field of a grant', () => {
+        const grant = { v: 1, client: 'did:cid:bagaaieraclient', registries: 'anything' };
+
+        expect(grants.validateGrant(grant)).toBe('valid');
+        expect(memeplex.validateGrant(grant)).toBe('valid');
     });
 
     it('show every refusal of a link', () => {
@@ -272,6 +289,58 @@ describe('createGrant', () => {
         expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
     });
 
+    it('creates the grant on a registry the request lists, and leaves the list out of the grant', async () => {
+        const did = await keymaster.createGrant(linkFor({ registries: [ETH] }));
+
+        expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
+        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
+
+        const first = await keymaster.createGrant(linkFor({ registries: [ETH, BTC] }));
+        expect((await keymaster.resolveDID(first)).didDocumentRegistration?.registry).toBe(BTC);
+
+        const named = await keymaster.createGrant(linkFor({ registries: [ETH, BTC] }), { registry: ETH });
+        expect((await keymaster.resolveDID(named)).didDocumentRegistration?.registry).toBe(ETH);
+    });
+
+    it('refuses a registry the request does not list', async () => {
+        await expect(keymaster.createGrant(linkFor({ registries: [ETH, 'SOL:mainnet-beta'] }), { registry: BTC }))
+            .rejects.toThrow('Invalid parameter: options.registry: the request lists ETH:mainnet, SOL:mainnet-beta, not BTC:mainnet');
+        await expect(keymaster.createGrant(linkFor({ registries: ['ZEC:mainnet'] }), { registry: 'ZEC:mainnet' }))
+            .rejects.toThrow('Invalid parameter: options.registry: this node does not support ZEC:mainnet');
+        await expect(keymaster.createGrant(linkFor({ registries: [ETH] }), { registry: 'hyperswarm' }))
+            .rejects.toThrow('Invalid parameter: options.registry: a grant may be created on');
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('refuses when the node supports none of the registries the request lists', async () => {
+        await expect(keymaster.createGrant(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }))).rejects.toThrow(
+            'Invalid parameter: options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta and this node supports local, hyperswarm, BTC:mainnet, ETH:mainnet');
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('creates and signs the grant as the identity it checked, whatever the current ID becomes', async () => {
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+        let switched = false;
+
+        // The current ID changes to the client while the grantor is being checked.
+        jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) => {
+            if (did === alice && options?.confirm && !switched) {
+                switched = true;
+                await keymaster.setCurrentId('Memepool');
+            }
+            return resolve(did, options);
+        });
+
+        const did = await keymaster.createGrant(linkFor());
+
+        expect(switched).toBe(true);
+        expect(await keymaster.getCurrentId()).toBe('Memepool');
+        expect((await keymaster.resolveDID(did)).didDocument?.controller).toBe(alice);
+        expect(await keymaster.listAssets('Alice')).toStrictEqual([did]);
+        expect(await keymaster.listAssets('Memepool')).toStrictEqual([]);
+        expect(await verified(did)).toStrictEqual({ status: 'pending', user: alice, client, registry: BTC });
+    });
+
     it('refuses a local identity, whose assets are created on local', async () => {
         await keymaster.createId('Larry', { registry: 'local' });
 
@@ -446,6 +515,23 @@ describe('updateGrant', () => {
         expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag', 'memeplex:post'] })).toBe(true);
         expect((await keymaster.resolveDID(did)).didDocumentData)
             .toStrictEqual({ memeplexGrant: { ...scope, actions: ['memeplex:post', 'memeplex:tag'] }, note: 'kept' });
+    });
+
+    it('keeps a member of the data whose value is null, so the verifier reads a scope update', async () => {
+        const scope = { v: 1, client, nonce: NONCE };
+        const did = await keymaster.createAsset({ memeplexGrant: scope, note: null, kept: { deep: null } }, { registry: BTC });
+        await anchor(100);
+
+        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocumentData)
+            .toStrictEqual({ memeplexGrant: { ...scope, actions: ['memeplex:tag'] }, note: null, kept: { deep: null } });
+        await anchor(200);
+
+        const read = await verified(did);
+
+        expect(read).toMatchObject({ status: 'valid', pending: 0 });
+        expect(read.status === 'valid' && read.ended).toBeUndefined();
+        expect(read.status === 'valid' && read.versions.map(version => version.actions)).toStrictEqual([undefined, ['memeplex:tag']]);
     });
 
     it('is read by the verifier as a scope update that does not end the grant', async () => {

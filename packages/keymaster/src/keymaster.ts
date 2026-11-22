@@ -2137,7 +2137,7 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const { request } = decoded;
-        const { controller, alias } = options;
+        const { alias } = options;
         const offered: string[] = request.actions ?? CORE_GRANT_ACTIONS;
         const actions = this.grantActions(offered, options.actions ?? offered, 'options.actions');
         const requested = options.expiresAt === undefined ? request.expiresAt : options.expiresAt;
@@ -2145,18 +2145,29 @@ export default class Keymaster implements KeymasterInterface {
             ? undefined
             : this.grantExpiry(requested, 'options.expiresAt');
 
+        // A request may list the registries its client can publish on. The
+        // grant is created on one of them, since the client's objects go on
+        // the grant's registry.
+        const listed: string[] | undefined = request.registries;
         const supported = await this.listRegistries();
         let { registry } = options;
 
         if (!registry) {
-            registry = PERMITTED_GRANT_REGISTRIES.find(permitted => supported.includes(permitted));
+            registry = PERMITTED_GRANT_REGISTRIES
+                .find(permitted => supported.includes(permitted) && (!listed || listed.includes(permitted)));
 
+            if (!registry && listed) {
+                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${supported.join(', ')}`);
+            }
             if (!registry) {
                 throw new InvalidParameterError(`options.registry: this node supports none of ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
             }
         }
         else if (!PERMITTED_GRANT_REGISTRIES.includes(registry)) {
             throw new InvalidParameterError(`options.registry: a grant may be created on ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
+        }
+        else if (listed && !listed.includes(registry)) {
+            throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')}, not ${registry}`);
         }
         else if (!supported.includes(registry)) {
             throw new InvalidParameterError(`options.registry: this node does not support ${registry}`);
@@ -2165,7 +2176,7 @@ export default class Keymaster implements KeymasterInterface {
         // createAsset puts a local identity's assets on `local` whatever
         // registry is asked for, and a grant there, like a grant to oneself, is
         // void.
-        const id = await this.fetchIdInfo(controller);
+        const id = await this.fetchIdInfo(options.controller);
         const grantor = await this.resolveDID(id.did, { confirm: true });
 
         if (grantor.didDocumentRegistration?.registry === 'local') {
@@ -2183,7 +2194,9 @@ export default class Keymaster implements KeymasterInterface {
             ...(expiresAt ? { expiresAt } : {}),
         };
 
-        return this.createAsset({ memeplexGrant }, { registry, controller, alias });
+        // The identity checked is named as the controller, so that it is the
+        // one that owns and signs the grant whatever the current ID is by then.
+        return this.createAsset({ memeplexGrant }, { registry, controller: id.did, alias });
     }
 
     // The grants among the assets of an identity, each as its latest version
@@ -2224,8 +2237,9 @@ export default class Keymaster implements KeymasterInterface {
         return grants;
     }
 
-    // A live asset of the current ID that holds a valid grant.
-    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant }> {
+    // A live asset of the current ID that holds a valid grant, with the data
+    // the grant is a member of.
+    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant; data: Record<string, unknown> }> {
         const owner = await this.fetchIdInfo();
         const did = await this.lookupDID(id);
         const doc = await this.resolveDID(did);
@@ -2239,7 +2253,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('id: not a grant of the current ID');
         }
 
-        return { did, grant: grant as MemeplexGrant };
+        return { did, grant: grant as MemeplexGrant, data: doc.didDocumentData as Record<string, unknown> };
     }
 
     // Changes the scope of a grant of the current ID in place. Every field of
@@ -2247,13 +2261,17 @@ export default class Keymaster implements KeymasterInterface {
     // other ends the grant. The actions on offer are the core actions and the
     // extension kinds the grant lists. Nothing is written when the change
     // leaves the grant as it is.
+    //
+    // The update states the asset's whole data with `memeplexGrant` replaced.
+    // mergeData is not used: it drops a member whose value is null, and a
+    // change to the data outside the grant's scope ends the grant too.
     async updateGrant(id: string, changes: GrantChanges): Promise<boolean> {
         if (!changes || typeof changes !== 'object'
             || (changes.actions === undefined && changes.expiresAt === undefined)) {
             throw new InvalidParameterError('changes: actions or expiresAt is needed');
         }
 
-        const { did, grant } = await this.ownGrant(id);
+        const { did, grant, data } = await this.ownGrant(id);
         const updated: MemeplexGrant = { ...grant };
 
         if (changes.actions !== undefined) {
@@ -2282,7 +2300,7 @@ export default class Keymaster implements KeymasterInterface {
             return true;
         }
 
-        return this.mergeData(did, { memeplexGrant: updated });
+        return this.updateDID(did, { didDocumentData: { ...data, memeplexGrant: updated } });
     }
 
     // Revokes a grant of the current ID by deleting its asset. The client can

@@ -65,10 +65,19 @@ export function isGrantAction(action: unknown): boolean {
     return typeof action === 'string' && (CORE_GRANT_ACTIONS.includes(action) || PINNED_DID_URL.test(action));
 }
 
+// The registries a grant request lists, when it limits where the client can
+// publish: at least one of the permitted registries, each once.
+function isRegistryList(registries: unknown): boolean {
+    return Array.isArray(registries) && registries.length >= 1
+        && registries.every(registry => PERMITTED_GRANT_REGISTRIES.includes(registry))
+        && new Set(registries).size === registries.length;
+}
+
 // The grant schema, and the grant request schema, which also requires `name`
-// and `nonce`. A field neither schema names is allowed.
+// and `nonce` and reads `registries`. A field neither schema names is allowed,
+// so `registries` in a grant is one of those.
 function matchesSchema(value: Record<string, unknown>, request: boolean): boolean {
-    const { client, name, actions, nonce, expiresAt } = value;
+    const { client, name, actions, nonce, expiresAt, registries } = value;
 
     if (typeof client !== 'string' || !DID.test(client)) {
         return false;
@@ -79,7 +88,7 @@ function matchesSchema(value: Record<string, unknown>, request: boolean): boolea
         if (typeof name !== 'string' || name.length < 1 || [...name].length > 100) {
             return false;
         }
-        if (nonce === undefined) {
+        if (nonce === undefined || (registries !== undefined && !isRegistryList(registries))) {
             return false;
         }
     }

@@ -84,6 +84,40 @@
             }
         },
         {
+            "name": "the registries the client can publish on",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJFVEg6bWFpbm5ldCIsIkJUQzptYWlubmV0Il19fQ",
+            "expect": {
+                "request": {
+                    "v": 1,
+                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
+                    "name": "Memepool",
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "ETH:mainnet",
+                        "BTC:mainnet"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "every permitted registry",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIlpFQzptYWlubmV0IiwiRVRIOm1haW5uZXQiLCJTT0w6bWFpbm5ldC1iZXRhIl19fQ",
+            "expect": {
+                "request": {
+                    "v": 1,
+                    "client": "did:cid:bagaaieraclientclientclientclientclientclientclientclientcli",
+                    "name": "Memepool",
+                    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ZEC:mainnet",
+                        "ETH:mainnet",
+                        "SOL:mainnet-beta"
+                    ]
+                }
+            }
+        },
+        {
             "name": "v written as 1.0",
             "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLjAsImNsaWVudCI6ImRpZDpjaWQ6YmFnYWFpZXJhY2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpZW50Y2xpIiwibmFtZSI6Ik1lbWVwb29sIiwibm9uY2UiOiJRbTl2ZEhOMGNtRndJRzV2Ym1ObE1USXoifX0",
             "expect": {
@@ -524,6 +558,60 @@
                 "error": "invalid-request",
                 "validity": "schema"
             }
+        },
+        {
+            "name": "no registries listed",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6W119fQ",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
+        },
+        {
+            "name": "a registry twice",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsIkJUQzptYWlubmV0Il19fQ",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
+        },
+        {
+            "name": "a registry a grant may not be created on",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6bWFpbm5ldCIsImh5cGVyc3dhcm0iXX19",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
+        },
+        {
+            "name": "a testnet registry",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WyJCVEM6c2lnbmV0Il19fQ",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
+        },
+        {
+            "name": "registries that are not a list",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6IkJUQzptYWlubmV0In19",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
+        },
+        {
+            "name": "a registry that is not a string",
+            "link": "archon://grant?request=eyJtZW1lcGxleEdyYW50UmVxdWVzdCI6eyJ2IjoxLCJjbGllbnQiOiJkaWQ6Y2lkOmJhZ2FhaWVyYWNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaWVudGNsaSIsIm5hbWUiOiJNZW1lcG9vbCIsIm5vbmNlIjoiUW05dmRITjBjbUZ3SUc1dmJtTmxNVEl6IiwicmVnaXN0cmllcyI6WzFdfX0",
+            "expect": {
+                "error": "invalid-request",
+                "validity": "schema"
+            },
+            "verifier": "pending"
         },
         {
             "name": "an expiry with an offset",
