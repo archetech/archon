@@ -19,6 +19,10 @@ publishes for the user under their grant. Everything they read comes from the
 3. **Timeline.** The reader's own posts and those of the authors they follow.
 4. **Post and reply.** What the reader publishes is shown as waiting until its chain
    anchors it and the indexer has it: it is not a publication before then.
+   **An article** is a post with a title, a summary and a body. The body is sent to
+   the service, which stores it; a timeline shows the title and summary, and the
+   body is read when the article is opened. It is shown as it was written: the page
+   does not render Markdown.
 5. **Thread.** A post with the replies under it, how many have boosted it, how it is
    rated, and the tags and reactions on it.
 6. **Respond.** A boost, a thumb up or down, a like, a tag, each offered only when

@@ -8,7 +8,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { parseGrantLink, readGrantRequest } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
-import { createMemepoolApp } from '../../services/memepool/src/api.ts';
+import { BODY_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
 
 // The Memepool service: a Memeplex client whose key the service holds. Users
 // sign in with a wallet, grant the service, and publish through it. The
@@ -95,7 +95,19 @@ async function granted(wallet: Keymaster) {
     return { agent, grantDid };
 }
 
+// Where the service keeps a body: its node's IPFS, as the service wires it.
+// How many bodies the service has stored, and read back.
+let stored = 0;
+let read = 0;
+const content = {
+    add: (text: string) => { stored += 1; return gatekeeper.addText(text); },
+    get: (cid: string) => { read += 1; return gatekeeper.getText(cid); },
+};
+const objectOf = async (did: string) => ((await gatekeeper.resolveDID(did)).didDocumentData as { memeplex: Record<string, any> }).memeplex;
+
 beforeEach(async () => {
+    stored = 0;
+    read = 0;
     block = 0;
     clock = Date.UTC(2026, 10, 2);
     gatekeeper = new Gatekeeper({
@@ -108,7 +120,7 @@ beforeEach(async () => {
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
         client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
-        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock,
+        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content,
     });
 });
 
@@ -712,5 +724,184 @@ describe('publishing', () => {
         expect((await other.put(`/api/v1/objects/${did}`).send({ kind: 'post', text: 'Bob\'s now.' })).status).toBe(400);
         expect((await other.delete('/api/v1/objects/did:cid:bagaaieranothing')).status).toBe(400);
         expect((await agent.delete(`/api/v1/objects/${did}`)).status).toBe(200);
+    }, 120_000);
+});
+
+describe('an article', () => {
+    const BODY = '# Why every post should be a DID\n\nPermalinks, edit history and provable timestamps, for free.\n';
+    const article = { kind: 'post', title: 'Why every post should be a DID', summary: 'Permalinks for free.', body: BODY };
+
+    it('stores the body on its node and publishes the reference to it, with no body in the entry', async () => {
+        const { agent, grantDid } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
+        const published = await objectOf(did);
+
+        expect(published).toStrictEqual({
+            v: 1, kind: 'post', author: aliceDid, grant: grantDid, title: article.title, summary: article.summary,
+            content: { cid: expect.stringMatching(/^b[a-z2-7]+$/), type: 'text/markdown', bytes: Buffer.byteLength(BODY) },
+        });
+        // The node's IPFS has it, which is where it is pinned.
+        expect(await gatekeeper.getText(published.content.cid)).toBe(BODY);
+    }, 120_000);
+
+    it('gives the body of what it published to a reader, as text a browser will not take for a page', async () => {
+        const { agent } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
+        const reader = await signIn(bob);
+        const read = await reader.get(`/api/v1/objects/${did}/content`);
+
+        expect(read.status).toBe(200);
+        expect(read.text).toBe(BODY);
+        expect(read.headers['content-type']).toBe('text/markdown; charset=utf-8');
+        expect(read.headers['x-content-type-options']).toBe('nosniff');
+        expect((await request(app).get(`/api/v1/objects/${did}/content`)).status).toBe(401);
+    }, 120_000);
+
+    it('takes no reference to content it has not stored', async () => {
+        const { agent } = await granted(alice);
+        const elsewhere = { cid: await gatekeeper.addText('kept by someone else'), type: 'text/markdown', bytes: 20 };
+
+        for (const reference of ['content', 'pdf', 'source']) {
+            const refused = await agent.post('/api/v1/objects').send({ kind: 'post', title: 'Borrowed', [reference]: elsewhere });
+
+            expect(refused.status).toBe(400);
+            expect(refused.body.error).toMatch(/has not stored/);
+        }
+        expect(await service.listAssets()).toHaveLength(0);
+    }, 120_000);
+
+    it('refuses a body that is none, too large, or on a kind that has none', async () => {
+        const { agent } = await granted(alice);
+        const post = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body.did;
+
+        await anchor();
+        for (const [object, why] of [
+            [{ ...article, body: '' }, /text of the article/],
+            [{ ...article, body: 7 }, /text of the article/],
+            [{ ...article, body: 'x'.repeat(BODY_LIMIT + 1) }, /may be 200000 bytes/],
+            [{ kind: 'reply', target: post, targetVersion: 'bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', body: BODY }, /a reply has no body/],
+        ] as const) {
+            const refused = await agent.post('/api/v1/objects').send(object);
+
+            expect(refused.status).toBe(400);
+            expect(refused.body.error).toMatch(why);
+        }
+        // A body at the limit, counted in bytes and not in characters.
+        expect((await agent.post('/api/v1/objects').send({ ...article, body: 'é'.repeat(BODY_LIMIT / 2) })).status).toBe(200);
+        expect((await agent.post('/api/v1/objects').send({ ...article, body: `${'é'.repeat(BODY_LIMIT / 2)}x` })).status).toBe(400);
+    }, 120_000);
+
+    it('keeps the body when an edit leaves it alone, and stores another when it changes', async () => {
+        const { agent, grantDid } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
+        const first = await objectOf(did);
+
+        await anchor();
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: first.content })).status).toBe(200);
+        expect(await objectOf(did)).toStrictEqual({ v: 1, kind: 'post', author: aliceDid, grant: grantDid, title: 'Retitled', content: first.content });
+
+        // The same reference, however its members are ordered.
+        await anchor();
+        const { cid, type, bytes } = first.content;
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled twice', content: { bytes, type, cid } })).status).toBe(200);
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: { cid, type, bytes, more: 1 } })).status).toBe(400);
+
+        await anchor();
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', body: `${BODY}More.\n` })).status).toBe(200);
+        const revised = await objectOf(did);
+
+        expect(revised.content.cid).not.toBe(first.content.cid);
+        expect((await agent.get(`/api/v1/objects/${did}/content`)).text).toBe(`${BODY}More.\n`);
+        // The earlier body is still on the node, for the versions that refer to it.
+        expect(await gatekeeper.getText(first.content.cid)).toBe(BODY);
+
+        // An edit cannot bring in a reference the entry does not already have.
+        const other = { cid: await gatekeeper.addText('another'), type: 'text/markdown', bytes: 7 };
+        expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: other })).status).toBe(400);
+    }, 120_000);
+
+    it('reads no body for an entry that has none, or that it did not publish', async () => {
+        const { agent } = await granted(alice);
+        const post = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body.did;
+        // An entry someone else made can refer to anything.
+        const foreign = await alice.createAsset({
+            memeplex: { v: 1, kind: 'post', author: aliceDid, grant: 'did:cid:any', title: 'Elsewhere', content: { cid: await gatekeeper.addText('theirs'), type: 'text/markdown', bytes: 6 } },
+        }, { registry: 'hyperswarm' });
+
+        for (const did of [post, foreign, aliceDid, 'did:cid:unknown']) {
+            expect((await agent.get(`/api/v1/objects/${did}/content`)).status).toBe(404);
+        }
+    }, 120_000);
+
+    it('reads nothing through an entry it did not create, though it has been handed it', async () => {
+        const { agent } = await granted(alice);
+        // An asset can be transferred to any identity, which signs nothing.
+        const foreign = await alice.createAsset({
+            memeplex: { v: 1, kind: 'post', author: aliceDid, grant: 'did:cid:any', title: 'Planted', content: { cid: await gatekeeper.addText('anything at all'), type: 'text/markdown', bytes: 15 } },
+        }, { registry: 'hyperswarm' });
+
+        await alice.transferAsset(foreign, serviceDid);
+        expect((await gatekeeper.resolveDID(foreign)).didDocument?.controller).toBe(serviceDid);
+
+        expect((await agent.get(`/api/v1/objects/${foreign}/content`)).status).toBe(404);
+        expect(read).toBe(0);
+    }, 120_000);
+
+    it('gives the body of the version that is asked for', async () => {
+        const { agent } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
+        const first = (await gatekeeper.resolveDID(did)).didDocumentMetadata!.versionId!;
+
+        await anchor();
+        await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: article.title, body: 'Rewritten.\n' });
+
+        expect((await agent.get(`/api/v1/objects/${did}/content`)).text).toBe('Rewritten.\n');
+        expect((await agent.get(`/api/v1/objects/${did}/content?versionId=${first}`)).text).toBe(BODY);
+        expect((await agent.get(`/api/v1/objects/${did}/content?versionId=bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)).status).toBe(404);
+    }, 120_000);
+
+    it('stores no body for an object it would not publish', async () => {
+        const { agent } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
+
+        await anchor();
+        expect(stored).toBe(1);
+        for (const refused of [
+            await agent.post('/api/v1/objects').send({ ...article, text: 'A post has a text or a body.' }),
+            await agent.post('/api/v1/objects').send({ ...article, title: 'x'.repeat(301) }),
+            await agent.post('/api/v1/objects').send({ kind: 'nonsense', body: BODY }),
+            // An edit that would change what the object is.
+            await agent.put(`/api/v1/objects/${did}`).send({ kind: 'paper', title: article.title, authors: [aliceDid], body: BODY }),
+        ]) {
+            expect(refused.status).toBe(400);
+        }
+        expect(stored).toBe(1);
+    }, 120_000);
+
+    it('takes a body at the limit however it is written in the request', async () => {
+        const { agent } = await granted(alice);
+        const lines = '\n'.repeat(BODY_LIMIT);
+        const sent = JSON.stringify({ ...article, body: lines }).replace(/\\n/g, '\\u000a');
+
+        // Six bytes of request for each byte of body.
+        expect(sent.length).toBeGreaterThan(BODY_LIMIT * 6);
+        const published = await agent.post('/api/v1/objects').set('Content-Type', 'application/json').send(sent);
+
+        expect(published.status).toBe(200);
+        expect((await objectOf(published.body.did)).content.bytes).toBe(BODY_LIMIT);
+        // A request that is no object's is not given that room.
+        expect((await agent.post('/api/v1/login').send({ response: 'x'.repeat(300_000) })).status).toBe(413);
+    }, 120_000);
+
+    it('publishes no body when it has nowhere to store one', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,
+        });
+        const { agent } = await granted(alice);
+        const refused = await agent.post('/api/v1/objects').send(article);
+
+        expect(refused.status).toBe(400);
+        expect(refused.body.error).toMatch(/stores no content/);
+        expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).status).toBe(200);
     }, 120_000);
 });

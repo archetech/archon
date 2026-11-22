@@ -214,30 +214,61 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
 // What an object says. A short one says it in `text`. A longer one keeps its
 // words apart, under `content`, and a paper gives a `summary` of them. A post
 // with neither and a `target` is a boost of that object.
-function Body({ object }: { object: NonNullable<Publication['memeplex']> }) {
-    const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
+// Which version of a publication is shown, as something to compare.
+const versionKey = (publication: Publication) => `${publication.current ?? 0} ${publication.versions[publication.current ?? 0]?.opid ?? ''}`;
 
-    if (words) {
-        return (
-            <>
-                <p className="text">{words}</p>
-                {object.text === undefined && object.content !== undefined && (
-                    <p className="muted">The full text is kept apart from this entry, and this page does not show it yet.</p>
-                )}
-            </>
+// The version of a publication that is shown: the last one attributed.
+const shownVersion = (publication: Publication) => publication.versions[publication.current ?? 0]?.opid;
+
+// The body of an article, which is kept apart from its entry. The service
+// holds the bodies of what it published, and no others. The body read is that
+// of the version shown, so that it goes with the title and summary beside it
+// and is read again when another version is shown.
+function Article({ api, did, version }: { api: Api; did: string; version?: string }) {
+    const [body, setBody] = useState<{ text?: string; error?: string } | null>(null);
+
+    useEffect(() => {
+        let stale = false;
+
+        setBody(null);
+        api.content(did, version).then(
+            text => { if (!stale) setBody({ text }); },
+            failure => { if (!stale) setBody({ error: message(failure) }); },
         );
+
+        return () => { stale = true; };
+    }, [api, did, version]);
+
+    if (!body) {
+        return <p className="muted">Reading the full text.</p>;
     }
-    if (object.content !== undefined) {
-        return <p className="muted">The text is kept apart from this entry, and this page does not show it yet.</p>;
+    if (body.error) {
+        return <p role="alert" className="error">The full text could not be read: {body.error}</p>;
     }
-    if (object.target) {
-        return <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>;
+    if (body.text === undefined) {
+        return <p className="muted">The full text is kept apart from this entry, and this service does not hold it.</p>;
     }
 
-    return null;
+    return <div className="text article">{body.text}</div>;
 }
 
-function Post({ publication, onOpen, onWithdraw }: { publication: Publication; onOpen?: () => void; onWithdraw?: () => void }) {
+// `full` shows the body of an article, where a list shows its summary alone.
+function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string; version?: string } }) {
+    const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
+    const article = object.text === undefined && object.content !== undefined;
+
+    return (
+        <>
+            {words && <p className={article ? 'text summary' : 'text'}>{words}</p>}
+            {article && (full ? <Article api={full.api} did={full.did} version={full.version} /> : <p className="muted">Open it to read the full text.</p>)}
+            {!words && !article && object.target && (
+                <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
+            )}
+        </>
+    );
+}
+
+function Post({ publication, onOpen, onWithdraw, full }: { publication: Publication; onOpen?: () => void; onWithdraw?: () => void; full?: Api }) {
     const object = publication.memeplex;
 
     if (publication.state === 'withdrawn' || !object) {
@@ -251,7 +282,7 @@ function Post({ publication, onOpen, onWithdraw }: { publication: Publication; o
                 <time>{when(publication)}</time>
             </header>
             {object.title && <h3>{object.title}</h3>}
-            <Body object={object} />
+            <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
             <footer>
                 {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
@@ -288,6 +319,51 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
             </label>
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !text.trim()} onClick={publish}>Publish</button>
+        </div>
+    );
+}
+
+// An article: a post with a title, whose body the service stores apart from
+// the entry. The summary is what a timeline shows of it.
+function ArticleComposer({ onPublish, onCancel }: {
+    onPublish: (article: { title: string; summary?: string; body: string }) => Promise<void>;
+    onCancel: () => void;
+}) {
+    const [title, setTitle] = useState('');
+    const [summary, setSummary] = useState('');
+    const [body, setBody] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const publish = async () => {
+        setBusy(true);
+        setError('');
+        try {
+            await onPublish({ title: title.trim(), ...(summary.trim() ? { summary: summary.trim() } : {}), body });
+        }
+        catch (failure) {
+            setError(message(failure));
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="composer">
+            <label>
+                Title
+                <input value={title} disabled={busy} onChange={event => setTitle(event.target.value)} />
+            </label>
+            <label>
+                Summary
+                <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
+            </label>
+            <label>
+                Article
+                <textarea value={body} disabled={busy} onChange={event => setBody(event.target.value)} rows={14} />
+            </label>
+            {error && <p role="alert" className="error">{error}</p>}
+            <button disabled={busy || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
+            <button className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
         </div>
     );
 }
@@ -480,11 +556,44 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
 
 // The reader's own post or reply, being rewritten. Its kind and what it answers
 // stay as they are: an edit that changed them would not be the same object.
-function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: string) => void }) {
+function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: boolean) => void }) {
     const object = publication.memeplex!;
+    const article = object.text === undefined && object.content !== undefined;
     const [text, setText] = useState(object.text ?? '');
+    const [title, setTitle] = useState(object.title ?? '');
+    const [summary, setSummary] = useState(typeof object.summary === 'string' ? object.summary : '');
+    // The body as the service holds it, once it has been read.
+    const [held, setHeld] = useState<string | undefined>(undefined);
+    const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!article) {
+            return undefined;
+        }
+
+        let stale = false;
+
+        api.content(publication.did!, shownVersion(publication)).then(
+            read => {
+                if (stale) {
+                    return;
+                }
+                if (read === undefined) {
+                    setError('This service does not hold the full text, so it cannot be changed here.');
+                    return;
+                }
+                setHeld(read);
+                setBody(read);
+            },
+            failure => { if (!stale) setError(message(failure)); },
+        );
+
+        return () => { stale = true; };
+        // The body is that of the version the editor was opened on.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [api, article, publication.did]);
 
     const save = async () => {
         setBusy(true);
@@ -493,14 +602,55 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
             const { v: _v, author: _author, grant: _grant, ...fields } = object;
 
             void _v; void _author; void _grant;
-            await api.edit(publication.did!, { ...fields, text: text.trim() });
-            onDone(text.trim());
+            if (!article) {
+                await api.edit(publication.did!, { ...fields, text: text.trim() });
+                onDone(true);
+                return;
+            }
+
+            // A body that has not changed is the one the entry already refers
+            // to. A changed one is sent, and the service stores it.
+            const { content, summary: _summary, ...rest } = fields;
+
+            void _summary;
+            await api.edit(publication.did!, {
+                ...rest,
+                title: title.trim(),
+                // A paper has a summary, which may be empty. A post has one or none.
+                ...(summary.trim() || object.kind === 'paper' ? { summary: summary.trim() } : {}),
+                ...(body === held ? { content } : { body }),
+            });
+            onDone(true);
         }
         catch (failure) {
             setError(message(failure));
             setBusy(false);
         }
     };
+
+    if (article) {
+        const unchanged = title.trim() === object.title && summary.trim() === (typeof object.summary === 'string' ? object.summary : '') && body === held;
+
+        return (
+            <div className="composer">
+                <label>
+                    Title
+                    <input value={title} disabled={busy} onChange={event => setTitle(event.target.value)} />
+                </label>
+                <label>
+                    Summary
+                    <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
+                </label>
+                <label>
+                    Article
+                    <textarea value={body} disabled={busy || held === undefined} onChange={event => setBody(event.target.value)} rows={14} />
+                </label>
+                {error && <p role="alert" className="error">{error}</p>}
+                <button disabled={busy || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
+                <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
+            </div>
+        );
+    }
 
     return (
         <div className="composer">
@@ -522,7 +672,8 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
     const [editing, setEditing] = useState(false);
-    // The text of an edit that its chain has not anchored yet.
+    // The version an edit was made of, while its chain has not anchored the
+    // edit: the edit is anchored once another version is the one shown.
     const [edited, setEdited] = useState<string | undefined>(undefined);
     const [replies, setReplies] = useState<Reply[] | null>(null);
     const [error, setError] = useState('');
@@ -538,7 +689,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                 setReplies(thread);
                 if (latest) {
                     setRoot(latest);
-                    setEdited(text => (latest.memeplex?.text === text ? undefined : text));
+                    setEdited(of => (of !== undefined && versionKey(latest) !== of ? undefined : of));
                 }
                 setError('');
             }
@@ -570,12 +721,14 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
         <section>
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             <button className="quiet" onClick={load}>Refresh</button>
-            <Post publication={root} />
+            <Post publication={root} full={api} />
             {/* One edit at a time: the next is of the post as the last one left it. */}
-            {mine && root.state === 'published' && root.memeplex?.text !== undefined && !editing && edited === undefined && (
+            {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
-            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); setEdited(saved); }} />}
+            {/* An editor is of one version. When another is shown it starts again from that one,
+                so that what is saved was written against what the reader saw. */}
+            {editing && <Edit key={versionKey(root)} api={api} publication={root} onDone={saved => { setEditing(false); if (saved) setEdited(versionKey(root)); }} />}
             {edited !== undefined && <p className="muted">Your edit is waiting to be anchored.</p>}
             <Respond api={api} me={me} grants={grants} target={root} />
             {error && <p role="alert" className="error">{error}</p>}
@@ -610,6 +763,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     const [total, setTotal] = useState(0);
     const reads = useRef(0);
     const [waiting, setWaiting] = useState<Waiting[]>([]);
+    // Whether the reader is writing an article, which has a form of its own.
+    const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
     const [following, setFollowing] = useState('');
     const [error, setError] = useState('');
@@ -717,13 +872,27 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 />
             ) : (
                 <>
-                    {may(me, 'memeplex:post') && (
-                        <Composer
-                            label="Post"
-                            onPublish={async text => {
-                                const did = await api.publish({ kind: 'post', text });
+                    {may(me, 'memeplex:post') && !writing && (
+                        <>
+                            <Composer
+                                label="Post"
+                                onPublish={async text => {
+                                    const did = await api.publish({ kind: 'post', text });
 
-                                setWaiting(current => [...current, { did, text }]);
+                                    setWaiting(current => [...current, { did, text }]);
+                                }}
+                            />
+                            <p><button className="quiet" onClick={() => setWriting(true)}>Write an article</button></p>
+                        </>
+                    )}
+                    {may(me, 'memeplex:post') && writing && (
+                        <ArticleComposer
+                            onCancel={() => setWriting(false)}
+                            onPublish={async article => {
+                                const did = await api.publish({ kind: 'post', ...article });
+
+                                setWaiting(current => [...current, { did, text: article.title }]);
+                                setWriting(false);
                             }}
                         />
                     )}

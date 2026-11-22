@@ -932,6 +932,22 @@ describe('getText', () => {
         expect(json).toStrictEqual(mockText);
     });
 
+    it.each([
+        ['a number', '123'],
+        ['an object', '{"a":1}'],
+        ['a quoted string', '"quoted"'],
+        ['true', 'true'],
+        ['nothing', ''],
+    ])('should return text that reads as JSON, %s, as the text it is', async (_name, text) => {
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.text}/${mockCID}`)
+            .reply(200, text, { 'Content-Type': 'text/plain' });
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        expect(await gatekeeper.getText(mockCID)).toBe(text);
+    });
+
     it('should throw exception on getText server error', async () => {
         nock(GatekeeperURL)
             .get(`${Endpoints.ipfs.text}/${mockCID}`)

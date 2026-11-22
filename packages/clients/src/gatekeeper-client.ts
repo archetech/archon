@@ -445,10 +445,26 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getText(cid: string): Promise<string> {
         try {
-            const response = await this.axios.get(`${this.API}/ipfs/text/${cid}`);
+            // Text is returned as it was stored. Left to itself the HTTP
+            // client reads a body that looks like JSON as JSON, so that `123`
+            // would come back a number and `"a"` without its quotes.
+            const response = await this.axios.get(`${this.API}/ipfs/text/${cid}`, {
+                responseType: 'text',
+                transformResponse: [(data: unknown) => data],
+            });
             return response.data;
         }
-        catch (error) {
+        catch (error: any) {
+            // An error's body is the server's JSON, read here since the
+            // request asked for text.
+            if (typeof error?.response?.data === 'string') {
+                try {
+                    error.response.data = JSON.parse(error.response.data);
+                }
+                catch {
+                    // Not JSON: thrown as the text it is.
+                }
+            }
             throwError(error);
         }
     }

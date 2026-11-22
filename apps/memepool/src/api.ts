@@ -63,6 +63,10 @@ export interface Api {
     thread(did: string): Promise<Reply[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
+    // The body of an article the service published, or nothing when it holds
+    // none for the object. `versionId` names the version whose body is wanted:
+    // the one a reader is shown, where the latest may be an edit not anchored.
+    content(did: string, versionId?: string): Promise<string | undefined>;
 }
 
 export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
@@ -137,6 +141,19 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             const response = await call(bases.memeplex, `/publications/${encodeURIComponent(did)}`);
 
             return response.status === 404 ? undefined : json(response);
+        },
+        async content(did, versionId) {
+            const version = versionId ? `?versionId=${encodeURIComponent(versionId)}` : '';
+            const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/content${version}`);
+
+            if (response.status === 404) {
+                return undefined;
+            }
+            if (!response.ok) {
+                throw await failure(response);
+            }
+
+            return response.text();
         },
     };
 }
