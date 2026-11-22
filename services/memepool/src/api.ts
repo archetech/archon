@@ -427,10 +427,13 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                     // never attributed.
                     const { kind } = fields(req);
 
-                    // A kind the rules do not know is refused as not valid, below.
-                    grant = actionFor(String(kind)) === undefined ? live[0] : live.find(each => allows(each, String(kind)));
+                    // What is not a kind the rules know, or not a string at
+                    // all, is refused as not valid, below.
+                    const known = typeof kind === 'string' && actionFor(kind) !== undefined;
+
+                    grant = known ? live.find(each => allows(each, kind)) : live[0];
                     if (!grant) {
-                        res.status(403).json({ error: `your grant does not allow a ${String(kind)}` });
+                        res.status(403).json({ error: `your grant does not allow a ${kind}` });
                         return;
                     }
                 }

@@ -535,8 +535,9 @@ describe('a grant that allows some kinds', () => {
         expect(refused.status).toBe(403);
         expect(refused.body).toStrictEqual({ error: 'your grant does not allow a rating' });
         expect(await gatekeeper.getQueue(REGISTRY)).toHaveLength(queued);
-        // A kind the rules do not know is not a matter of scope.
+        // A kind the rules do not know, or that is no string, is not a matter of scope.
         expect((await agent.post('/api/v1/objects').send({ kind: 'essay', text: 'x' })).status).toBe(400);
+        expect((await agent.post('/api/v1/objects').send({ kind: ['rating'], target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 })).status).toBe(400);
     }, 120_000);
 
     it('publishes under whichever of the reader\'s grants allows the kind, and lists what they allow between them', async () => {
