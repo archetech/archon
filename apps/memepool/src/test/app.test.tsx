@@ -640,6 +640,39 @@ describe('responding to a post', () => {
             { did: 'did:cid:new1', object: { kind: 'rating', ...about, rating: 0, min: 0, max: 1 } },
         ]));
         expect(state.published).toHaveLength(1);
+        // The first thumb is no longer what waits.
+        await screen.findByText('Your thumb down is waiting to be anchored.');
+        expect(screen.queryByText('Your thumb up is waiting to be anchored.')).toBeNull();
+
+        state.responses = { boosts: [], ratings: { ratings: [{ ...under(post('did:cid:new1', ALICE, ''), 'did:cid:grant'), memeplex: { kind: 'rating', author: ALICE, grant: 'did:cid:grant', rating: 0 } }], mean: 0 }, tags: [] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await waitFor(() => expect(screen.queryByText(/is waiting to be anchored/)).toBeNull());
+    });
+
+    it('keeps a tag the service refused, for the reader to try again', async () => {
+        const { api, user } = await opened();
+        vi.mocked(api.publish).mockRejectedValue(new ApiError(502, 'the node did not accept the operation'));
+
+        await user.type(screen.getByLabelText('Tag'), 'cryptography');
+        await user.click(screen.getByRole('button', { name: 'Add tag' }));
+
+        await screen.findByRole('alert');
+        expect((screen.getByLabelText('Tag') as HTMLInputElement).value).toBe('cryptography');
+    });
+
+    it('stops showing a failure to read the counts once they are read', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [root] });
+        vi.mocked(api.responses).mockRejectedValueOnce(new ApiError(503, 'the index is still being built'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect((await screen.findByRole('alert')).textContent).toBe('the index is still being built');
+
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await screen.findByText(/0 boosts · no ratings/);
+        expect(screen.queryByRole('alert')).toBeNull();
     });
 
     it('takes no thumb until it knows whether the reader has a rating', async () => {
@@ -731,6 +764,21 @@ describe('editing', () => {
         await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
         await user.click(screen.getByRole('button', { name: 'Edit' }));
         expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A better reply.');
+    });
+
+    it('offers no edit of a post that a refresh shows was withdrawn', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api } = services({ me: granted, timeline: [mine] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Edit' });
+
+        vi.mocked(api.publication).mockResolvedValue({ ...mine, state: 'withdrawn' });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull());
     });
 
     it('offers no edit of another author\'s post, or of one published through another client', async () => {

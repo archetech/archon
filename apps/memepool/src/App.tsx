@@ -290,6 +290,9 @@ const LIKE = '❤️';
 interface Sent {
     what: string;
     shown: (responses: Responses) => boolean;
+    // Responses that share one replace each other: the reader's rating is one
+    // object, and its last thumb is the one that waits.
+    replaces?: string;
 }
 
 function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<string>; target: Publication }) {
@@ -310,6 +313,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
 
             if (mine === reads.current) {
                 setResponses(read);
+                setError('');
                 // What the indexer shows has been anchored, and waits no more.
                 setSent(current => current.filter(each => !each.shown(read)));
             }
@@ -336,15 +340,20 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         each => each.memeplex?.author === me.did && grants.has(String(each.memeplex.grant)),
     )?.did;
 
-    const send = async (what: string, shown: Sent['shown'], act: () => Promise<unknown>) => {
+    // Whether the response was sent.
+    const send = async (what: string, shown: Sent['shown'], act: () => Promise<unknown>, replaces?: string): Promise<boolean> => {
         setBusy(true);
         setError('');
         try {
             await act();
-            setSent(current => [...current, { what, shown }]);
+            setSent(current => [...current.filter(each => !replaces || each.replaces !== replaces), { what, shown, replaces }]);
+
+            return true;
         }
         catch (failure) {
             setError(message(failure));
+
+            return false;
         }
         finally {
             setBusy(false);
@@ -366,6 +375,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                 setRated(await api.publish(object));
             }
         },
+        'rating',
     );
     const tag = (value: string, what: string) => send(
         what,
@@ -410,7 +420,11 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                     <button
                         className="quiet"
                         disabled={busy || !tagWord(word)}
-                        onClick={async () => { await tag(tagWord(word), `Your tag ${tagWord(word)}`); setWord(''); }}
+                        onClick={async () => {
+                            if (await tag(tagWord(word), `Your tag ${tagWord(word)}`)) {
+                                setWord('');
+                            }
+                        }}
                     >
                         Add tag
                     </button>
@@ -516,7 +530,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             <button className="quiet" onClick={load}>Refresh</button>
             <Post publication={root} />
             {/* One edit at a time: the next is of the post as the last one left it. */}
-            {mine && root.memeplex?.text !== undefined && !editing && edited === undefined && (
+            {mine && root.state === 'published' && root.memeplex?.text !== undefined && !editing && edited === undefined && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
             {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); setEdited(saved); }} />}
