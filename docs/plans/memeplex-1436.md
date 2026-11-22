@@ -325,9 +325,9 @@ Memeplex adds no recovery mechanism of its own.
   rendering; see [text formatting](memeplex-reference-1436.md#text-formatting).
 - **Spam:** batch anchoring alone is not a rate limit; services and indexers need
   their own [controls](memeplex-reference-1436.md#design-choices).
-- **Unavailable content:** operation pinning does not preserve referenced bytes;
-  [content availability](memeplex-reference-1436.md#content-availability) needs
-  separate pinning.
+- **Unavailable content:** operation pinning does not preserve referenced bytes.
+  The client that publishes an object [pins its content](memeplex-reference-1436.md#content-availability),
+  so the bytes last as long as that client keeps them.
 
 ## Scope and decisions still open
 
@@ -343,5 +343,4 @@ limit automatic presentation; they do not decide authorship.
 
 The schemas and signed fixtures are written (`share/schema/memeplex/v1`,
 `tests/fixtures/memeplex-v1-vectors.json`). They are published, and their DIDs
-pinned, once the verifier has exercised them: publication fixes `v: 1`. Who pins long-form content, and for how long,
-is the one [open question](memeplex-reference-1436.md#open-question).
+pinned, once the verifier has exercised them: publication fixes `v: 1`.
