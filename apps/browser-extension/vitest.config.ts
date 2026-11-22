@@ -46,6 +46,7 @@ export default defineConfig({
             '@didcid/keymaster/wallet/typeGuards': path.join(packages, 'keymaster/dist/esm/db/typeGuards.js'),
             '@didcid/keymaster/search': path.join(packages, 'keymaster/dist/esm/search-client.js'),
             '@didcid/keymaster/didcomm-protocols': path.join(packages, 'keymaster/dist/esm/didcomm-protocols.js'),
+            '@didcid/keymaster/grant': path.join(packages, 'keymaster/dist/esm/grant.js'),
             // After every subpath above, never before them.
             '@didcid/keymaster': path.join(packages, 'keymaster/dist/esm/keymaster.js'),
 
