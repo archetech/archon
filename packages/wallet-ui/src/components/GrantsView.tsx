@@ -161,13 +161,15 @@ function isAnchored(doc: Resolved, registry: string): boolean {
     return !hasChain(registry) || anchoredOn(doc as Parameters<typeof anchoredOn>[0], registry);
 }
 
-// Whether a grant's actions are ones this view can show and change: a list of
-// names, or none. Keymaster takes an asset as a grant on its client alone, so
-// the rest of what a grant holds may be anything.
+// Whether a grant's actions and expiry are ones this view can show and change:
+// a list of names, or none, and a date-time, or none. Keymaster takes an asset
+// as a grant on its client alone, so the rest of what a grant holds may be
+// anything.
 function readable(grant: GrantData): boolean {
-    const { actions } = grant as { actions?: unknown };
+    const { actions, expiresAt } = grant as { actions?: unknown; expiresAt?: unknown };
 
-    return actions === undefined || (Array.isArray(actions) && actions.every(action => typeof action === "string"));
+    return (actions === undefined || (Array.isArray(actions) && actions.every(action => typeof action === "string")))
+        && (expiresAt === undefined || typeof expiresAt === "string");
 }
 
 // The `actions` a scope stands for: none when none are listed, which a grant
@@ -216,7 +218,9 @@ function ScopeEditor({ scope, onChange, disabled }: { scope: Scope; onChange: (s
 }
 
 function describeScope(held: HeldGrant): string {
-    if (!readable(held.grant)) {
+    const { actions } = held.grant as { actions?: unknown };
+
+    if (actions !== undefined && !(Array.isArray(actions) && actions.every(action => typeof action === "string"))) {
         return "Actions in a form this wallet cannot read";
     }
     if (!held.grant.actions) {
@@ -226,8 +230,18 @@ function describeScope(held: HeldGrant): string {
     return held.grant.actions.length > 0 ? held.grant.actions.join(", ") : "No actions";
 }
 
+function expiryText(grant: GrantData): string {
+    const { expiresAt } = grant as { expiresAt?: unknown };
+
+    if (expiresAt === undefined) {
+        return "Never";
+    }
+
+    return typeof expiresAt === "string" ? new Date(expiresAt).toLocaleString() : "In a form this wallet cannot read";
+}
+
 function isExpired(grant: GrantData): boolean {
-    return grant.expiresAt !== undefined && new Date(grant.expiresAt).getTime() <= Date.now();
+    return typeof grant.expiresAt === "string" && new Date(grant.expiresAt).getTime() <= Date.now();
 }
 
 const NOT_A_LINK = "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.";
@@ -827,7 +841,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     <Typography variant="body2" sx={{ wordBreak: "break-all", mb: 1 }}>{describeScope(held)}</Typography>
                     <Typography variant="body2" color="text.secondary">Expires</Typography>
                     <Typography variant="body2" sx={{ mb: 1 }}>
-                        {held.grant.expiresAt ? new Date(held.grant.expiresAt).toLocaleString() : "Never"}
+                        {expiryText(held.grant)}
                     </Typography>
                     <Box sx={{ display: "flex", gap: 1 }}>
                         <Button

@@ -60,6 +60,13 @@ def test_there_are_vectors_for_every_fault_for_a_sound_request_and_for_data_that
 
 def test_a_request_is_named_by_its_did_an_alias_or_a_link_to_it():
     assert grants.grant_request_id("did:cid:abc") == "did:cid:abc"
+    # A DID URL would have a node resolve another version than the latest.
+    for url in (
+        "did:cid:abc?versionSequence=1", "did:cid:abc#key-1", "did:cid:abc/path",
+        "did:cid:abc%3FversionSequence=1", "did:cid:abc versionSequence=1",
+    ):
+        assert grants.grant_request_id(url) == ""
+        assert grants.grant_request_id(f"archon://grant?request={url}") == ""
     assert grants.grant_request_id("  did:cid:abc\n") == "did:cid:abc"
     assert grants.grant_request_id("archon://grant?request=did:cid:abc") == "did:cid:abc"
     assert grants.grant_request_id("\tarchon://grant?request=did:cid:abc \n") == "did:cid:abc"
@@ -206,7 +213,7 @@ def test_create_grant_refuses_what_names_no_request(node, name):
 
 
 def test_create_grant_refuses_a_request_the_node_does_not_have(node):
-    unknown = request_of(node)[:-6] + "aaaaaa"
+    unknown = request_of(node) + "aaaaaa"
 
     for name in [unknown, f"archon://grant?request={unknown}", "no-such-alias", "archon://auth?challenge=did:cid:abc"]:
         with refuses("request: not found$"):

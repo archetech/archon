@@ -59,12 +59,19 @@ export function isNameList(value: unknown): value is string[] {
         && new Set(value).size === value.length;
 }
 
+// A DID and nothing after it. A DID URL is not one: a query such as
+// `?versionSequence=1` asks a node for an earlier version, which would be read
+// as the request though the request has since changed or been deleted.
+const BARE_DID = /^did:[a-z0-9]+:[A-Za-z0-9_.:-]+$/;
+
 // What names a grant request: its DID or an alias for it, or a link to it with
-// the white space around it removed.
+// the white space around it removed. Empty for what begins as a DID and is not
+// one alone.
 export function grantRequestId(named: string): string {
     const text = named.trim();
+    const id = text.startsWith(GRANT_LINK_PREFIX) ? text.slice(GRANT_LINK_PREFIX.length) : text;
 
-    return text.startsWith(GRANT_LINK_PREFIX) ? text.slice(GRANT_LINK_PREFIX.length) : text;
+    return id.startsWith('did:') && !BARE_DID.test(id) ? '' : id;
 }
 
 // The app a member of an asset's data names, given what follows the app's name

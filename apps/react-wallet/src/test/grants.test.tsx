@@ -283,6 +283,7 @@ describe('Grants view: a grant link', () => {
     it.each([
         ['another archon link', () => 'archon://auth?challenge=did:cid:abc', /not a grant link/],
         ['a link that names no DID', () => 'archon://grant?request=!!!', /not a grant link/],
+        ['a DID with a query that asks for an earlier version', () => `${linkFor({}, { didDocumentMetadata: { versionSequence: '1' } })}?versionSequence=1`, /not a grant link/],
         ['a request the node cannot find', () => `archon://grant?request=${REQUEST}9`, /cannot find the request/],
         ['a deleted request', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2', deactivated: true } }), /was withdrawn/],
         ['a DID that is not an asset', () => linkFor({}, { didDocumentRegistration: { type: 'agent' } }), /does not name a grant request/],
@@ -505,9 +506,14 @@ describe('Grants view: the grants an identity holds', () => {
         holding({
             [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: 'read' } }),
             'did:cid:empty': doc({ exampleGrant: { client: CLIENT, actions: [] } }),
+            'did:cid:when': doc({ exampleGrant: { client: CLIENT, expiresAt: { toString: null } } }),
         });
         view();
-        const [odd, empty] = await screen.findAllByTestId('grant');
+        const [odd, empty, when] = await screen.findAllByTestId('grant');
+
+        expect(within(when).getByText('In a form this wallet cannot read')).toBeTruthy();
+        expect((within(when).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((within(when).getByRole('button', { name: 'Revoke' }) as HTMLButtonElement).disabled).toBe(false);
 
         expect(within(odd).getByText('Actions in a form this wallet cannot read')).toBeTruthy();
         expect((within(odd).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);

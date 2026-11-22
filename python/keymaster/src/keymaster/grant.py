@@ -69,11 +69,21 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+# A DID and nothing after it. A DID URL is not one: a query such as
+# ``?versionSequence=1`` asks a node for an earlier version, which would be read
+# as the request though the request has since changed or been deleted.
+_BARE_DID = re.compile(r"did:[a-z0-9]+:[A-Za-z0-9_.:-]+")
+
+
 def grant_request_id(named: str) -> str:
     """What names a grant request: its DID or an alias for it, or a link to it
-    with the white space around it removed."""
+    with the white space around it removed. Empty for what begins as a DID and
+    is not one alone."""
     text = named.strip(JS_WHITESPACE)
-    return text[len(GRANT_LINK_PREFIX):] if text.startswith(GRANT_LINK_PREFIX) else text
+    identifier = text[len(GRANT_LINK_PREFIX):] if text.startswith(GRANT_LINK_PREFIX) else text
+    if identifier.startswith("did:") and not _BARE_DID.fullmatch(identifier):
+        return ""
+    return identifier
 
 
 def _app_of(member: str, suffix: str) -> str | None:
