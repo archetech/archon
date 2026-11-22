@@ -246,7 +246,12 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const [editing, setEditing] = useState<{ grant: HeldGrant; scope: Scope } | null>(null);
     const [revoking, setRevoking] = useState<HeldGrant | null>(null);
 
-    const permitted = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
+    // Where this node could create a grant, and of those, where the client that
+    // is asking says it can publish. A grant on a registry the client cannot
+    // reach is one it cannot use.
+    const supported = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
+    const asked: string[] | undefined = request?.registries;
+    const permitted = supported.filter(name => !asked || asked.includes(name));
 
     const showRevocations = useCallback(() => setRevocations(tracked(sessionKey)), [sessionKey]);
 
@@ -455,7 +460,11 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         setLinkError("");
         setRequest(decoded.request);
         setScope(scopeOf(decoded.request.actions, decoded.request.expiresAt));
-        setRegistry(current => current || permitted[0] || "");
+
+        const listed: string[] | undefined = decoded.request.registries;
+        const choices = supported.filter(name => !listed || listed.includes(name));
+
+        setRegistry(current => (choices.includes(current as typeof choices[number]) ? current : choices[0] ?? ""));
     }
 
     function discard() {
@@ -610,10 +619,17 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                 <Typography variant="h6" component="h2" sx={{ mb: 1 }}>Grant a client</Typography>
 
-                {permitted.length === 0 && (
+                {supported.length === 0 && (
                     <Alert severity="warning" sx={{ mb: 2 }}>
                         This node supports none of the registries a grant may be created on
                         ({PERMITTED_REGISTRIES.join(", ")}).
+                    </Alert>
+                )}
+                {supported.length > 0 && asked && permitted.length === 0 && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        This client can publish only on {asked.join(", ")}, and this node supports
+                        none of them. A grant made on {supported.join(", ")} would be one the
+                        client cannot use.
                     </Alert>
                 )}
 

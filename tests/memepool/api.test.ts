@@ -566,6 +566,44 @@ describe('a grant that allows some kinds', () => {
     }, 120_000);
 });
 
+describe('the registries the service can publish on', () => {
+    const on = (registries: string[]) => createMemepoolApp({
+        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, registries,
+    });
+
+    it('lists them in the grant request it shows', async () => {
+        app = on(['BTC:mainnet', 'ZEC:mainnet']);
+        const agent = await signIn(alice);
+
+        expect(decodeGrantLink((await agent.get('/api/v1/me')).body.link)).toMatchObject({
+            request: { client: serviceDid, registries: ['BTC:mainnet', 'ZEC:mainnet'] },
+        });
+    });
+
+    it('lists none when it is told of none', async () => {
+        const agent = await signIn(alice);
+        const decoded = decodeGrantLink((await agent.get('/api/v1/me')).body.link) as { request: Record<string, unknown> };
+
+        expect('registries' in decoded.request).toBe(false);
+    });
+
+    it('does not take a grant on a registry its node lacks as one to publish under', async () => {
+        const { grantDid } = await granted(alice);
+
+        app = on(['ZEC:mainnet']);
+        const elsewhere = await signIn(alice);
+        const me = (await elsewhere.get('/api/v1/me')).body;
+
+        expect(me.grant).toBeUndefined();
+        expect(me.link).toMatch(/^archon:\/\/grant\?request=/);
+        expect((await elsewhere.post('/api/v1/objects').send({ kind: 'post', text: 'Unreachable.' })).status).toBe(403);
+
+        app = on(['BTC:mainnet']);
+        const here = await signIn(alice);
+        expect((await here.get('/api/v1/me')).body.grant).toBe(grantDid);
+    }, 120_000);
+});
+
 describe('publishing', () => {
     it('publishes, edits and withdraws what the signed-in user writes, as that user', async () => {
         const { agent, grantDid } = await granted(alice);

@@ -19,6 +19,7 @@ let settings: MemepoolSettings;
 let dirs: string[];
 let running: Server[];
 let warned: string[];
+let logged: string[];
 
 const dataDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'memepool-'));
@@ -28,7 +29,7 @@ const dataDir = () => {
 
 async function start(overrides: Partial<MemepoolSettings> = {}) {
     const started = await startMemepool({ ...settings, ...overrides }, { version: 'test', commit: 'test' }, {
-        log: () => undefined,
+        log: (message: string) => { logged.push(message); },
         warn: (message: string) => { warned.push(message); },
     });
 
@@ -46,6 +47,7 @@ beforeEach(async () => {
     });
 
     warned = [];
+    logged = [];
     const { app } = createGatekeeperApp({ gatekeeper, httpLogging: false, ready: true });
 
     node = await new Promise<Server>(resolve => { const listening = app.listen(0, '127.0.0.1', () => resolve(listening)); });
@@ -83,6 +85,8 @@ it('makes its wallet and identity on a first start, and serves as that identity'
     expect((await request(url).get('/api/v1/version')).body).toStrictEqual({ version: 'test', commit: 'test' });
     expect((await request(url).get('/api/v1/challenge')).body.challenge).toMatch(/^did:/);
     expect(warned).toStrictEqual([expect.stringContaining('creating one')]);
+    // Of the registries its node has, the ones a grant may be on.
+    expect(logged).toContain('Memepool can publish on BTC:mainnet');
 }, 60_000);
 
 it('is the same client at the next start, and another with another data directory', async () => {

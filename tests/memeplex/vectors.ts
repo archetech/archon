@@ -218,6 +218,12 @@ export async function build(): Promise<Vectors> {
     requestCase('an empty name', 'schema', { ...request, name: '' });
     requestCase('a name of 101 code points', 'schema', { ...request, name: codePoints(101) });
     requestCase('an expiry on a day that does not exist', 'expiry-instant', { ...request, expiresAt: '2027-02-29T00:00:00Z' });
+    requestCase('the registries the client can publish on', 'valid', { ...request, registries: ['BTC:mainnet', 'SOL:mainnet-beta'] });
+    requestCase('every permitted registry', 'valid', { ...request, registries: ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'] });
+    requestCase('no registries listed', 'schema', { ...request, registries: [] });
+    requestCase('a registry twice', 'schema', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] });
+    requestCase('a registry that is not permitted', 'schema', { ...request, registries: ['BTC:mainnet', 'BTC:signet'] });
+    requestCase('registries that are not a list', 'schema', { ...request, registries: 'BTC:mainnet' });
 
     // Objects. Each is created by the client that holds its author's grant.
     const by = (user: Signer, held: Identity) => ({ v: 1, author: user.did, grant: held.did });

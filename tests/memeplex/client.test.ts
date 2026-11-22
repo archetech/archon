@@ -123,6 +123,11 @@ it('asks for a grant with a link that carries a valid request with a nonce of it
     expect(second.request.nonce).not.toBe(first.request.nonce);
     expect(decodeGrantLink(first.link)).toStrictEqual({ request: first.request });
 
+    const narrowed = await client.requestGrant({ name: 'Memepool', registries: ['BTC:mainnet', 'ZEC:mainnet'] });
+    expect(narrowed.request.registries).toStrictEqual(['BTC:mainnet', 'ZEC:mainnet']);
+    expect(decodeGrantLink(narrowed.link)).toStrictEqual({ request: narrowed.request });
+    await expect(client.requestGrant({ name: 'Memepool', registries: ['BTC:signet'] })).rejects.toThrow('not a valid grant request: schema');
+
     // A Gatekeeper as it is, with no adapter, is what the client reads from.
     const direct = new MemeplexClient({ keymaster: clientKeymaster, gatekeeper, identity: 'memepool' });
     expect(await direct.did()).toBe(first.request.client);

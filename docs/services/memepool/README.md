@@ -10,6 +10,10 @@ A user does two things with a wallet, once each:
 2. **Grants the service.** The service shows a grant link naming its own DID; the
    wallet creates the grant from the user's identity.
 
+The grant link lists the registries the service can publish on: the permitted ones
+its node supports. A wallet offers the user those, so the grant is one the service
+can use, and the service does not take a grant on any other as one to publish under.
+
 From then on the service publishes what the user writes, as objects it creates on
 the grant's registry, naming the user as author. The user ends this at any time by
 revoking the grant in the wallet.

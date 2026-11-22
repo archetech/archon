@@ -6,6 +6,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
+import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
 import { createMemepoolApp } from './api.js';
 
@@ -77,6 +78,11 @@ export async function startMemepool(
     await keymaster.setCurrentId(settings.name);
 
     const client = new MemeplexClient({ keymaster, gatekeeper, identity: settings.name });
+    // What the service can publish on: the permitted registries its node has.
+    const supported = await gatekeeper.listRegistries();
+    const registries = PERMITTED_REGISTRIES.filter(registry => supported.includes(registry));
+
+    log.log(`Memepool can publish on ${registries.join(', ') || 'no permitted registry'}`);
     const did = await client.did();
 
     log.log(`Memepool is ${did}`);
@@ -87,6 +93,7 @@ export async function startMemepool(
         name: settings.name,
         publicURL: settings.publicURL || undefined,
         pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
+        registries,
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

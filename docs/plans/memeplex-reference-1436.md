@@ -348,7 +348,9 @@ ignored, as the strictness rule requires.
     "name": {"type": "string", "minLength": 1, "maxLength": 100},
     "actions": {"$ref": "#/$defs/actions"},
     "nonce": {"$ref": "#/$defs/nonce"},
-    "expiresAt": {"$ref": "#/$defs/expiresAt"}
+    "expiresAt": {"$ref": "#/$defs/expiresAt"},
+    "registries": {"type": "array", "minItems": 1, "uniqueItems": true,
+                   "items": {"enum": ["BTC:mainnet", "ZEC:mainnet", "ETH:mainnet", "SOL:mainnet-beta"]}}
   }
 }
 ```
@@ -722,8 +724,15 @@ cutoff, even though Archon supports historical resolution by time.
                                "client": "did:cid:…client",
                                "name": "Memepool",
                                "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
+                               "registries": ["BTC:mainnet", "ZEC:mainnet"],
                                "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz" } }
    ```
+
+   `registries` lists the permitted registries the client can publish on: those its
+   own node supports. A client publishes every object on its grant's registry, so a
+   grant on a registry the client cannot reach is a grant it cannot use, and the user
+   would have paid to anchor it. A request that leaves `registries` out can publish
+   on any permitted registry.
 
    `nonce` is at least 128 random bits, base64url-encoded. The client presents the
    request as a **grant link**, following the `archon://` deep links Archon wallets
@@ -747,8 +756,10 @@ cutoff, even though Archon supports historical resolution by time.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
    claim) and the requested scope: the listed actions, or every core kind when the
    request has no `actions`. The user approves it or a narrower subset and picks a
-   permitted registry, and the wallet creates the grant there with that scope and the
-   request's `client` and `nonce`.
+   registry from those that are permitted, that the request lists when it lists any,
+   and that the wallet's own node supports. With none of those, the wallet creates no
+   grant and says why. Otherwise it creates the grant there with that scope and the
+   request's `client` and `nonce`. The grant does not carry `registries`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see
    Discovery queries), keeps the one carrying its nonce, waits until it is anchored,
    and checks the grant against the core authorization rules. The grant's creator

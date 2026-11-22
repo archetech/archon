@@ -173,6 +173,42 @@ describe('Grants view: a grant link', () => {
         expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
     });
 
+    it('offers, of the registries this node supports, only those the client can publish on', async () => {
+        view();
+        const user = await review(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }));
+
+        await user.click(screen.getByRole('combobox', { name: 'Registry' }));
+        expect(screen.getAllByRole('option').map(option => option.textContent)).toStrictEqual(['ZEC:mainnet']);
+        await user.keyboard('{Escape}');
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        const [data, options] = keymaster.createAsset.mock.calls[0];
+        expect(options.registry).toBe('ZEC:mainnet');
+        // The grant says nothing of registries: it is on one.
+        expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, nonce: NONCE } });
+    });
+
+    it('creates nothing, and says why, when the client can publish on no registry this node supports', async () => {
+        view();
+        await review(linkFor({ registries: ['SOL:mainnet-beta'] }));
+
+        expect(screen.getByText(/This client can publish only on SOL:mainnet-beta, and this node supports\s+none of them/)).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('does not carry one request\'s registry over to another that does not list it', async () => {
+        view();
+        const user = await review(linkFor({ registries: ['BTC:mainnet'] }));
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        await review(linkFor({ registries: ['ZEC:mainnet'] }));
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
+    });
+
     it('says so, and creates nothing, on a node with no permitted registry', async () => {
         view({ registries: ['hyperswarm', 'local'] });
         await review(linkFor());
