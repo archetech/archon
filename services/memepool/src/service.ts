@@ -78,11 +78,11 @@ export async function startMemepool(
     await keymaster.setCurrentId(settings.name);
 
     const client = new MemeplexClient({ keymaster, gatekeeper, identity: settings.name });
-    // What the service can publish on: the permitted registries its node has.
+    // What the service can publish on: the permitted registries its node has,
+    // which the service asks the node for whenever it needs to know.
     const supported = await gatekeeper.listRegistries();
-    const registries = PERMITTED_REGISTRIES.filter(registry => supported.includes(registry));
 
-    log.log(`Memepool can publish on ${registries.join(', ') || 'no permitted registry'}`);
+    log.log(`Memepool can publish on ${PERMITTED_REGISTRIES.filter(registry => supported.includes(registry)).join(', ') || 'no permitted registry'}`);
     const did = await client.did();
 
     log.log(`Memepool is ${did}`);
@@ -93,7 +93,7 @@ export async function startMemepool(
         name: settings.name,
         publicURL: settings.publicURL || undefined,
         pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
-        registries,
+        registries: () => gatekeeper.listRegistries(),
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,
