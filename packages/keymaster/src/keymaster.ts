@@ -2235,9 +2235,9 @@ export default class Keymaster implements KeymasterInterface {
         return grants;
     }
 
-    // A live asset of the current ID that holds a valid grant, with the data
-    // the grant is a member of.
-    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant; data: Record<string, unknown> }> {
+    // A live asset of the current ID that holds a valid grant, with the
+    // version of the asset it was read from.
+    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant; doc: DidCidDocument }> {
         const owner = await this.fetchIdInfo();
         const did = await this.lookupDID(id);
         const doc = await this.resolveDID(did);
@@ -2251,7 +2251,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('id: not a grant of the current ID');
         }
 
-        return { did, grant: grant as MemeplexGrant, data: doc.didDocumentData as Record<string, unknown> };
+        return { did, grant: grant as MemeplexGrant, doc };
     }
 
     // Changes the scope of a grant of the current ID in place. Every field of
@@ -2263,13 +2263,18 @@ export default class Keymaster implements KeymasterInterface {
     // The update states the asset's whole data with `memeplexGrant` replaced.
     // mergeData is not used: it drops a member whose value is null, and a
     // change to the data outside the grant's scope ends the grant too.
+    //
+    // The update is signed as the successor of the version the grant was read
+    // from. If the grant has changed since, the node refuses it: writing it
+    // would put back the scope that change took away.
     async updateGrant(id: string, changes: GrantChanges): Promise<boolean> {
         if (!changes || typeof changes !== 'object'
             || (changes.actions === undefined && changes.expiresAt === undefined)) {
             throw new InvalidParameterError('changes: actions or expiresAt is needed');
         }
 
-        const { did, grant, data } = await this.ownGrant(id);
+        const { did, grant, doc } = await this.ownGrant(id);
+        const data = doc.didDocumentData as Record<string, unknown>;
         const updated: MemeplexGrant = { ...grant };
 
         if (changes.actions !== undefined) {
@@ -2298,7 +2303,7 @@ export default class Keymaster implements KeymasterInterface {
             return true;
         }
 
-        return this.updateDID(did, { didDocumentData: { ...data, memeplexGrant: updated } });
+        return this.updateFromDocument(did, { didDocumentData: { ...data, memeplexGrant: updated } }, doc);
     }
 
     // Revokes a grant of the current ID by deleting its asset. The client can

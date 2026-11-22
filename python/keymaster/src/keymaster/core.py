@@ -2733,7 +2733,7 @@ class Keymaster:
 
     async def _own_grant(self, identifier: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
         """A live asset of the current ID that holds a valid grant: its DID,
-        the grant, and the data the grant is a member of."""
+        the grant, and the version of the asset it was read from."""
         owner = await self.fetch_id_info()
         did = await self.lookup_did(identifier)
         doc = await self.resolve_did(did)
@@ -2747,7 +2747,7 @@ class Keymaster:
             raise KeymasterError("Invalid parameter: id: not a grant")
         if not self.did_match((doc.get("didDocument") or {}).get("controller") or "", owner["did"]):
             raise KeymasterError("Invalid parameter: id: not a grant of the current ID")
-        return did, grant, data
+        return did, grant, doc
 
     async def update_grant(self, identifier: str, changes: dict[str, Any]) -> bool:
         """Changes the scope of a grant of the current ID in place.
@@ -2763,11 +2763,15 @@ class Keymaster:
         replaced. merge_data is not used: it drops a member whose value is
         None, and a change to the data outside the grant's scope ends the
         grant too.
+
+        The update is signed as the successor of the version the grant was
+        read from. If the grant has changed since, the node refuses it: writing
+        it would put back the scope that change took away.
         """
         if not isinstance(changes, dict) or ("actions" not in changes and "expiresAt" not in changes):
             raise KeymasterError("Invalid parameter: changes: actions or expiresAt is needed")
 
-        did, grant, data = await self._own_grant(identifier)
+        did, grant, doc = await self._own_grant(identifier)
         updated = dict(grant)
 
         if "actions" in changes:
@@ -2787,7 +2791,8 @@ class Keymaster:
 
         if updated == grant:
             return True
-        return await self.update_did(did, {"didDocumentData": {**data, "memeplexGrant": updated}})
+        data = {**doc["didDocumentData"], "memeplexGrant": updated}
+        return await self._update_from_document(did, {"didDocumentData": data}, doc)
 
     async def revoke_grant(self, identifier: str) -> bool:
         """Revokes a grant of the current ID by deleting its asset.

@@ -538,6 +538,35 @@ def test_update_grant_keeps_a_member_of_the_data_whose_value_is_none(node):
     assert node.gatekeeper.operations[-1]["doc"] == {"didDocumentData": expected}
 
 
+def test_update_grant_is_refused_when_the_grant_has_changed_since_it_was_read(node):
+    did = run(node.keymaster.create_grant(link_for(node)))
+    resolve = node.gatekeeper.resolve_did
+    update = node.gatekeeper.update_did
+    intervened = []
+
+    # Another update lands after this one has read the grant.
+    async def intervening(identifier, options=None):
+        read = await resolve(identifier, options)
+        if identifier == did and not intervened:
+            intervened.append(read["didDocumentMetadata"].get("versionId"))
+            assert await node.keymaster.update_grant(did, {"actions": ["memeplex:tag"]}) is True
+        return read
+
+    # As a Gatekeeper does, refuse an update that does not follow the latest version.
+    async def checking(operation):
+        if operation.get("previd") != node.gatekeeper.docs[operation["did"]]["didDocumentMetadata"].get("versionId"):
+            return False
+        return await update(operation)
+
+    node.gatekeeper.resolve_did = intervening
+    node.gatekeeper.update_did = checking
+
+    assert run(node.keymaster.update_grant(did, {"expiresAt": "2028-01-01T00:00:00Z"})) is False
+    assert len(intervened) == 1
+    assert grant_of(node, did) == {"v": 1, "client": node.client, "nonce": NONCE, "actions": ["memeplex:tag"]}
+    assert sequence_of(node, did) == 2
+
+
 def test_update_grant_widens_to_every_core_kind_by_none_or_by_naming_the_core_actions(node):
     did = run(node.keymaster.create_grant(link_for(node, actions=["memeplex:tag"])))
     plain = {"v": 1, "client": node.client, "nonce": NONCE}

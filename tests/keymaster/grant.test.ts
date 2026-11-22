@@ -556,6 +556,30 @@ describe('updateGrant', () => {
         expect(read.status === 'valid' && read.versions.map(version => version.actions)).toStrictEqual([undefined, ['memeplex:tag']]);
     });
 
+    it('is refused when the grant has changed since it was read, and leaves that change standing', async () => {
+        const did = await keymaster.createGrant(linkFor());
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+        let intervened = false;
+
+        // Another update lands after this one has read the grant.
+        jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (id, options) => {
+            const read = await resolve(id, options);
+
+            if (id === did && !intervened) {
+                intervened = true;
+                expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
+            }
+            return read;
+        });
+
+        await expect(keymaster.updateGrant(did, { expiresAt: '2028-01-01T00:00:00Z' }))
+            .rejects.toThrow('Invalid operation: previd');
+
+        expect(intervened).toBe(true);
+        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE, actions: ['memeplex:tag'] });
+        expect(await sequenceOf(did)).toBe('2');
+    });
+
     it('is read by the verifier as a scope update that does not end the grant', async () => {
         const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:post', 'memeplex:tag'] }));
         await anchor(100);

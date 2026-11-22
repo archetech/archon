@@ -118,6 +118,7 @@ function normalizePath(path: string): string {
         .replace(/\/credentials\/held\/[^/]+/g, '/credentials/held/:did')
         .replace(/\/credentials\/issued\/[^/]+/g, '/credentials/issued/:did')
         .replace(/\/assets\/[^/]+/g, '/assets/:id')
+        .replace(/\/grants\/[^/]+/g, '/grants/:id')
         .replace(/\/polls\/[^/]+\/voters\/[^/]+/g, '/polls/:poll/voters/:voter')
         .replace(/\/polls\/ballot\/[^/]+/g, '/polls/ballot/:did')
         .replace(/\/polls\/[^/]+/g, '/polls/:poll')

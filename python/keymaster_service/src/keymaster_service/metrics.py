@@ -70,6 +70,9 @@ _PATH_NORMALIZERS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/credentials/held/[^/]+"), "/credentials/held/:did"),
     (re.compile(r"/credentials/issued/[^/]+"), "/credentials/issued/:did"),
     (re.compile(r"/assets/[^/]+"), "/assets/:id"),
+    # The grant routes take an alias that may hold a slash, and the path seen
+    # here is decoded, so the identifier is all that follows.
+    (re.compile(r"/grants/.+"), "/grants/:id"),
     (re.compile(r"/polls/[^/]+/voters/[^/]+"), "/polls/:poll/voters/:voter"),
     (re.compile(r"/polls/ballot/[^/]+"), "/polls/ballot/:did"),
     (re.compile(r"/polls/[^/]+"), "/polls/:poll"),

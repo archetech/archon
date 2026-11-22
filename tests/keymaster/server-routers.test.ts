@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
@@ -784,6 +785,24 @@ test.each(['clients/memepool', 'Alice / grant', 'did:cid:grant'])(
         expect(keymaster.revokeGrant).toHaveBeenCalledWith(identifier);
     },
 );
+
+// The rules of the service's metric labels, as its source states them.
+function metricLabel(path: string): string {
+    const source = readFileSync('services/keymaster/server/src/keymaster-api.ts', 'utf-8');
+    const body = source.slice(source.indexOf('function normalizePath'), source.indexOf('const app = express()'));
+    const rules = [...body.matchAll(/\.replace\(\/(.+)\/g, '([^']+)'\)/g)];
+
+    expect(rules.length).toBeGreaterThan(20);
+    return rules.reduce((label, [, pattern, replacement]) => label.replace(new RegExp(pattern, 'g'), replacement), path.split('?')[0]);
+}
+
+test('metric labels give every asset, and every grant, one label', () => {
+    expect(metricLabel('/api/v1/assets/did:cid:abcdef')).toBe('/api/v1/assets/:id');
+    expect(metricLabel('/api/v1/grants')).toBe('/api/v1/grants');
+    expect(metricLabel('/api/v1/grants?owner=Alice')).toBe('/api/v1/grants');
+    expect(metricLabel('/api/v1/grants/did:cid:abcdef')).toBe('/api/v1/grants/:id');
+    expect(metricLabel(`/api/v1/grants/${encodeURIComponent('clients/memepool')}`)).toBe('/api/v1/grants/:id');
+});
 
 test('grant routes pass the link, its options and the owner', async () => {
     const { app, keymaster } = mount();
