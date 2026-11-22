@@ -33,7 +33,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `POST /callback` | Where a wallet sends `{ "response": "did:cid:…" }`, its answer, when the challenge names this as its callback. Signs nobody in: the answer is kept for the browser that asked |
 | `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it asks whether a wallet has sent an answer to the callback: `202` with `{ "waiting": true }` until one has, then `{ "answered": "did:cid:…" }`, which is who answered and not yet a session. With `{ "confirm": "did:cid:…" }` naming that identity it signs the browser in. Sets the session cookie and returns the DID signed in |
 | `POST /logout` | Ends the session |
-| `GET /me` | The DID signed in, with its `grant` and `registry` (and any `others` in force), or with the grant `link` to show and any grants still `pending` |
+| `GET /me` | The DID signed in, with its `grant` and `registry`, any `others` in force, and the `actions` those grants allow when every one of them is narrowed; or with the grant `link` to show and any grants still `pending` |
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`; returns its `did` |
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
@@ -46,7 +46,7 @@ and the grant, whatever the request carries.
 | 400 | The object is not valid, an edit would change what the object is, or the object was not published under a grant of the user's that is in force |
 | 401 | Not signed in, or the answer is not one this service takes (see Sessions) |
 | 409 | More than one identity answered the challenge |
-| 403 | The user has no grant to publish under: none, one not yet anchored, or one revoked or expired |
+| 403 | The user has no grant to publish under (none, one not yet anchored, or one revoked or expired), or none that allows this kind of object |
 | 429 | The service has issued as many challenges this minute as it is set to |
 | 502 | The node did not accept the operation |
 
@@ -103,9 +103,10 @@ attributed.
 
 An object is a publication once the chain anchors it, and what the grant allowed
 at that position decides whether it is attributed. The service refuses what it
-can tell is wrong before creating anything. It does not check an object's kind
-against the grant's actions: an object of a kind the grant does not allow is
-created and is not attributed.
+can tell is wrong before creating anything: an object that is not valid, and one
+of a kind the user's grants do not allow, which would be created and never
+attributed. With several grants in force, a new object goes under the earliest
+whose scope allows its kind.
 
 ## Running it
 

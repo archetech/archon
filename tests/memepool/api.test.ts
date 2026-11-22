@@ -506,6 +506,66 @@ describe('a user with more than one grant', () => {
     }, 120_000);
 });
 
+describe('a grant that allows some kinds', () => {
+    async function narrowed(actions: string[]) {
+        const agent = await signIn(alice);
+        const { request: asked } = decodeGrantLink((await agent.get('/api/v1/me')).body.link) as { request: { client: string; nonce: string } };
+        const grantDid = await alice.createAsset({ memeplexGrant: { v: 1, client: asked.client, nonce: asked.nonce, actions } }, { registry: REGISTRY });
+
+        await anchor();
+
+        return { agent, grantDid };
+    }
+
+    it('says what the grant allows, publishes that, and refuses the rest before anything is created', async () => {
+        const { agent, grantDid } = await narrowed(['memeplex:post', 'memeplex:tag']);
+
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({
+            did: aliceDid, grant: grantDid, registry: REGISTRY, actions: ['memeplex:post', 'memeplex:tag'],
+        });
+
+        const posted = await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Allowed.' });
+        expect(posted.status).toBe(200);
+        await anchor();
+        const targetVersion = (await client.publication(posted.body.did, grantDid)).versions[0].opid;
+
+        const queued = (await gatekeeper.getQueue(REGISTRY)).length;
+        const refused = await agent.post('/api/v1/objects').send({ kind: 'rating', target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 });
+
+        expect(refused.status).toBe(403);
+        expect(refused.body).toStrictEqual({ error: 'your grant does not allow a rating' });
+        expect(await gatekeeper.getQueue(REGISTRY)).toHaveLength(queued);
+        // A kind the rules do not know, or that is no string, is not a matter of scope.
+        expect((await agent.post('/api/v1/objects').send({ kind: 'essay', text: 'x' })).status).toBe(400);
+        expect((await agent.post('/api/v1/objects').send({ kind: ['rating'], target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 })).status).toBe(400);
+    }, 120_000);
+
+    it('publishes under whichever of the reader\'s grants allows the kind, and lists what they allow between them', async () => {
+        const { agent, grantDid: posts } = await narrowed(['memeplex:post']);
+        const ratings = await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid, actions: ['memeplex:rate'] } }, { registry: REGISTRY });
+        await anchor();
+
+        expect((await agent.get('/api/v1/me')).body).toMatchObject({ grant: posts, others: [ratings], actions: ['memeplex:post', 'memeplex:rate'] });
+
+        const posted = await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' });
+        await anchor();
+        const targetVersion = (await client.publication(posted.body.did, posts)).versions[0].opid;
+        const rated = await agent.post('/api/v1/objects').send({ kind: 'rating', target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 });
+        await anchor();
+
+        expect(await client.publication(rated.body.did, ratings)).toMatchObject({ state: 'published', memeplex: { grant: ratings } });
+        expect((await agent.post('/api/v1/objects').send({ kind: 'tag', target: posted.body.did, targetVersion, tag: 'x' })).status).toBe(403);
+    }, 120_000);
+
+    it('lists no actions when one of the reader\'s grants allows every kind', async () => {
+        const { agent } = await narrowed(['memeplex:post']);
+        await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid } }, { registry: REGISTRY });
+        await anchor();
+
+        expect((await agent.get('/api/v1/me')).body.actions).toBeUndefined();
+    }, 120_000);
+});
+
 describe('publishing', () => {
     it('publishes, edits and withdraws what the signed-in user writes, as that user', async () => {
         const { agent, grantDid } = await granted(alice);

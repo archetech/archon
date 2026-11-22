@@ -7,7 +7,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { MemeplexIndex, decodeGrantLink, validateGrantRequest } from '@didcid/memeplex';
-import { IndexerClient, MemeplexClient, liveGrants, usable } from '@didcid/memeplex/client';
+import { IndexerClient, MemeplexClient, allows, liveGrants, usable } from '@didcid/memeplex/client';
 import type { ClientGatekeeper } from '@didcid/memeplex/client';
 import { Sync } from '../../services/memeplex-indexer/src/sync.ts';
 import { createIndexerApp } from '../../services/memeplex-indexer/src/api.ts';
@@ -144,6 +144,7 @@ it('carries a user from a grant link to a thread a reader sees', async () => {
     found = await client.findGrants(request);
     const grant = usable(found)!;
     expect(grant).toStrictEqual({ did: grantDid, user: userDid, registry: REGISTRY });
+    expect(allows(grant, 'rating')).toBe(true);
 
     const post = await client.publish(grant, { kind: 'post', text: 'Every post is a DID.' });
     expect((await client.publication(post, grant.did)).state).toBe('pending');
@@ -227,9 +228,17 @@ it('refuses to publish what is not a valid object, and what the grant does not a
 
     const post = await client.publish(grant, { kind: 'post', text: 'Allowed.' });
     await anchor();
-    const reply = await client.publish(grant, {
-        kind: 'reply', target: post, targetVersion: (await client.publication(post, grant.did)).versions[0].opid, text: 'Not allowed.',
-    });
+    const targetVersion = (await client.publication(post, grant.did)).versions[0].opid;
+
+    // Outside the grant's scope: refused before anything is created.
+    expect(grant.actions).toStrictEqual(['memeplex:post']);
+    await expect(client.publish(grant, { kind: 'reply', target: post, targetVersion, text: 'Not allowed.' }))
+        .rejects.toThrow('the grant does not allow a reply');
+
+    // And what a client publishes outside it anyway is not attributed.
+    const reply = await clientKeymaster.createAsset({
+        memeplex: { v: 1, kind: 'reply', author: grant.user, grant: grant.did, target: post, targetVersion, text: 'Not allowed.' },
+    }, { registry: REGISTRY });
     await anchor();
 
     expect(await indexer.publication(post)).toMatchObject({ state: 'published' });
@@ -304,4 +313,15 @@ it('orders the grants in force by when they were anchored, across chains', () =>
 
     expect(liveGrants(found).map(each => each.did)).toStrictEqual(['did:cid:a', 'did:cid:b', 'did:cid:c']);
     expect(usable(found)).toBeUndefined();
+});
+
+it('lets a scope allow the core kinds it lists, all of them when it lists none, and no other kind', () => {
+    expect(allows({}, 'post')).toBe(true);
+    expect(allows({}, 'paper')).toBe(true);
+    expect(allows({}, 'rating')).toBe(true);
+    expect(allows({}, 'essay')).toBe(false);
+    expect(allows({}, 'toString')).toBe(false);
+    expect(allows({ actions: ['memeplex:post'] }, 'paper')).toBe(true);
+    expect(allows({ actions: ['memeplex:post'] }, 'reply')).toBe(false);
+    expect(allows({ actions: [] }, 'post')).toBe(false);
 });

@@ -21,7 +21,8 @@ publishes for the user under their grant. Everything they read comes from the
    anchors it and the indexer has it: it is not a publication before then.
 5. **Thread.** A post with the replies under it, how many have boosted it, how it is
    rated, and the tags and reactions on it.
-6. **Respond.** A boost, a thumb up or down, a like, a tag. Each is an object of the
+6. **Respond.** A boost, a thumb up or down, a like, a tag, each offered only when
+   the reader's grant allows it. Each is an object of the
    reader's, about the version of the post that is shown. A reader has one rating of
    an object, so a second thumb changes the first.
 7. **Edit and withdraw**, for what the reader published through this service.

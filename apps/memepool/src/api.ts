@@ -31,6 +31,8 @@ export interface Me {
     grant?: string;
     // Other grants of theirs that are in force.
     others?: string[];
+    // What their grants let the service publish. Absent means every core kind.
+    actions?: string[];
     registry?: string;
     link?: string;
     pending?: string[];

@@ -282,6 +282,11 @@ export function tagWord(written: string): string {
 
 const LIKE = '❤️';
 
+// Whether the reader's grant lets the service publish with an action. What it
+// does not allow is not offered: it would be refused, or published and never
+// attributed.
+const may = (me: Me, action: string) => me.grant !== undefined && (!me.actions || me.actions.includes(action));
+
 // What others have made of an object, and the reader's own responses to it: a
 // boost, a thumb up or down, a like, a tag. Each is an object of the reader's,
 // and counts once its chain has anchored it.
@@ -407,27 +412,37 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
             {error && <p role="alert" className="error">{error}</p>}
             {me.grant && (
                 <>
-                    <button className="quiet" disabled={busy} onClick={boost}>Boost</button>
+                    {may(me, 'memeplex:post') && <button className="quiet" disabled={busy} onClick={boost}>Boost</button>}
                     {/* Not until the ratings have been read: a thumb has to know
-                        whether the reader has a rating to change. */}
-                    <button className="quiet" disabled={busy || !responses} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
-                    <button className="quiet" disabled={busy || !responses} onClick={() => rate(0)} aria-label="Thumb down">👎</button>
-                    <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>
-                    <label className="inline">
-                        Tag
-                        <input value={word} disabled={busy} onChange={event => setWord(event.target.value)} placeholder="a word" />
-                    </label>
-                    <button
-                        className="quiet"
-                        disabled={busy || !tagWord(word)}
-                        onClick={async () => {
-                            if (await tag(tagWord(word), `Your tag ${tagWord(word)}`)) {
-                                setWord('');
-                            }
-                        }}
-                    >
-                        Add tag
-                    </button>
+                        whether the reader has a rating to change. A rating the
+                        reader has can be changed whatever the scope is since:
+                        the permission it was made with covers its edits. */}
+                    {(may(me, 'memeplex:rate') || mine) && (
+                        <>
+                            <button className="quiet" disabled={busy || !responses} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
+                            <button className="quiet" disabled={busy || !responses} onClick={() => rate(0)} aria-label="Thumb down">👎</button>
+                        </>
+                    )}
+                    {may(me, 'memeplex:tag') && (
+                        <>
+                            <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>
+                            <label className="inline">
+                                Tag
+                                <input value={word} disabled={busy} onChange={event => setWord(event.target.value)} placeholder="a word" />
+                            </label>
+                            <button
+                                className="quiet"
+                                disabled={busy || !tagWord(word)}
+                                onClick={async () => {
+                                    if (await tag(tagWord(word), `Your tag ${tagWord(word)}`)) {
+                                        setWord('');
+                                    }
+                                }}
+                            >
+                                Add tag
+                            </button>
+                        </>
+                    )}
                 </>
             )}
             {sent.map((each, index) => <p key={index} className="muted">{each.what} is waiting to be anchored.</p>)}
@@ -549,7 +564,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                     <footer className="muted">Waiting to be anchored</footer>
                 </article>
             ))}
-            {me.grant && <Composer label="Reply" onPublish={reply} />}
+            {may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} />}
         </section>
     );
 }
@@ -675,7 +690,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 />
             ) : (
                 <>
-                    {me.grant && (
+                    {may(me, 'memeplex:post') && (
                         <Composer
                             label="Post"
                             onPublish={async text => {
