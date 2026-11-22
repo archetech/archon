@@ -202,7 +202,9 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
                             <p><Copy text={me.link} label="Copy grant link" /></p>
                         </>
                     )}
-                    <button onClick={onChecked}>I have approved it</button>
+                    {me.unavailable
+                        ? <p role="alert" className="error">Memepool cannot be granted here: {me.unavailable}.</p>
+                        : <button onClick={onChecked}>I have approved it</button>}
                 </>
             )}
         </section>

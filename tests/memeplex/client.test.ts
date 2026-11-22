@@ -112,16 +112,21 @@ afterEach(async () => {
 });
 
 it('asks for a grant with a link that carries a valid request with a nonce of its own', async () => {
-    const first = await client.requestGrant({ name: 'Memepool', actions: ['memeplex:post', 'memeplex:reply'] });
-    const second = await client.requestGrant({ name: 'Memepool' });
+    const first = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], actions: ['memeplex:post', 'memeplex:reply'] });
+    const second = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
 
     expect(first.request).toStrictEqual({
-        v: 1, client: await client.did(), name: 'Memepool', actions: ['memeplex:post', 'memeplex:reply'], nonce: first.request.nonce,
+        v: 1, client: await client.did(), name: 'Memepool', actions: ['memeplex:post', 'memeplex:reply'], nonce: first.request.nonce, registries: [REGISTRY],
     });
     expect(validateGrantRequest(first.request)).toBe('valid');
     expect(first.request.nonce).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(second.request.nonce).not.toBe(first.request.nonce);
     expect(decodeGrantLink(first.link)).toStrictEqual({ request: first.request });
+
+    const narrowed = await client.requestGrant({ name: 'Memepool', registries: ['BTC:mainnet', 'ZEC:mainnet'] });
+    expect(narrowed.request.registries).toStrictEqual(['BTC:mainnet', 'ZEC:mainnet']);
+    expect(decodeGrantLink(narrowed.link)).toStrictEqual({ request: narrowed.request });
+    await expect(client.requestGrant({ name: 'Memepool', registries: ['BTC:signet'] })).rejects.toThrow('not a valid grant request: schema');
 
     // A Gatekeeper as it is, with no adapter, is what the client reads from.
     const direct = new MemeplexClient({ keymaster: clientKeymaster, gatekeeper, identity: 'memepool' });
@@ -129,7 +134,7 @@ it('asks for a grant with a link that carries a valid request with a nonce of it
 });
 
 it('carries a user from a grant link to a thread a reader sees', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
 
     expect(await client.findGrants(request)).toStrictEqual([]);
 
@@ -178,7 +183,7 @@ it('carries a user from a grant link to a thread a reader sees', async () => {
 }, 120_000);
 
 it('publishes nothing that counts once the user has revoked the grant', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     const grantDid = await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -199,7 +204,7 @@ it('publishes nothing that counts once the user has revoked the grant', async ()
 }, 120_000);
 
 it('finds each grant made from a request, and takes none as its own when there are two', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     const { keymaster: other, did: otherDid } = await keymasterFor('mallory');
 
     const grantDid = await grantFrom(link);
@@ -218,7 +223,7 @@ it('finds each grant made from a request, and takes none as its own when there a
 }, 120_000);
 
 it('refuses to publish what is not a valid object, and what the grant does not allow is not attributed', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', actions: ['memeplex:post'] });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], actions: ['memeplex:post'] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -246,7 +251,7 @@ it('refuses to publish what is not a valid object, and what the grant does not a
 }, 120_000);
 
 it('states the grant\'s user and DID in what it publishes, whatever it is handed', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -269,7 +274,7 @@ it('tells a missing publication from an indexer that is failing or is not one', 
 });
 
 it('refuses an edit that would change what an object is', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY] });
     await grantFrom(link);
     await anchor();
     const grant = usable(await client.findGrants(request))!;
@@ -291,7 +296,7 @@ it('refuses an edit that would change what an object is', async () => {
 }, 120_000);
 
 it('does not take an expired grant as one to publish under', async () => {
-    const { request, link } = await client.requestGrant({ name: 'Memepool', expiresAt: '2027-01-01T00:00:00Z' });
+    const { request, link } = await client.requestGrant({ name: 'Memepool', registries: [REGISTRY], expiresAt: '2027-01-01T00:00:00Z' });
     await grantFrom(link);
     await anchor();
     const found = await client.findGrants(request);

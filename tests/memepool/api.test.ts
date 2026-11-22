@@ -101,7 +101,7 @@ beforeEach(async () => {
     ({ keymaster: bob } = await keymasterFor('bob'));
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
-        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' },
+        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
         sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock,
     });
 });
@@ -240,7 +240,7 @@ describe('signing in', () => {
 
     it('issues no more challenges in a minute than it is set to', async () => {
         app = createMemepoolApp({
-            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, challengesPerMinute: 2,
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock, challengesPerMinute: 2,
         });
 
         expect((await request(app).get('/api/v1/challenge')).status).toBe(200);
@@ -267,7 +267,7 @@ describe('signing in', () => {
 describe('signing in with a wallet that sends its answer to the callback', () => {
     beforeEach(() => {
         app = createMemepoolApp({
-            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' },
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
             sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, publicURL: 'https://node.example/memepool/',
         });
     });
@@ -563,6 +563,82 @@ describe('a grant that allows some kinds', () => {
         await anchor();
 
         expect((await agent.get('/api/v1/me')).body.actions).toBeUndefined();
+    }, 120_000);
+});
+
+describe('the registries the service can publish on', () => {
+    const on = (registries: string[]) => createMemepoolApp({
+        client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, registries,
+    });
+
+    it('lists them in the grant request it shows', async () => {
+        app = on(['BTC:mainnet', 'ZEC:mainnet']);
+        const agent = await signIn(alice);
+
+        expect(decodeGrantLink((await agent.get('/api/v1/me')).body.link)).toMatchObject({
+            request: { client: serviceDid, registries: ['BTC:mainnet', 'ZEC:mainnet'] },
+        });
+    });
+
+    it('asks for no grant on a node with no registry a grant may be on, and says so', async () => {
+        app = on([]);
+        const agent = await signIn(alice);
+
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({
+            did: aliceDid, pending: [], unavailable: 'this node supports no registry a grant may be made on',
+        });
+    });
+
+    it('does not wait on a grant that is on a registry its node lacks', async () => {
+        app = on(['ZEC:mainnet']);
+        const agent = await signIn(alice);
+        const before = (await agent.get('/api/v1/me')).body;
+
+        // On a registry the service cannot publish on, and not anchored yet.
+        await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid } }, { registry: REGISTRY });
+        const after = (await agent.get('/api/v1/me')).body;
+
+        expect(after.pending).toStrictEqual([]);
+        expect(after.link).toMatch(/^archon:\/\/grant\?request=/);
+        expect(before.pending).toStrictEqual([]);
+    }, 120_000);
+
+    it('asks its node each time, and keeps a registry the node has dropped for a while', async () => {
+        let supported = ['hyperswarm', 'BTC:mainnet'];
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock,
+            registries: async () => supported,
+        });
+        const { grantDid } = await granted(alice);
+        const agent = await signIn(alice);
+
+        expect((await agent.get('/api/v1/me')).body.grant).toBe(grantDid);
+
+        // The node drops a registry while its queue is full.
+        supported = ['hyperswarm'];
+        expect((await agent.get('/api/v1/me')).body.grant).toBe(grantDid);
+
+        // And one the node gains is one the service asks for.
+        supported = ['hyperswarm', 'ZEC:mainnet'];
+        await alice.revokeDID(grantDid);
+        await anchor();
+        expect(decodeGrantLink((await agent.get('/api/v1/me')).body.link)).toMatchObject({ request: { registries: ['BTC:mainnet', 'ZEC:mainnet'] } });
+    }, 120_000);
+
+    it('does not take a grant on a registry its node lacks as one to publish under', async () => {
+        const { grantDid } = await granted(alice);
+
+        app = on(['ZEC:mainnet']);
+        const elsewhere = await signIn(alice);
+        const me = (await elsewhere.get('/api/v1/me')).body;
+
+        expect(me.grant).toBeUndefined();
+        expect(me.link).toMatch(/^archon:\/\/grant\?request=/);
+        expect((await elsewhere.post('/api/v1/objects').send({ kind: 'post', text: 'Unreachable.' })).status).toBe(403);
+
+        app = on(['BTC:mainnet']);
+        const here = await signIn(alice);
+        expect((await here.get('/api/v1/me')).body.grant).toBe(grantDid);
     }, 120_000);
 });
 

@@ -6,6 +6,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
+import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
 import { createMemepoolApp } from './api.js';
 
@@ -35,6 +36,13 @@ export async function startMemepool(
 ): Promise<{ server: Server; did: string }> {
     if (!settings.passphrase) {
         throw new Error('ARCHON_MEMEPOOL_WALLET_PASSPHRASE is not set');
+    }
+
+    // Nothing made on `local` leaves the node, and Keymaster makes everything
+    // a local identity creates there: such a service could publish on no
+    // grant's registry. It is refused before a wallet or an identity is made.
+    if (settings.registry === 'local') {
+        throw new Error('ARCHON_MEMEPOOL_REGISTRY cannot be local: Memepool publishes on the registries of its users\' grants, and a local identity can publish only on local');
     }
 
     const gatekeeper = new GatekeeperClient();
@@ -77,9 +85,21 @@ export async function startMemepool(
     await keymaster.setCurrentId(settings.name);
 
     const client = new MemeplexClient({ keymaster, gatekeeper, identity: settings.name });
+    // What the service can publish on: the permitted registries its node has,
+    // which the service asks the node for whenever it needs to know.
+    const supported = await gatekeeper.listRegistries();
+
+    log.log(`Memepool can publish on ${PERMITTED_REGISTRIES.filter(registry => supported.includes(registry)).join(', ') || 'no permitted registry'}`);
     const did = await client.did();
 
     log.log(`Memepool is ${did}`);
+
+    // The identity may be one the wallet already held.
+    const own = await keymaster.resolveDID(did);
+
+    if (own.didDocumentRegistration?.registry === 'local') {
+        throw new Error(`Memepool's identity ${settings.name} is registered on local, so nothing it publishes can be on a grant's registry. Give the service a wallet whose identity is on another registry.`);
+    }
 
     const app = createMemepoolApp({
         client,
@@ -87,6 +107,7 @@ export async function startMemepool(
         name: settings.name,
         publicURL: settings.publicURL || undefined,
         pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
+        registries: () => gatekeeper.listRegistries(),
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

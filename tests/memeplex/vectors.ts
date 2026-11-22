@@ -203,7 +203,7 @@ export async function build(): Promise<Vectors> {
     await grantCase('lacks v', alice, 'version', without(grant, 'v'));
     await grantCase('v as a string', alice, 'version', { ...grant, v: '1' });
 
-    const request = { v: 1, client: memepool.did, name: 'Memepool', nonce: nonce(6) };
+    const request = { v: 1, client: memepool.did, name: 'Memepool', nonce: nonce(6), registries: ['BTC:mainnet'] };
     const requestCase = (name: string, expect: Validity, memeplexGrantRequest: Record<string, unknown>) => {
         cases.push({ name: `grant request: ${name}`, schema: 'grant-request', member: 'memeplexGrantRequest', expect, request: memeplexGrantRequest });
     };
@@ -218,6 +218,13 @@ export async function build(): Promise<Vectors> {
     requestCase('an empty name', 'schema', { ...request, name: '' });
     requestCase('a name of 101 code points', 'schema', { ...request, name: codePoints(101) });
     requestCase('an expiry on a day that does not exist', 'expiry-instant', { ...request, expiresAt: '2027-02-29T00:00:00Z' });
+    requestCase('several registries the client can publish on', 'valid', { ...request, registries: ['BTC:mainnet', 'SOL:mainnet-beta'] });
+    requestCase('lacks registries', 'schema', without(request, 'registries'));
+    requestCase('every permitted registry', 'valid', { ...request, registries: ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'] });
+    requestCase('no registries listed', 'schema', { ...request, registries: [] });
+    requestCase('a registry twice', 'schema', { ...request, registries: ['BTC:mainnet', 'BTC:mainnet'] });
+    requestCase('a registry that is not permitted', 'schema', { ...request, registries: ['BTC:mainnet', 'BTC:signet'] });
+    requestCase('registries that are not a list', 'schema', { ...request, registries: 'BTC:mainnet' });
 
     // Objects. Each is created by the client that holds its author's grant.
     const by = (user: Signer, held: Identity) => ({ v: 1, author: user.did, grant: held.did });
