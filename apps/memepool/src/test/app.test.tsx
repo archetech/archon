@@ -28,6 +28,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         published: [] as Record<string, unknown>[],
         edited: [] as { did: string; object: Record<string, unknown> }[],
         responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
+        // The bodies the service holds, by the DID of the entry.
+        bodies: {} as Record<string, string>,
     };
     const api: Api = {
         me: vi.fn(async () => state.me),
@@ -45,6 +47,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         thread: vi.fn(async () => []),
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async () => undefined),
+        content: vi.fn(async (did: string) => state.bodies[did]),
     };
 
     return { api, state };
@@ -511,10 +514,11 @@ describe('reading and publishing', () => {
         });
         render(<App api={api} />);
 
-        expect(await screen.findByText('The text is kept apart from this entry, and this page does not show it yet.')).toBeTruthy();
-        expect(screen.getByText('On DIDs')).toBeTruthy();
+        expect(await screen.findByText('On DIDs')).toBeTruthy();
         expect(screen.getByText('A summary.')).toBeTruthy();
-        expect(screen.getByText(/The full text is kept apart/)).toBeTruthy();
+        // A list shows what an article says of itself, and reads no body.
+        expect(screen.getAllByText('Open it to read the full text.')).toHaveLength(2);
+        expect(api.content).not.toHaveBeenCalled();
         expect(screen.getByText(/A boost of/)).toBeTruthy();
     });
 
@@ -813,6 +817,132 @@ describe('a grant that allows some kinds', () => {
     });
 });
 
+describe('an article', () => {
+    const BODY = '# On DIDs\n\nEvery post is one.\n';
+    const article = (did: string, author = ALICE): Publication => under({
+        ...post(did, author, ''),
+        memeplex: { kind: 'post', author, title: 'On DIDs', summary: 'A summary.', content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length }, v: 1 },
+    }, 'did:cid:grant');
+
+    it('is written with a title, a summary and a body, which the service is sent to store', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        expect((screen.getByRole('button', { name: 'Publish article' }) as HTMLButtonElement).disabled).toBe(true);
+        await user.type(screen.getByLabelText('Title'), 'On DIDs');
+        await user.type(screen.getByLabelText('Summary'), 'A summary.');
+        await user.type(screen.getByLabelText('Article'), 'Every post is one.');
+        await user.click(screen.getByRole('button', { name: 'Publish article' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([
+            { kind: 'post', title: 'On DIDs', summary: 'A summary.', body: 'Every post is one.' },
+        ]));
+        // Waiting to be anchored, under its title, and the short form is back.
+        expect(await screen.findByText('On DIDs')).toBeTruthy();
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('keeps what was written when the service refuses it, and leaves when cancelled', async () => {
+        const { api } = services({ me: granted });
+        vi.mocked(api.publish).mockRejectedValue(new ApiError(400, 'a body may be 200000 bytes, and this is 200001'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), 'On DIDs');
+        await user.type(screen.getByLabelText('Article'), 'Too much.');
+        await user.click(screen.getByRole('button', { name: 'Publish article' }));
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/a body may be 200000 bytes/);
+        expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe('Too much.');
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('is read in full when it is opened', async () => {
+        const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
+        state.bodies['did:cid:1'] = BODY;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
+        expect(api.content).toHaveBeenCalledWith('did:cid:1');
+        expect(screen.getByText('A summary.')).toBeTruthy();
+    });
+
+    it('says so when the service does not hold the body, or could not read it', async () => {
+        const { api } = services({ me: granted, timeline: [article('did:cid:1', BOB)] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/this service does not hold it/)).toBeTruthy();
+
+        vi.mocked(api.content).mockRejectedValue(new ApiError(502, 'the node does not have the body'));
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect((await screen.findByRole('alert')).textContent).toMatch(/could not be read: the node does not have the body/);
+        localStorage.clear();
+    });
+
+    it('is edited with its body, and sends the body only when it has changed', async () => {
+        const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
+        state.bodies['did:cid:1'] = BODY;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+
+        await user.clear(screen.getByLabelText('Title'));
+        await user.type(screen.getByLabelText('Title'), 'On every DID');
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(state.edited).toStrictEqual([{
+            did: 'did:cid:1',
+            object: { kind: 'post', title: 'On every DID', summary: 'A summary.', content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length } },
+        }]));
+    });
+
+    it('sends a changed body for the service to store, in place of the reference', async () => {
+        const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
+        state.bodies['did:cid:1'] = BODY;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        await user.type(screen.getByLabelText('Article'), 'More.');
+        await user.clear(screen.getByLabelText('Summary'));
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(state.edited).toStrictEqual([{
+            did: 'did:cid:1', object: { kind: 'post', title: 'On DIDs', body: `${BODY}More.` },
+        }]));
+    });
+
+    it('cannot be changed here when the service does not hold its body', async () => {
+        const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/does not hold the full text/);
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+        expect(state.edited).toStrictEqual([]);
+    });
+});
+
 describe('editing', () => {
     it('rewrites the reader\'s own reply, keeping what it answers', async () => {
         const mine = under({ ...post('did:cid:1', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:0', targetVersion: 'op-0', v: 1 } }, 'did:cid:grant');
@@ -893,6 +1023,16 @@ describe('the services\' client', () => {
 
         expect(await api.publish({ kind: 'post', text: 'x' })).toBe('did:cid:new');
         expect(asked[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', body: '{"kind":"post","text":"x"}', headers: { 'Content-Type': 'application/json' } });
+    });
+
+    it('reads a body as text, and none when the service holds none', async () => {
+        const fetcher = (async (url: string) => (url === '/memepool/api/v1/objects/did%3Acid%3A1/content'
+            ? new Response('# On DIDs\n', { status: 200, headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
+            : new Response(JSON.stringify({ error: 'no body the service holds' }), { status: 404 }))) as unknown as typeof fetch;
+        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
+
+        expect(await api.content('did:cid:1')).toBe('# On DIDs\n');
+        expect(await api.content('did:cid:2')).toBeUndefined();
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

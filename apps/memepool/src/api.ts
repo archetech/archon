@@ -63,6 +63,9 @@ export interface Api {
     thread(did: string): Promise<Reply[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
+    // The body of an article the service published, or nothing when it holds
+    // none for the object.
+    content(did: string): Promise<string | undefined>;
 }
 
 export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
@@ -137,6 +140,18 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             const response = await call(bases.memeplex, `/publications/${encodeURIComponent(did)}`);
 
             return response.status === 404 ? undefined : json(response);
+        },
+        async content(did) {
+            const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/content`);
+
+            if (response.status === 404) {
+                return undefined;
+            }
+            if (!response.ok) {
+                throw await failure(response);
+            }
+
+            return response.text();
         },
     };
 }

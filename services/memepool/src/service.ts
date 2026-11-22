@@ -108,6 +108,8 @@ export async function startMemepool(
         publicURL: settings.publicURL || undefined,
         pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
         registries: () => gatekeeper.listRegistries(),
+        // The node's IPFS pins what is added to it.
+        content: { add: text => gatekeeper.addText(text), get: cid => gatekeeper.getText(cid) },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

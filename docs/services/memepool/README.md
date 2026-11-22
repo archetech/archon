@@ -44,12 +44,36 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it asks whether a wallet has sent an answer to the callback: `202` with `{ "waiting": true }` until one has, then `{ "answered": "did:cid:…" }`, which is who answered and not yet a session. With `{ "confirm": "did:cid:…" }` naming that identity it signs the browser in. Sets the session cookie and returns the DID signed in |
 | `POST /logout` | Ends the session |
 | `GET /me` | The DID signed in, with its `grant` and `registry`, any `others` in force, and the `actions` those grants allow when every one of them is narrowed; or with the grant `link` to show and any grants still `pending`; or, on a node with no registry a grant may be on, with `unavailable` saying so in place of a link |
-| `POST /objects` | Publishes an object. Takes its fields, with `kind`; returns its `did` |
+| `POST /objects` | Publishes an object. Takes its fields, with `kind`, and for an article its `body`; returns its `did` |
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
+| `GET /objects/:did/content` | The body of an article the service published, as `text/markdown` |
 
 The service states an object's `v`, `author` and `grant` itself, from the session
 and the grant, whatever the request carries.
+
+### Content
+
+The client that publishes an object pins the content the object refers to, so this
+service stores the content of what it publishes and takes none on trust.
+
+- **An article is sent with its text**, as `body` beside the fields of a post or a
+  paper: `{ "kind": "post", "title": "…", "summary": "…", "body": "# …" }`. The
+  service adds the text to its node's IPFS, which pins it, and publishes the entry
+  with `content: { cid, type: "text/markdown", bytes }` in place of the body. A body
+  may be 200,000 bytes.
+- **It takes no reference to content it has not stored.** A request that carries
+  `content`, `pdf` or `source` is refused, since those would be bytes the service
+  never saw and does not keep. An edit may send back the reference the entry already
+  has, to leave its body as it is, or a new `body` to replace it.
+- **It reads the body of what it published, and no other.** `GET /objects/:did/content`
+  answers 404 for an entry that another client published: such an entry can refer to
+  anything, of any size.
+- **It keeps what it stores.** Content stays on the node for as long as the node's
+  IPFS keeps it. Withdrawing an article or replacing its body removes nothing: the
+  entry's earlier versions still refer to the earlier body.
+
+A paper's PDF and source are files, which the service does not take yet.
 
 | Status | Meaning |
 |---|---|

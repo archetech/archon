@@ -3,7 +3,7 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { PERMITTED_REGISTRIES, actionFor } from '@didcid/memeplex';
 import { MemeplexClientError, allows, liveGrants } from '@didcid/memeplex/client';
-import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
+import type { MemeplexClient, ObjectFields, UsableGrant } from '@didcid/memeplex/client';
 
 // The Memepool service over HTTP. Memepool is a Memeplex client: an agent DID
 // whose key this service holds. A user signs in by answering a challenge from
@@ -16,7 +16,19 @@ import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 export interface LoginKeymaster {
     createChallenge(challenge?: Record<string, unknown>): Promise<string>;
     verifyResponse(response: string, options?: { retries?: number }): Promise<{ challenge: string; match: boolean; responder?: string }>;
-    resolveDID(did: string): Promise<{ didDocument?: { controller?: string }; didDocumentMetadata?: { versionSequence?: string | number } }>;
+    resolveDID(did: string): Promise<{
+        didDocument?: { controller?: string };
+        didDocumentData?: unknown;
+        didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean };
+    }>;
+}
+
+// Where the service keeps the content of what it publishes: its node's IPFS,
+// which pins what is added to it. `add` gives the CID of a text, and `get` the
+// text of a CID.
+export interface ContentStore {
+    add(text: string): Promise<string>;
+    get(cid: string): Promise<string | null>;
 }
 
 export interface MemepoolOptions {
@@ -38,6 +50,11 @@ export interface MemepoolOptions {
     // back afterwards, so the service asks each time it needs to know and
     // counts a registry it has seen as one it can publish on.
     registries: string[] | (() => Promise<string[]>);
+    // Where the body of an article is stored. The client that publishes an
+    // object pins the content the object references, so the service stores a
+    // body itself and takes no reference to bytes it has not stored. Without a
+    // store it publishes no body.
+    content?: ContentStore;
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -58,6 +75,13 @@ const ASKED = 'memepool_challenge';
 const MAX_HELD = 10_000;
 // How long a session is shown one grant request, which is valid for an hour.
 const REQUEST_REUSE = 50 * 60_000;
+// The largest body the service stores, in bytes of UTF-8. It arrives in a JSON
+// request, which the service takes up to 256 kB of.
+export const BODY_LIMIT = 200_000;
+// The kinds that have a body, and the members of an object that refer to
+// content by its CID.
+const BODY_KINDS = ['post', 'paper'];
+const REFERENCES = ['content', 'pdf', 'source'];
 // How many answers sent to the callback are verified at once.
 const MAX_VERIFYING = 8;
 
@@ -115,7 +139,7 @@ function cookieOf(req: Request, wanted = COOKIE): string | undefined {
 type Signed = Request & { user: string };
 
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
-    const { client, keymaster, name, version } = options;
+    const { client, keymaster, name, version, content } = options;
     const seen = new Set<string>();
     const registriesNow = async (): Promise<string[]> => {
         try {
@@ -521,12 +545,92 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     const fields = (req: Request) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
 
-    router.post('/objects', publishing(async (req, grant) => ({ did: await client.publish(grant, fields(req)) })));
+    // The object as its latest version states it, or nothing for a DID that
+    // holds no object.
+    const objectOf = async (did: string): Promise<{ controller?: string; memeplex: Record<string, any> } | undefined> => {
+        const doc = await keymaster.resolveDID(did);
+        const data = doc.didDocumentData;
+        const memeplex = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>).memeplex : undefined;
+
+        return memeplex && typeof memeplex === 'object' && !Array.isArray(memeplex) && !doc.didDocumentMetadata?.deactivated
+            ? { controller: doc.didDocument?.controller, memeplex: memeplex as Record<string, any> }
+            : undefined;
+    };
+
+    // What is published for a request: its fields, with a `body` stored and
+    // replaced by the reference to it.
+    //
+    // The service pins the content of what it publishes, so it takes no
+    // reference to bytes it did not store. An edit may keep a reference the
+    // object already has, which is to content the service stored before.
+    const stating = async (req: Request, did?: string): Promise<ObjectFields> => {
+        const { body, ...stated } = fields(req) as ObjectFields & { body?: unknown };
+        const held = did ? (await objectOf(did))?.memeplex : undefined;
+
+        for (const reference of REFERENCES) {
+            if (reference in stated && JSON.stringify(stated[reference]) !== JSON.stringify(held?.[reference])) {
+                throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: send the text of an article as \`body\``);
+            }
+        }
+        if (body === undefined) {
+            return stated;
+        }
+        if (!content) {
+            throw new MemeplexClientError('invalid', 'this service stores no content, so it publishes no body');
+        }
+        if (typeof body !== 'string' || body.length === 0) {
+            throw new MemeplexClientError('invalid', '`body` is the text of the article');
+        }
+        if (!BODY_KINDS.includes(stated.kind)) {
+            throw new MemeplexClientError('invalid', `a ${String(stated.kind)} has no body`);
+        }
+
+        const bytes = Buffer.byteLength(body, 'utf8');
+
+        if (bytes > BODY_LIMIT) {
+            throw new MemeplexClientError('invalid', `a body may be ${BODY_LIMIT} bytes, and this is ${bytes}`);
+        }
+
+        return { ...stated, content: { cid: await content.add(body), type: 'text/markdown', bytes } };
+    };
+
+    router.post('/objects', publishing(async (req, grant) => ({ did: await client.publish(grant, await stating(req)) })));
 
     router.put('/objects/:did', publishing(async (req, grant) => {
-        await client.edit(String(req.params.did), grant, fields(req));
+        const did = String(req.params.did);
+
+        await client.edit(did, grant, await stating(req, did));
         return true;
     }, req => String(req.params.did)));
+
+    // The body of an article the service published, which is content it
+    // stored. It reads no other: a reference in an object someone else made
+    // can be to anything, of any size.
+    router.get('/objects/:did/content', async (req, res) => {
+        const object = content ? await objectOf(String(req.params.did)).catch(() => undefined) : undefined;
+        const reference = object?.memeplex.content;
+
+        if (!content || !object || object.controller !== await client.did()
+            || typeof reference?.cid !== 'string' || reference.type !== 'text/markdown') {
+            res.status(404).json({ error: 'no body the service holds' });
+            return;
+        }
+
+        try {
+            // Text a user wrote, served from the pages' own origin: a browser
+            // is told what it is and not to take it for anything else.
+            const text = await content.get(reference.cid);
+
+            if (typeof text !== 'string') {
+                throw new Error('the node has no such content');
+            }
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.type('text/markdown; charset=utf-8').send(text);
+        }
+        catch {
+            res.status(502).json({ error: 'the node does not have the body' });
+        }
+    });
 
     router.delete('/objects/:did', publishing(async (req, grant) => {
         await client.withdraw(String(req.params.did), grant);
