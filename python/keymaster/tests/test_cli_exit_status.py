@@ -80,3 +80,102 @@ def test_reported_failure_exits_non_zero_and_says_why(
     assert status == 1
     assert "cannot resolve did:cid:nope" in captured.err
     assert captured.out == ""
+
+
+# A write the node refuses ----------------------------------------------------
+
+CLI_SOURCE = Path(cli.__file__).read_text(encoding="utf-8")
+
+
+def _refusing(method: str) -> type:
+    class Refusing:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+    async def refuse(self: Any, *args: Any, **kwargs: Any) -> bool:
+        return False
+
+    setattr(Refusing, method, refuse)
+    return Refusing
+
+
+@pytest.mark.parametrize(
+    ("argv", "method", "refusal"),
+    [
+        (["revoke-did", "did:cid:asset"], "revoke_did", "Update failed"),
+        (["rotate-keys"], "rotate_keys", "Update failed"),
+        (["change-registry", "did:cid:asset", "hyperswarm"], "change_registry", "Update failed"),
+        (["accept-credential", "did:cid:credential"], "accept_credential", "Update failed"),
+        (["unpublish-didcomm"], "unpublish_didcomm", "failed"),
+    ],
+)
+def test_a_write_the_node_refuses_exits_non_zero_and_prints_no_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    argv: list[str], method: str, refusal: str,
+) -> None:
+    status = _invoke(monkeypatch, tmp_path, argv, _refusing(method))
+    captured = capsys.readouterr()
+
+    assert status == 1
+    assert captured.out == ""
+    assert captured.err == f"{refusal}\n"
+
+
+def test_a_refused_credential_over_didcomm_prints_its_answer_and_exits_non_zero(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    message = tmp_path / "message.json"
+    message.write_text("{}")
+
+    status = _invoke(monkeypatch, tmp_path, ["accept-credential-didcomm", str(message)], _refusing("accept_credential_didcomm"))
+    captured = capsys.readouterr()
+
+    assert status == 1
+    assert json.loads(captured.out) == {"ok": False}
+    assert captured.err == "Credential not accepted\n"
+
+
+def test_a_write_the_node_takes_exits_zero_and_prints_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class Taking:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def rotate_keys(self) -> bool:
+            return True
+
+    assert _invoke(monkeypatch, tmp_path, ["rotate-keys"], Taking) == 0
+    assert capsys.readouterr().out == "OK\n"
+
+
+def _handlers() -> dict[str, str]:
+    """The source of each command handler, by its name."""
+    parts = CLI_SOURCE.split("\nasync def cmd_")[1:]
+    return {part.split("(", 1)[0]: part.split("\n\n\n", 1)[0] for part in parts}
+
+
+def test_every_handler_that_holds_a_write_result_reports_it_as_one() -> None:
+    writes = {name: body for name, body in _handlers().items() if "ok = await km." in body}
+
+    assert len(writes) > 30
+    assert {"revoke_did", "rotate_keys", "change_registry", "update_grant", "revoke_grant", "accept_credential"} <= set(writes)
+    unreported = sorted(
+        name for name, body in writes.items()
+        if "_report_write(ok" not in body
+        and "raise CommandError(UPDATE_FAILED)" not in body
+        and "if not ok:\n        raise CommandError(" not in body
+    )
+    assert unreported == []
+
+
+def test_no_handler_prints_a_failure_on_standard_output() -> None:
+    printed = [
+        line.strip()
+        for line in CLI_SOURCE.splitlines()
+        if "print(" in line
+        and "file=sys.stderr" not in line
+        and ("UPDATE_FAILED" in line or "if ok else" in line or '"failed"' in line or '"Failed"' in line)
+    ]
+
+    assert printed == []

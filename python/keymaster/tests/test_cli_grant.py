@@ -163,11 +163,20 @@ def test_options_that_contradict_each_other_are_refused_before_calling_keymaster
     assert stub.calls == []
 
 
-def test_update_grant_says_when_the_node_did_not_accept_the_change(monkeypatch, tmp_path, capsys) -> None:
-    stub = _keymaster(update_grant=False)
+@pytest.mark.parametrize(
+    ("argv", "method"),
+    [
+        (["update-grant", "did:cid:grant", "--no-expiry"], "update_grant"),
+        (["revoke-grant", "did:cid:grant"], "revoke_grant"),
+    ],
+)
+def test_a_write_the_node_did_not_accept_fails_the_command(monkeypatch, tmp_path, capsys, argv, method) -> None:
+    stub = _keymaster(**{method: False})
 
-    assert _run(monkeypatch, tmp_path, ["update-grant", "did:cid:grant", "--no-expiry"], stub) == 0
-    assert capsys.readouterr().out.strip() == "Update failed"
+    assert _run(monkeypatch, tmp_path, argv, stub) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "Update failed\n"
 
 
 def test_revoke_grant_revokes_and_prints_ok(monkeypatch, tmp_path, capsys) -> None:

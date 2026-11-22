@@ -97,6 +97,18 @@ async function claimPaidCashuQuote(quote, mint, id) {
 // `archon create-id alice && next` runs `next` after alice failed, and no
 // script or CI step can tell. exitCode rather than exit(1), so stdout a
 // partially-completed command already wrote still flushes.
+// The outcome of a write the node was asked for. One it refused is a failure
+// like any other: `keymaster revoke-did <id> && next` must not run `next`
+// after a revocation that did not happen.
+function reportWrite(ok, done = UPDATE_OK, refused = UPDATE_FAILED) {
+    if (ok) {
+        console.log(done);
+    }
+    else {
+        fail(refused);
+    }
+}
+
 // The registry a grant was created on, for a command that did not have to name
 // one. The grant exists whether or not the node can be asked.
 async function grantRegistry(did) {
@@ -233,7 +245,7 @@ program
             const contents = fs.readFileSync(file).toString();
             const wallet = JSON.parse(contents);
             const ok = await keymaster.saveWallet(wallet, true);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -259,7 +271,7 @@ program
     .action(async (newPassphrase) => {
         try {
             const ok = await keymaster.changePassphrase(newPassphrase);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -328,7 +340,7 @@ program
     .action(async () => {
         try {
             const ok = await keymaster.backupId();
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -367,7 +379,7 @@ program
     .action(async (oldName, newName) => {
         try {
             const ok = await keymaster.renameId(oldName, newName);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -431,7 +443,7 @@ program
     .action(async () => {
         try {
             const ok = await keymaster.rotateKeys();
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -445,7 +457,7 @@ program
     .action(async (options) => {
         try {
             const ok = await keymaster.publishAssertionKey(options.name);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -459,7 +471,7 @@ program
     .action(async (options) => {
         try {
             const ok = await keymaster.unpublishAssertionKey(options.name);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -520,7 +532,7 @@ program
     .action(async (did, registry) => {
         try {
             const ok = await keymaster.changeRegistry(did, registry);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -533,7 +545,7 @@ program
     .action(async (did, confirm) => {
         try {
             const ok = await keymaster.revokeDID(did);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(`cannot revoke ${did}`);
@@ -703,7 +715,7 @@ program
     .action(async (did) => {
         try {
             const ok = await keymaster.revokeCredential(did);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -727,7 +739,7 @@ program
                 }
             }
             else {
-                console.log(UPDATE_FAILED);
+                fail(UPDATE_FAILED);
             }
         }
         catch (error) {
@@ -1234,7 +1246,7 @@ program
         try {
             const data = JSON.parse(fs.readFileSync(file).toString());
             const ok = await keymaster.mergeData(id, data);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1249,7 +1261,7 @@ program
             const data = fs.readFileSync(file);
             const filename = path.basename(file);
             const ok = await keymaster.updateImage(id, data, { filename });
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1264,7 +1276,7 @@ program
             const data = fs.readFileSync(file);
             const filename = file.split('/').pop();
             const ok = await keymaster.updateFile(id, data, { filename });
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1277,7 +1289,7 @@ program
     .action(async (id, controller) => {
         try {
             const ok = await keymaster.transferAsset(id, controller);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         } catch (error) {
             fail(error.error || error);
         }
@@ -1333,7 +1345,7 @@ program
             }
 
             const ok = await keymaster.mergeData(id, { [key]: parsed });
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1422,7 +1434,7 @@ program
                 ...(!expiry ? { expiresAt: null } : expires === undefined ? {} : { expiresAt: expires }),
             };
             const ok = await keymaster.updateGrant(id, changes);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -1435,7 +1447,7 @@ program
     .action(async (id) => {
         try {
             const ok = await keymaster.revokeGrant(id);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -1504,7 +1516,7 @@ program
     .action(async (ballot) => {
         try {
             const ok = await keymaster.updatePoll(ballot);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1517,7 +1529,7 @@ program
     .action(async (poll) => {
         try {
             const ok = await keymaster.publishPoll(poll);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1530,7 +1542,7 @@ program
     .action(async (poll) => {
         try {
             const ok = await keymaster.publishPoll(poll, { reveal: true });
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1543,7 +1555,7 @@ program
     .action(async (poll) => {
         try {
             const ok = await keymaster.unpublishPoll(poll);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1623,7 +1635,7 @@ program
     .action(async (id, member) => {
         try {
             const ok = await keymaster.addVaultMember(id, member);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1636,7 +1648,7 @@ program
     .action(async (id, member) => {
         try {
             const ok = await keymaster.removeVaultMember(id, member);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1664,7 +1676,7 @@ program
             const data = fs.readFileSync(file);
             const name = file.split('/').pop();
             const ok = await keymaster.addVaultItem(id, name, data);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1677,7 +1689,7 @@ program
     .action(async (id, item) => {
         try {
             const ok = await keymaster.removeVaultItem(id, item);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error);
@@ -1708,7 +1720,7 @@ program
         try {
             const routingKeys = options.routingKeys ? options.routingKeys.split(',').map(s => s.trim()) : undefined;
             const ok = await keymaster.publishDidComm(endpoint, options.name, routingKeys);
-            console.log(ok ? 'published' : 'failed');
+            reportWrite(ok, 'published', 'failed');
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -1722,7 +1734,7 @@ program
     .action(async (options) => {
         try {
             const ok = await keymaster.unpublishDidComm(options.name);
-            console.log(ok ? 'unpublished' : 'failed');
+            reportWrite(ok, 'unpublished', 'failed');
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -1821,6 +1833,11 @@ program
             const message = JSON.parse(fs.readFileSync(file).toString());
             const ok = await keymaster.acceptCredentialDidComm(message);
             console.log(JSON.stringify({ ok }, null, 4));
+
+            // The answer is printed either way, for a caller that reads it.
+            if (!ok) {
+                fail('Credential not accepted');
+            }
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -1881,7 +1898,7 @@ program
         try {
             const vc = JSON.parse(fs.readFileSync(file).toString());
             const ok = await keymaster.updateCredential(did, vc);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2553,7 +2570,7 @@ program
     .action(async (poll, member) => {
         try {
             const ok = await keymaster.addPollVoter(poll, member);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2567,7 +2584,7 @@ program
     .action(async (poll, member) => {
         try {
             const ok = await keymaster.removePollVoter(poll, member);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2656,7 +2673,7 @@ program
         try {
             const message = JSON.parse(fs.readFileSync(file).toString());
             const ok = await keymaster.updateDmail(did, message);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2721,7 +2738,7 @@ program
         try {
             const tagList = tags.split(',').map((t) => t.trim());
             const ok = await keymaster.fileDmail(did, tagList);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2735,7 +2752,7 @@ program
     .action(async () => {
         try {
             const ok = await keymaster.refreshNotices();
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2749,7 +2766,7 @@ program
     .action(async (did) => {
         try {
             const ok = await keymaster.importDmail(did);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2763,7 +2780,7 @@ program
     .action(async (did) => {
         try {
             const ok = await keymaster.removeDmail(did);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2779,7 +2796,7 @@ program
             const data = fs.readFileSync(file);
             const name = path.basename(file);
             const ok = await keymaster.addDmailAttachment(did, name, data);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);
@@ -2793,7 +2810,7 @@ program
     .action(async (did, name) => {
         try {
             const ok = await keymaster.removeDmailAttachment(did, name);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+            reportWrite(ok);
         }
         catch (error) {
             fail(error.error || error.message || error);

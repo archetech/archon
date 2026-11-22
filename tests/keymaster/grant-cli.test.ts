@@ -186,13 +186,14 @@ describe('update-grant', () => {
         expect(requests).toEqual([]);
     });
 
-    it('says when the node did not accept the change', async () => {
+    it('fails when the node did not accept the change', async () => {
         routes['PUT /grants/did%3Acid%3Agrant'] = () => ({ body: { ok: false } });
 
-        const { status, stdout } = await run('update-grant', 'did:cid:grant', '--no-expiry');
+        const { status, stdout, stderr } = await run('update-grant', 'did:cid:grant', '--no-expiry');
 
-        expect(status).toBe(0);
-        expect(stdout).toBe('Update failed');
+        expect(status).toBe(1);
+        expect(stdout).toBe('');
+        expect(stderr).toBe('Update failed');
     });
 });
 
@@ -210,6 +211,16 @@ describe('revoke-grant', () => {
 
         expect(status).toBe(0);
         expect(requests).toEqual([{ route: 'DELETE /grants/clients%2Fexample', body: undefined }]);
+    });
+
+    it('fails when the node did not accept the revocation', async () => {
+        routes['DELETE /grants/did%3Acid%3Agrant'] = () => ({ body: { ok: false } });
+
+        const { status, stdout, stderr } = await run('revoke-grant', 'did:cid:grant');
+
+        expect(status).toBe(1);
+        expect(stdout).toBe('');
+        expect(stderr).toBe('Update failed');
     });
 
     it('fails with the refusal Keymaster gives', async () => {
