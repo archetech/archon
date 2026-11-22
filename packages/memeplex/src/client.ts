@@ -52,11 +52,12 @@ export interface UsableGrant {
 }
 
 // Whether a grant's scope lets a client create an object of a kind. An object
-// outside it would be created and never attributed.
+// outside it would be created and never attributed. A scope that lists no
+// actions is every core kind, and no other.
 export function allows(grant: Pick<UsableGrant, 'actions'>, kind: string): boolean {
     const action = actionFor(kind);
 
-    return !grant.actions || (action !== undefined && grant.actions.includes(action));
+    return action !== undefined && (!grant.actions || grant.actions.includes(action));
 }
 
 // The fields of an object a client supplies. `v`, `author` and `grant` are the

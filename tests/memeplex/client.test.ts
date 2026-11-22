@@ -314,3 +314,14 @@ it('orders the grants in force by when they were anchored, across chains', () =>
     expect(liveGrants(found).map(each => each.did)).toStrictEqual(['did:cid:a', 'did:cid:b', 'did:cid:c']);
     expect(usable(found)).toBeUndefined();
 });
+
+it('lets a scope allow the core kinds it lists, all of them when it lists none, and no other kind', () => {
+    expect(allows({}, 'post')).toBe(true);
+    expect(allows({}, 'paper')).toBe(true);
+    expect(allows({}, 'rating')).toBe(true);
+    expect(allows({}, 'essay')).toBe(false);
+    expect(allows({}, 'toString')).toBe(false);
+    expect(allows({ actions: ['memeplex:post'] }, 'paper')).toBe(true);
+    expect(allows({ actions: ['memeplex:post'] }, 'reply')).toBe(false);
+    expect(allows({ actions: [] }, 'post')).toBe(false);
+});
