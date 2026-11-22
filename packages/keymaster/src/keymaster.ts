@@ -2,7 +2,8 @@ import { attachedJson, isCashuTokenMessage, issueCredentialMessage, type DidComm
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { CashuWallet, hasCashuState } from './cashu.js';
-import { grantIn, grantMember, grantRequestFault, grantRequestId, grantRequestIn, isDateTime, isNameList } from './grant.js';
+import { anchoredOn, grantIn, grantMember, grantRequestId, grantRequestOf, isDateTime, isNameList } from './grant.js';
+import type { GrantRequestRefusal } from './grant.js';
 import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
@@ -285,6 +286,14 @@ const MULTIKEY_CONTEXT = 'https://w3id.org/security/multikey/v1';
 // suite Archon defines rather than claiming one it does not implement. The
 // bytes are unchanged: JCS canonicalization, sha256, base64url signature.
 const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-secp256k1-jcs-2026';
+
+// What Keymaster says of a grant request it cannot read, by why.
+const REQUEST_REFUSALS: Record<Exclude<GrantRequestRefusal, 'invalid'>, string> = {
+    'deleted': 'deleted',
+    'not-an-asset': 'not an asset',
+    'changed': 'changed since it was created, so who asks is not established',
+    'not-a-request': 'not a grant request',
+};
 
 export default class Keymaster implements KeymasterInterface {
     private passphrase: string;
@@ -2075,14 +2084,8 @@ export default class Keymaster implements KeymasterInterface {
         return revocations;
     }
 
-    // Whether a resolved version is anchored on a registry: it names that
-    // registry as its chain and has the height and time of a block. `confirmed`
-    // is not that, since a creation is confirmed from the start.
     private anchoredOn(doc: DidCidDocument, registry: string): boolean {
-        const timestamp = doc.didDocumentMetadata?.timestamp;
-        const { height, timeISO } = timestamp?.upperBound ?? {};
-
-        return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string';
+        return anchoredOn(doc, registry);
     }
 
     // The actions a caller names for a grant: a list of at least one, none
@@ -2131,32 +2134,15 @@ export default class Keymaster implements KeymasterInterface {
             throw error;
         }
 
-        const did = doc.didDocument?.id;
-        const client = doc.didDocument?.controller;
+        const read = grantRequestOf(doc);
 
-        if (doc.didDocumentMetadata?.deactivated) {
-            throw new InvalidParameterError('request: deleted');
-        }
-        if (doc.didDocumentRegistration?.type !== 'asset' || !did || !client) {
-            throw new InvalidParameterError('request: not an asset');
-        }
-        if (Number(doc.didDocumentMetadata?.versionSequence) !== 1) {
-            throw new InvalidParameterError('request: changed since it was created, so who asks is not established');
+        if ('refused' in read) {
+            const said = read.refused === 'invalid' ? `invalid (${read.fault})` : REQUEST_REFUSALS[read.refused];
+
+            throw new InvalidParameterError(`request: ${said}`);
         }
 
-        const held = grantRequestIn(doc.didDocumentData);
-
-        if (!held) {
-            throw new InvalidParameterError('request: not a grant request');
-        }
-
-        const fault = grantRequestFault(held.request);
-
-        if (fault) {
-            throw new InvalidParameterError(`request: invalid (${fault})`);
-        }
-
-        return { did, app: held.app, client, request: held.request as Record<string, any> };
+        return read;
     }
 
     // Creates the grant a grant request asks for, as an asset of the granting

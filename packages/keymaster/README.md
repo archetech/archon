@@ -351,6 +351,8 @@ Keymaster applies no app's rules. Whether a grant's actions mean anything, wheth
 
 `list-grants` prints each grant with its `app`, its `request`, and its `status`: `anchored`, or `pending` while its latest version is not anchored on its registry. An asset the node could not resolve is listed as `unresolved`.
 
+The rules for reading a request and a grant are pure functions in `@didcid/keymaster/grant` (`grantRequestOf`, `grantIn`, `grantRequestFault`, `anchoredOn` and the rest), for a program that shows a request before anything is granted. The wallets' Auth tab uses them, and Keymaster's own commands do.
+
 `update-grant` changes `actions` and `expiresAt` and keeps everything else the grant and its asset hold. It is refused when the grant has changed since it was read. `update-grant` and `revoke-grant` refuse a DID that is not a live grant of the current ID. On a chain registry a revocation takes effect once it is anchored.
 
 ### Client

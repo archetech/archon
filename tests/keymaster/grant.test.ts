@@ -49,6 +49,11 @@ describe('the shape every grant request has', () => {
         expect(grants.grantRequestId('\tarchon://grant?request=did:cid:abc \n')).toBe('did:cid:abc');
         expect(grants.grantRequestId('my-request')).toBe('my-request');
         expect(grants.grantRequestId('archon://grant?request=')).toBe('');
+        // A DID URL would have a node resolve another version than the latest.
+        for (const url of ['did:cid:abc?versionSequence=1', 'did:cid:abc#key-1', 'did:cid:abc/path', 'did:cid:abc%3FversionSequence=1', 'did:cid:abc versionSequence=1']) {
+            expect(grants.grantRequestId(url)).toBe('');
+            expect(grants.grantRequestId(`archon://grant?request=${url}`)).toBe('');
+        }
         expect(grants.grantRequestId('archon://auth?challenge=did:cid:abc')).toBe('archon://auth?challenge=did:cid:abc');
     });
 

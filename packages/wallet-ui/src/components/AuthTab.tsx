@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
     Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-    Divider, MenuItem, Paper, Select, TextField, IconButton, InputAdornment, Tooltip, Typography
+    Divider, MenuItem, Paper, Select, Tab, Tabs, TextField, IconButton, InputAdornment, Tooltip, Typography
 } from "@mui/material";
 import { CameraAlt, CheckCircle, Login, Warning } from "@mui/icons-material";
 import axios from "axios";
@@ -11,6 +11,7 @@ import { useWalletNavigation } from "../contexts/WalletNavigation";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import PageHeader from "./layout/PageHeader";
+import GrantsTab from "./GrantsTab";
 import ActionMenu from "./layout/ActionMenu";
 
 // What the challenge's issuer says a response grants, such as connecting an
@@ -31,7 +32,8 @@ interface AutoLoginState {
     credentials: { vc: string; vp: string }[];
 }
 
-function AuthTab() {
+// Signing in: answering a challenge, and making one and checking its answer.
+function SignIn() {
     const [authDID, setAuthDID] = useState<string>("");
     const [callback, setCallback] = useState<string>("");
     const [description, setDescription] = useState<string>("");
@@ -569,6 +571,46 @@ function AuthTab() {
                     </Dialog>
                 </>
             )}
+        </Box>
+    );
+}
+
+type Section = "sign-in" | "grants";
+
+// What a service asks of an identity: to prove who it is, which is signing in,
+// and to let a client act in its name, which is a grant. Both begin with a DID
+// the service made and shows the wallet.
+//
+// Signing in stays mounted while grants are shown, since it is what takes a
+// challenge that arrives by a link, and a challenge that arrives brings it to
+// the front.
+function AuthTab() {
+    const [section, setSection] = useState<Section>("sign-in");
+    const { pendingChallenge } = useWalletNavigation();
+
+    useEffect(() => {
+        if (pendingChallenge) {
+            setSection("sign-in");
+        }
+    }, [pendingChallenge]);
+
+    return (
+        <Box>
+            <Tabs
+                value={section}
+                onChange={(_event, value: Section) => setSection(value)}
+                aria-label="Authentication and grants"
+                sx={{ borderBottom: 1, borderColor: "divider", mb: 1 }}
+            >
+                <Tab label="Sign in" value="sign-in" id="auth-tab-sign-in" aria-controls="auth-panel-sign-in" />
+                <Tab label="Grants" value="grants" id="auth-tab-grants" aria-controls="auth-panel-grants" />
+            </Tabs>
+            <Box role="tabpanel" id="auth-panel-sign-in" aria-labelledby="auth-tab-sign-in" hidden={section !== "sign-in"}>
+                <SignIn />
+            </Box>
+            <Box role="tabpanel" id="auth-panel-grants" aria-labelledby="auth-tab-grants" hidden={section !== "grants"}>
+                {section === "grants" && <GrantsTab />}
+            </Box>
         </Box>
     );
 }

@@ -20,7 +20,6 @@ import {
     Badge,
     Bolt,
     Toll,
-    VerifiedUser,
     Email,
     Forum,
     Key,
@@ -51,7 +50,6 @@ import { AssetsTab } from "@didcid/wallet-ui";
 import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
 import { CashuTab } from "@didcid/wallet-ui";
-import { GrantsTab } from "@didcid/wallet-ui";
 import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
 import { AuthTab } from "@didcid/wallet-ui";
@@ -216,12 +214,6 @@ function BrowserContent() {
             {displayComponent && (
                 <TabPanel value="cashu" sx={{ p: 0 }}>
                     <CashuTab />
-                </TabPanel>
-            )}
-
-            {displayComponent && (
-                <TabPanel value="grants" sx={{ p: 0 }}>
-                    <GrantsTab />
                 </TabPanel>
             )}
 
@@ -424,17 +416,6 @@ function BrowserContent() {
                                                 menuOpen ? "Cashu" : ""
                                             }
                                             value="cashu"
-                                            iconPosition="start"
-                                        />
-                                    )}
-
-                                    {displayComponent && (
-                                        <Tab
-                                            icon={<VerifiedUser />}
-                                            label={
-                                                menuOpen ? "Grants" : ""
-                                            }
-                                            value="grants"
                                             iconPosition="start"
                                         />
                                     )}
@@ -690,15 +671,6 @@ function BrowserContent() {
                                     <Toll />
                                 </ListItemIcon>
                                 <ListItemText primary="Cashu" />
-                            </ListItemButton>
-
-                            <ListItemButton
-                                onClick={() => selectFromMore("grants")}
-                            >
-                                <ListItemIcon>
-                                    <VerifiedUser />
-                                </ListItemIcon>
-                                <ListItemText primary="Grants" />
                             </ListItemButton>
 
                             {hasDidComm && (

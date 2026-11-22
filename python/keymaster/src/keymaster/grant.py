@@ -69,11 +69,21 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+# A DID and nothing after it. A DID URL is not one: a query such as
+# ``?versionSequence=1`` asks a node for an earlier version, which would be read
+# as the request though the request has since changed or been deleted.
+_BARE_DID = re.compile(r"did:[a-z0-9]+:[A-Za-z0-9_.:-]+")
+
+
 def grant_request_id(named: str) -> str:
     """What names a grant request: its DID or an alias for it, or a link to it
-    with the white space around it removed."""
+    with the white space around it removed. Empty for what begins as a DID and
+    is not one alone."""
     text = named.strip(JS_WHITESPACE)
-    return text[len(GRANT_LINK_PREFIX):] if text.startswith(GRANT_LINK_PREFIX) else text
+    identifier = text[len(GRANT_LINK_PREFIX):] if text.startswith(GRANT_LINK_PREFIX) else text
+    if identifier.startswith("did:") and not _BARE_DID.fullmatch(identifier):
+        return ""
+    return identifier
 
 
 def _app_of(member: str, suffix: str) -> str | None:
@@ -141,3 +151,58 @@ def grant_in(data: Any) -> tuple[str, str, dict[str, Any]] | None:
 def grant_member(app: str) -> str:
     """The name of the member of an asset's data that holds an app's grant."""
     return app + GRANT_SUFFIX
+
+
+MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def grant_request_of(doc: dict[str, Any]) -> dict[str, Any]:
+    """The app, the client and the request of a grant request, from the request
+    as a node resolves it: ``did``, ``app``, ``client`` and ``request``, or
+    ``refused`` with why (``deleted``, ``not-an-asset``, ``changed``,
+    ``not-a-request``, ``invalid``) and, for ``invalid``, the ``fault``.
+
+    Who asks is the request's controller, and only while the request is as it
+    was created. An asset's owner can transfer it to any identity, which signs
+    nothing, and can replace its contents first. The creation is signed by its
+    controller and holds the contents that controller gave it, so a request
+    that has had any version after its first does not say who asks for what it
+    holds. Nothing in the data is read for who asks.
+    """
+    document = doc.get("didDocument") or {}
+    metadata = doc.get("didDocumentMetadata") or {}
+    did, client = document.get("id"), document.get("controller")
+    if metadata.get("deactivated"):
+        return {"refused": "deleted"}
+    if (doc.get("didDocumentRegistration") or {}).get("type") != "asset" or not did or not client:
+        return {"refused": "not-an-asset"}
+    if str(metadata.get("versionSequence")) != "1":
+        return {"refused": "changed"}
+
+    held = grant_request_in(doc.get("didDocumentData"))
+    if held is None:
+        return {"refused": "not-a-request"}
+    app, request = held
+    fault = grant_request_fault(request)
+    if fault:
+        return {"refused": "invalid", "fault": fault}
+    return {"did": did, "app": app, "client": client, "request": request}
+
+
+def anchored_on(doc: dict[str, Any], registry: str) -> bool:
+    """Whether a resolved version is anchored on a registry: it names that
+    registry as its chain and has the height and time of a block. ``confirmed``
+    is not that, since a creation is confirmed from the start.
+    """
+    timestamp = (doc.get("didDocumentMetadata") or {}).get("timestamp")
+    timestamp = timestamp if isinstance(timestamp, dict) else {}
+    upper_bound = timestamp.get("upperBound")
+    upper_bound = upper_bound if isinstance(upper_bound, dict) else {}
+    height = upper_bound.get("height")
+    return (
+        timestamp.get("chain") == registry
+        and isinstance(height, int)
+        and not isinstance(height, bool)
+        and abs(height) <= MAX_SAFE_INTEGER
+        and isinstance(upper_bound.get("timeISO"), str)
+    )

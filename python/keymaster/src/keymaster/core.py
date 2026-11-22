@@ -17,11 +17,11 @@ import httpx
 from .cashu import CashuStateError, CashuWallet, has_cashu_state
 from .errors import KeymasterError
 from .grant import (
+    anchored_on,
     grant_in,
     grant_member,
-    grant_request_fault,
     grant_request_id,
-    grant_request_in,
+    grant_request_of,
     is_date_time,
     is_name_list,
 )
@@ -100,6 +100,14 @@ MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
 # of them is in effect at once.
 UNANCHORED_REGISTRIES = ("local", "hyperswarm", "pin")
 MAX_SAFE_INTEGER = 2**53 - 1
+
+# What Keymaster says of a grant request it cannot read, by why.
+_REQUEST_REFUSALS = {
+    "deleted": "deleted",
+    "not-an-asset": "not an asset",
+    "changed": "changed since it was created, so who asks is not established",
+    "not-a-request": "not a grant request",
+}
 
 # No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
 # defines P-256 and P-384 only -- so the secp256k1 credential proof names a
@@ -2576,22 +2584,7 @@ class Keymaster:
         return revocations
 
     def _anchored_on(self, doc: dict[str, Any], registry: str) -> bool:
-        """Whether a resolved version is anchored on a registry: it names that
-        registry as its chain and has the height and time of a block.
-        ``confirmed`` is not that, since a creation is confirmed from the start.
-        """
-        timestamp = (doc.get("didDocumentMetadata") or {}).get("timestamp")
-        timestamp = timestamp if isinstance(timestamp, dict) else {}
-        upper_bound = timestamp.get("upperBound")
-        upper_bound = upper_bound if isinstance(upper_bound, dict) else {}
-        height = upper_bound.get("height")
-        return (
-            timestamp.get("chain") == registry
-            and isinstance(height, int)
-            and not isinstance(height, bool)
-            and abs(height) <= MAX_SAFE_INTEGER
-            and isinstance(upper_bound.get("timeISO"), str)
-        )
+        return anchored_on(doc, registry)
 
     def _grant_actions(self, actions: Any, label: str) -> list[str]:
         """The actions a caller names for a grant: a list of at least one, none
@@ -2625,26 +2618,11 @@ class Keymaster:
         except KeymasterError:
             raise KeymasterError("Invalid parameter: request: not found") from None
 
-        document = doc.get("didDocument") or {}
-        metadata = doc.get("didDocumentMetadata") or {}
-        did, client = document.get("id"), document.get("controller")
-        if metadata.get("deactivated"):
-            raise KeymasterError("Invalid parameter: request: deleted")
-        if (doc.get("didDocumentRegistration") or {}).get("type") != "asset" or not did or not client:
-            raise KeymasterError("Invalid parameter: request: not an asset")
-        if str(metadata.get("versionSequence")) != "1":
-            raise KeymasterError(
-                "Invalid parameter: request: changed since it was created, so who asks is not established"
-            )
-
-        held = grant_request_in(doc.get("didDocumentData"))
-        if held is None:
-            raise KeymasterError("Invalid parameter: request: not a grant request")
-        app, request = held
-        fault = grant_request_fault(request)
-        if fault:
-            raise KeymasterError(f"Invalid parameter: request: invalid ({fault})")
-        return did, app, client, request
+        read = grant_request_of(doc)
+        if "refused" in read:
+            said = f"invalid ({read['fault']})" if read["refused"] == "invalid" else _REQUEST_REFUSALS[read["refused"]]
+            raise KeymasterError(f"Invalid parameter: request: {said}")
+        return read["did"], read["app"], read["client"], read["request"]
 
     async def create_grant(self, named: str, options: dict[str, Any] | None = None) -> str:
         """Creates the grant a grant request asks for, as an asset of the

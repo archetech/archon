@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { grantLink, validateGrant } from '@didcid/memeplex';
 import GrantsView from '../../../../packages/wallet-ui/src/components/GrantsView';
 
 const CLIENT = 'did:cid:bagaaieraclientclientclientclientclientclientclientclientcli';
@@ -10,7 +9,7 @@ const REQUEST = 'did:cid:bagaaierarequestrequestrequestrequestrequestrequestrequ
 const SCHEMA = `did:cid:bagaaieraschema?versionId=b${'a'.repeat(58)}`;
 
 const keymaster = {
-    createAsset: vi.fn(), listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), mergeData: vi.fn(), revokeDID: vi.fn(),
+    createAsset: vi.fn(), listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), updateGrant: vi.fn(), revokeDID: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn() };
 
@@ -66,7 +65,7 @@ function linkFor(request: Record<string, unknown> = {}, as: Record<string, unkno
         ...as,
     };
 
-    return grantLink(did);
+    return `archon://grant?request=${did}`;
 }
 
 // Reviewing resolves the request, so the view is read once it has an answer.
@@ -85,22 +84,49 @@ beforeEach(() => {
     holding({});
     keymaster.listRevocations.mockResolvedValue([]);
     keymaster.createAsset.mockResolvedValue(GRANT);
-    keymaster.mergeData.mockResolvedValue(true);
+    keymaster.updateGrant.mockResolvedValue(true);
     keymaster.revokeDID.mockResolvedValue(true);
 });
 
 describe('Grants view: a grant link', () => {
-    it('shows the client, its name as its own claim, and what it asks for', async () => {
+    it('shows the client, the app, its name as its own claim, and what it asks for', async () => {
         view();
         await review(linkFor({ actions: ['memeplex:post', 'memeplex:tag'] }));
 
         expect(screen.getByText(CLIENT)).toBeTruthy();
+        expect(screen.getByText('memeplex')).toBeTruthy();
         expect(screen.getByText('Memepool')).toBeTruthy();
         expect(screen.getByText(/the client's own claim/)).toBeTruthy();
         expect(screen.getAllByRole('checkbox').map(box => (box as HTMLInputElement).checked)).toStrictEqual([true, true]);
-        expect(screen.getByLabelText('Post')).toBeTruthy();
-        expect(screen.getByLabelText('Tag')).toBeTruthy();
-        expect(screen.queryByLabelText('Rate')).toBeNull();
+        expect(screen.getByLabelText('memeplex:post')).toBeTruthy();
+        expect(screen.getByLabelText('memeplex:tag')).toBeTruthy();
+        expect(screen.queryByLabelText('memeplex:rate')).toBeNull();
+    });
+
+    it('makes a grant for whatever app the request names, with what the request holds', async () => {
+        view();
+        const user = await review(linkFor({}, {
+            didDocumentData: { exampleGrantRequest: { registries: ['ZEC:mainnet'], actions: ['read', 'write'] } },
+        }));
+
+        expect(screen.getByText('example')).toBeTruthy();
+        expect(screen.queryByText(/the client's own claim/)).toBeNull();
+        await user.click(screen.getByLabelText('write'));
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        expect(keymaster.createAsset.mock.calls[0]).toStrictEqual([
+            { exampleGrant: { client: CLIENT, request: REQUEST, actions: ['read'] } },
+            { registry: 'ZEC:mainnet', controller: 'Alice' },
+        ]);
+    });
+
+    it('offers a registry that is no chain when the request lists it', async () => {
+        view();
+        const user = await review(linkFor({ registries: ['hyperswarm', 'BTC:mainnet'] }));
+
+        await user.click(screen.getByRole('combobox', { name: 'Registry' }));
+        expect(screen.getAllByRole('option').map(option => option.textContent)).toStrictEqual(['hyperswarm', 'BTC:mainnet']);
     });
 
     it('creates the grant asked for, for this identity, on the chosen registry', async () => {
@@ -111,16 +137,16 @@ describe('Grants view: a grant link', () => {
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
         const [data, options] = keymaster.createAsset.mock.calls[0];
         expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:tag'], request: REQUEST } });
-        expect(validateGrant(data.memeplexGrant)).toBe('valid');
         expect(options).toStrictEqual({ registry: 'BTC:mainnet', controller: 'Alice' });
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Grant created'));
     });
 
-    it('grants every core kind by leaving actions out, when that is what is asked', async () => {
+    it('leaves actions out of the grant when the request lists none, and says what that means', async () => {
         view();
         const user = await review(linkFor());
 
-        expect(screen.getAllByRole('checkbox')).toHaveLength(4);
+        expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+        expect(screen.getByText(/It lists no actions: the grant allows whatever memeplex allows a client/)).toBeTruthy();
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
 
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
@@ -129,20 +155,19 @@ describe('Grants view: a grant link', () => {
 
     it('grants a narrower scope when the user unticks an action', async () => {
         view();
-        const user = await review(linkFor());
-        await user.click(screen.getByLabelText('Rate'));
+        const user = await review(linkFor({ actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate', 'memeplex:tag'] }));
+        await user.click(screen.getByLabelText('memeplex:rate'));
         await user.click(screen.getByRole('button', { name: 'Create Grant' }));
 
         await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
         const { memeplexGrant } = keymaster.createAsset.mock.calls[0][0];
         expect(memeplexGrant.actions).toStrictEqual(['memeplex:post', 'memeplex:reply', 'memeplex:tag']);
-        expect(validateGrant(memeplexGrant)).toBe('valid');
     });
 
     it('will not create a grant with no actions left', async () => {
         view();
         const user = await review(linkFor({ actions: ['memeplex:post'] }));
-        await user.click(screen.getByLabelText('Post'));
+        await user.click(screen.getByLabelText('memeplex:post'));
 
         expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
     });
@@ -156,7 +181,6 @@ describe('Grants view: a grant link', () => {
         const { memeplexGrant } = keymaster.createAsset.mock.calls[0][0];
         expect(memeplexGrant.actions).toStrictEqual(['memeplex:post', SCHEMA]);
         expect(memeplexGrant.expiresAt).toBe('2030-01-02T03:04:00Z');
-        expect(validateGrant(memeplexGrant)).toBe('valid');
     });
 
     it('creates no grant for a local identity, whose assets cannot be on a chain', async () => {
@@ -193,7 +217,7 @@ describe('Grants view: a grant link', () => {
         expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
     });
 
-    it('offers, of the registries this node supports, only those the client can publish on', async () => {
+    it('offers, of the registries this node supports, only those the client lists', async () => {
         view();
         const user = await review(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }));
 
@@ -209,11 +233,11 @@ describe('Grants view: a grant link', () => {
         expect(data).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST } });
     });
 
-    it('creates nothing, and says why, when the client can publish on no registry this node supports', async () => {
+    it('creates nothing, and says why, when the client lists no registry this node supports', async () => {
         view();
         await review(linkFor({ registries: ['SOL:mainnet-beta'] }));
 
-        expect(screen.getByText(/This client can publish only on SOL:mainnet-beta, and this node supports\s+none of them/)).toBeTruthy();
+        expect(screen.getByText(/This client can use a grant only on SOL:mainnet-beta, and this node supports\s+none of them/)).toBeTruthy();
         expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
     });
 
@@ -248,18 +272,19 @@ describe('Grants view: a grant link', () => {
         expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
     });
 
-    it('says so, and creates nothing, on a node with no permitted registry', async () => {
+    it('says so, and creates nothing, on a node with none of the registries the request lists', async () => {
         view({ registries: ['hyperswarm', 'local'] });
         await review(linkFor());
 
-        expect(screen.getByText(/supports none of the registries/)).toBeTruthy();
+        expect(screen.getByText(/only on BTC:mainnet, ZEC:mainnet, and this node supports\s+none of them/)).toBeTruthy();
         expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it.each([
         ['another archon link', () => 'archon://auth?challenge=did:cid:abc', /not a grant link/],
         ['a link that names no DID', () => 'archon://grant?request=!!!', /not a grant link/],
-        ['a request the node cannot find', () => grantLink(`${REQUEST}9`), /cannot find the request/],
+        ['a DID with a query that asks for an earlier version', () => `${linkFor({}, { didDocumentMetadata: { versionSequence: '1' } })}?versionSequence=1`, /not a grant link/],
+        ['a request the node cannot find', () => `archon://grant?request=${REQUEST}9`, /cannot find the request/],
         ['a deleted request', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2', deactivated: true } }), /was withdrawn/],
         ['a DID that is not an asset', () => linkFor({}, { didDocumentRegistration: { type: 'agent' } }), /does not name a grant request/],
         ['a request changed since it was made', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2' } }), /does not say who is asking/],
@@ -313,14 +338,15 @@ describe('Grants view: the grants an identity holds', () => {
         // Anchored on another chain than the grant's own.
         expect(within(cards[4]).getByText('Awaiting anchoring')).toBeTruthy();
         expect(keymaster.listAssets).toHaveBeenCalledWith('Alice');
-        expect(within(cards[0]).getByText('Post, Rate')).toBeTruthy();
+        expect(within(cards[0]).getByText('memeplex:post, memeplex:rate')).toBeTruthy();
+        expect(within(cards[0]).getByText('memeplex')).toBeTruthy();
         expect(within(cards[0]).getByText('Active')).toBeTruthy();
         expect(within(cards[0]).getByText('Never')).toBeTruthy();
-        expect(within(cards[1]).getByText('All core kinds')).toBeTruthy();
+        expect(within(cards[1]).getByText('Whatever memeplex allows a client')).toBeTruthy();
         expect(within(cards[1]).getByText('Expired')).toBeTruthy();
         expect(within(cards[1]).getByText('ZEC:mainnet')).toBeTruthy();
         expect(within(cards[2]).getByText('Awaiting anchoring')).toBeTruthy();
-        expect(within(cards[2]).getByText(/cannot publish until this grant is anchored/)).toBeTruthy();
+        expect(within(cards[2]).getByText(/cannot act under this grant until it is anchored/)).toBeTruthy();
     });
 
     it('lists the rest when one asset cannot be read, says the list may be short, and reads again on Retry', async () => {
@@ -357,21 +383,20 @@ describe('Grants view: the grants an identity holds', () => {
     });
 
     it('keeps a field it does not know, and an expiry it was not asked to change, exactly', async () => {
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, expiresAt: '2030-01-02T03:04:59.500Z', note: 'kept' } }) });
+        const actions = ['memeplex:post', 'memeplex:reply', 'memeplex:rate', 'memeplex:tag'];
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, actions, expiresAt: '2030-01-02T03:04:59.500Z', note: 'kept' } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
         const dialog = screen.getByRole('dialog');
-        await user.click(within(dialog).getByLabelText('Tag'));
+        await user.click(within(dialog).getByLabelText('memeplex:tag'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({
-            memeplexGrant: {
-                v: 1, client: CLIENT, request: REQUEST, note: 'kept',
-                actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate'], expiresAt: '2030-01-02T03:04:59.500Z',
-            },
-        });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        // Keymaster is told the two members to set, and keeps the rest.
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([
+            GRANT, { actions: ['memeplex:post', 'memeplex:reply', 'memeplex:rate'], expiresAt: '2030-01-02T03:04:59.500Z' },
+        ]);
     });
 
     it('will not save a change to a grant that has changed since it was shown', async () => {
@@ -386,8 +411,8 @@ describe('Grants view: the grants an identity holds', () => {
 
         await waitFor(() => expect(notify.error).toHaveBeenCalled());
         expect(String(notify.error.mock.calls[0][0])).toMatch(/has changed since/);
-        expect(keymaster.mergeData).not.toHaveBeenCalled();
-        expect(await screen.findByText('Post')).toBeTruthy();
+        expect(keymaster.updateGrant).not.toHaveBeenCalled();
+        expect(await screen.findByText('memeplex:post')).toBeTruthy();
     });
 
     it('shows a change that is not anchored as awaiting anchoring, whatever expiry it sets', async () => {
@@ -412,12 +437,12 @@ describe('Grants view: the grants an identity holds', () => {
     });
 
     it('keeps the editor open and says so when the node refuses a change', async () => {
-        keymaster.mergeData.mockResolvedValue(false);
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT } }) });
+        keymaster.updateGrant.mockResolvedValue(false);
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:tag'] } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
-        await user.click(within(screen.getByRole('dialog')).getByLabelText('Tag'));
+        await user.click(within(screen.getByRole('dialog')).getByLabelText('memeplex:tag'));
         await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
 
         await waitFor(() => expect(notify.error).toHaveBeenCalled());
@@ -431,55 +456,113 @@ describe('Grants view: the grants an identity holds', () => {
     });
 
     it('changes scope and expiry in place, keeping the client and the request', async () => {
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, expiresAt: '2030-01-02T03:04:00Z' } }) });
+        const actions = ['memeplex:post', 'memeplex:reply', 'memeplex:rate', 'memeplex:tag'];
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, request: REQUEST, actions, expiresAt: '2030-01-02T03:04:00Z' } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
         const dialog = screen.getByRole('dialog');
-        await user.click(within(dialog).getByLabelText('Reply'));
+        await user.click(within(dialog).getByLabelText('memeplex:reply'));
         await user.clear(within(dialog).getByLabelText('Expires'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        const [did, data] = keymaster.mergeData.mock.calls[0];
-        expect(did).toBe(GRANT);
-        expect(data).toStrictEqual({
-            memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], request: REQUEST },
-        });
-        expect(validateGrant(data.memeplexGrant)).toBe('valid');
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([
+            GRANT, { actions: ['memeplex:post', 'memeplex:rate', 'memeplex:tag'], expiresAt: null },
+        ]);
     });
 
-    it('widens a narrowed grant to every core kind by leaving actions out', async () => {
+    it('offers, to change a grant, the actions it lists and no others', async () => {
         holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', SCHEMA] } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
         const dialog = screen.getByRole('dialog');
-        for (const name of ['Reply', 'Rate', 'Tag']) {
-            await user.click(within(dialog).getByLabelText(name));
-        }
+
+        expect(within(dialog).getAllByRole('checkbox')).toHaveLength(2);
         await user.click(within(dialog).getByLabelText(SCHEMA));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        expect(keymaster.mergeData.mock.calls[0][1]).toStrictEqual({ memeplexGrant: { v: 1, client: CLIENT } });
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { actions: ['memeplex:post'], expiresAt: null }]);
     });
 
-    it('keeps an extension action beside every core kind', async () => {
-        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post', SCHEMA] } }) });
+    it('changes the expiry of a grant that lists no actions, and leaves it listing none', async () => {
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, expiresAt: '2030-01-02T03:04:00Z' } }) });
         view();
         const user = userEvent.setup();
         await user.click(await screen.findByRole('button', { name: 'Change' }));
         const dialog = screen.getByRole('dialog');
-        for (const name of ['Reply', 'Rate', 'Tag']) {
-            await user.click(within(dialog).getByLabelText(name));
-        }
+
+        expect(within(dialog).queryAllByRole('checkbox')).toHaveLength(0);
+        await user.clear(within(dialog).getByLabelText('Expires'));
         await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => expect(keymaster.mergeData).toHaveBeenCalledTimes(1));
-        const { memeplexGrant } = keymaster.mergeData.mock.calls[0][1];
-        expect(memeplexGrant.actions).toStrictEqual(['memeplex:post', 'memeplex:reply', 'memeplex:rate', 'memeplex:tag', SCHEMA]);
-        expect(validateGrant(memeplexGrant)).toBe('valid');
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { expiresAt: null }]);
+    });
+
+    it('lists a grant whose actions it cannot read without failing, and will revoke it but not change it', async () => {
+        holding({
+            [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: 'read' } }),
+            'did:cid:empty': doc({ exampleGrant: { client: CLIENT, actions: [] } }),
+            'did:cid:when': doc({ exampleGrant: { client: CLIENT, expiresAt: { toString: null } } }),
+            'did:cid:whenever': doc({ exampleGrant: { client: CLIENT, expiresAt: 'not-a-date' } }),
+        });
+        view();
+        const [odd, empty, when, whenever] = await screen.findAllByTestId('grant');
+
+        expect(within(whenever).getByText('In a form this wallet cannot read')).toBeTruthy();
+        expect((within(whenever).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
+
+        expect(within(when).getByText('In a form this wallet cannot read')).toBeTruthy();
+        expect((within(when).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((within(when).getByRole('button', { name: 'Revoke' }) as HTMLButtonElement).disabled).toBe(false);
+
+        expect(within(odd).getByText('Actions in a form this wallet cannot read')).toBeTruthy();
+        expect((within(odd).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((within(odd).getByRole('button', { name: 'Revoke' }) as HTMLButtonElement).disabled).toBe(false);
+        expect(within(empty).getByText('No actions')).toBeTruthy();
+    });
+
+    it('leaves a grant that lists an empty set of actions listing it, when only the expiry changes', async () => {
+        holding({ [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: [], expiresAt: '2030-01-02T03:04:00Z' } }) });
+        view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Change' }));
+        await user.clear(within(screen.getByRole('dialog')).getByLabelText('Expires'));
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { expiresAt: null }]);
+    });
+
+    it('shows a grant on a registry that is no chain as active, with no anchoring to wait for', async () => {
+        holding({ [GRANT]: doc({ exampleGrant: { client: CLIENT } }, pending(), 'hyperswarm') });
+        view();
+        const user = userEvent.setup();
+        const card = await screen.findByTestId('grant');
+
+        expect(within(card).getByText('Active')).toBeTruthy();
+        expect(within(card).queryByText(/anchored/)).toBeNull();
+        await user.click(within(card).getByRole('button', { name: 'Change' }));
+        expect(within(screen.getByRole('dialog')).queryByText(/anchored/)).toBeNull();
+    });
+
+    it('lists a grant of any app, and changes it under its own name', async () => {
+        holding({ [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: ['read', 'write'] }, note: 'beside it' }) });
+        view();
+        const user = userEvent.setup();
+        const card = await screen.findByTestId('grant');
+
+        expect(within(card).getByText('example')).toBeTruthy();
+        expect(within(card).getByText('read, write')).toBeTruthy();
+        await user.click(within(card).getByRole('button', { name: 'Change' }));
+        await user.click(within(screen.getByRole('dialog')).getByLabelText('write'));
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(keymaster.updateGrant).toHaveBeenCalledTimes(1));
+        expect(keymaster.updateGrant.mock.calls[0]).toStrictEqual([GRANT, { actions: ['read'], expiresAt: null }]);
     });
 });
 
@@ -509,13 +592,13 @@ describe('Grants view: revoking', () => {
         await revoke();
 
         expect(await screen.findByText('Revocation requested')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
         expect(screen.queryByTestId('grant')).toBeNull();
         expect(keymaster.revokeDID).toHaveBeenCalledWith(GRANT);
 
         await act(async () => accept(true));
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
     });
 
     it('shows it as effective once the deletion is anchored, and not before', async () => {
@@ -536,12 +619,12 @@ describe('Grants view: revoking', () => {
 
         holding({ [GRANT]: doc({}, anchoredOn('BTC:mainnet', { deactivated: true })) });
         expect(await screen.findByText('Revoked')).toBeTruthy();
-        expect(screen.queryByText(/can still publish/)).toBeNull();
+        expect(screen.queryByText(/can still act/)).toBeNull();
 
         // A reorganization withdraws the anchor.
         holding({ [GRANT]: doc({}, pending({ deactivated: true })) });
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
     });
 
     it('still warns after the user leaves the tab and returns, and not under another identity', async () => {
@@ -559,7 +642,7 @@ describe('Grants view: revoking', () => {
 
         view({ identity: 'Carol' });
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
     });
 
     it('puts the grant back when the node refuses', async () => {
@@ -583,7 +666,7 @@ describe('Grants view: revoking', () => {
         await revoke();
 
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
     });
 
     it('puts the grant back when a revocation failed and the node still resolves the grant', async () => {
@@ -666,7 +749,7 @@ describe('Grants view: revoking', () => {
         holding(held);
         keymaster.listAssets.mockResolvedValue([]);
         expect(await screen.findByText('Revocation did not take effect')).toBeTruthy();
-        expect(screen.getByText(/can still publish/)).toBeTruthy();
+        expect(screen.getByText(/can still act/)).toBeTruthy();
 
         await user.click(await screen.findByRole('button', { name: 'Revoke Again' }));
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
@@ -695,7 +778,7 @@ describe('Grants view: revoking', () => {
 
             expect(await screen.findByText('Revocation submitted')).toBeTruthy();
             expect(screen.getByText(CLIENT)).toBeTruthy();
-            expect(screen.getByText(/can still publish until the revocation is anchored on BTC:mainnet/)).toBeTruthy();
+            expect(screen.getByText(/can still act under this grant until the revocation is anchored on BTC:mainnet/)).toBeTruthy();
             expect(screen.queryByTestId('grant')).toBeNull();
             expect(keymaster.listRevocations).toHaveBeenCalledWith(identity);
         });
@@ -709,7 +792,7 @@ describe('Grants view: revoking', () => {
             keymaster.listRevocations.mockResolvedValue([]);
             revoked(deleted(anchoredOn('BTC:mainnet')));
             expect(await screen.findByText('Revoked')).toBeTruthy();
-            expect(screen.queryByText(/can still publish/)).toBeNull();
+            expect(screen.queryByText(/can still act/)).toBeNull();
         });
 
         it('says when Keymaster reports the revocation displaced, and revokes again', async () => {
@@ -722,7 +805,7 @@ describe('Grants view: revoking', () => {
             view({ identity, pollMs: 20 });
 
             expect(await screen.findByText('Revocation did not take effect')).toBeTruthy();
-            expect(screen.getByText(/can still publish/)).toBeTruthy();
+            expect(screen.getByText(/can still act/)).toBeTruthy();
             expect(screen.queryByTestId('grant')).toBeNull();
 
             const user = userEvent.setup();
