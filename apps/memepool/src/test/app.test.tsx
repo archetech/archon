@@ -780,7 +780,7 @@ describe('a grant that allows some kinds', () => {
         const user = userEvent.setup();
 
         expect(await screen.findByLabelText('Post')).toBeTruthy();
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
 
         for (const name of ['Boost', 'Thumb up', 'Thumb down', 'Like', 'Add tag']) {
             expect(await screen.findByRole('button', { name })).toBeTruthy();
