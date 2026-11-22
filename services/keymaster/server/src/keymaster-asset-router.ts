@@ -73,7 +73,14 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      * @swagger
      * /assets:
      *   get:
-     *     summary: List all asset DIDs owned by the current ID.
+     *     summary: List all asset DIDs owned by an ID.
+     *     parameters:
+     *       - in: query
+     *         name: owner
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: The ID name or DID whose assets to list. Defaults to the current ID.
      *     responses:
      *       200:
      *         description: A list of asset DIDs.
@@ -98,7 +105,8 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      */
     router.get('/assets', async (req, res) => {
         try {
-            const assets = await getKeymaster().listAssets();
+            const owner = typeof req.query.owner === 'string' ? req.query.owner : undefined;
+            const assets = await getKeymaster().listAssets(owner);
             res.json({ assets });
         } catch (error: any) {
             sendError(res, error);

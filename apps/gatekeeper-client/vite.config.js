@@ -21,6 +21,7 @@ export default defineConfig({
         alias: {
             "@didcid/keymaster-ui/App.css": path.resolve(__dirname, "../../packages/keymaster-ui/src/App.css"),
             "@didcid/keymaster-ui": path.resolve(__dirname, "../../packages/keymaster-ui/src/index.js"),
+            "@didcid/keymaster/grant": path.resolve(__dirname, "../../packages/keymaster/dist/esm/grant.js"),
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/clients/drawbridge": path.resolve(__dirname, "../../packages/clients/dist/esm/drawbridge-client.js"),

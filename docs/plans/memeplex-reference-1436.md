@@ -867,7 +867,8 @@ There is no central moderator. Viewers choose which judgments to apply:
 
 ### Wallet
 
-The wallets have grants in their Auth tab, beside signing in. A grant request
+The wallets have grants in their Auth tab, beside signing in, and so do the
+standalone clients (`keymaster-client`, `gatekeeper-client`), which show the same view. A grant request
 reaches it pasted, as a link or a DID, or by opening or scanning a grant link
 (`archon://auth?grant=<DID>`), and is shown for review: nothing is created until the
 user approves.

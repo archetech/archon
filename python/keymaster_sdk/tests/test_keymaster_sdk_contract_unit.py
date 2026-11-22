@@ -92,6 +92,24 @@ def test_grant_helpers_call_the_grant_routes(monkeypatch):
     ]
 
 
+def test_list_assets_names_the_owner_asked_for(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return {"assets": ["did:test:asset"]}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.list_assets() == ["did:test:asset"]
+    assert sdk.list_assets("Alice") == ["did:test:asset"]
+    assert calls == [
+        ("GET", "http://unit.test/api/v1/assets", {}),
+        ("GET", "http://unit.test/api/v1/assets?owner=Alice", {}),
+    ]
+
+
 def test_list_revocations_names_the_owner_asked_for(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
     revocations = [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]

@@ -53,6 +53,8 @@ function App() {
     const [showRecoverSetup, setShowRecoverSetup] = useState(false);
     const [searchParams] = useSearchParams();
     const challengeDID = searchParams.get('challenge');
+    // A grant request, as `?grant=<DID>`: shown for review under Auth.
+    const grantDID = searchParams.get('grant');
 
     useEffect(() => {
         const init = async () => {
@@ -320,6 +322,7 @@ function App() {
                     keymaster={keymaster}
                     title={'Keymaster Browser Wallet Demo'}
                     challengeDID={challengeDID}
+                    grantDID={grantDID?.startsWith('did:') ? grantDID : undefined}
                     onWalletUpload={handleWalletUploadFile}
                     hasLightning={hasLightning}
                     hasDidComm={hasDidComm}
