@@ -19,7 +19,12 @@ publishes for the user under their grant. Everything they read comes from the
 3. **Timeline.** The reader's own posts and those of the authors they follow.
 4. **Post and reply.** What the reader publishes is shown as waiting until its chain
    anchors it and the indexer has it: it is not a publication before then.
-5. **Thread.** A post with the replies under it.
+5. **Thread.** A post with the replies under it, how many have boosted it, how it is
+   rated, and the tags and reactions on it.
+6. **Respond.** A boost, a thumb up or down, a like, a tag. Each is an object of the
+   reader's, about the version of the post that is shown. A reader has one rating of
+   an object, so a second thumb changes the first.
+7. **Edit and withdraw**, for what the reader published through this service.
 
 Follows are kept in the browser (`localStorage`) and published nowhere, so the
 network does not learn whom anyone follows. The indexer does see which authors a
