@@ -2052,6 +2052,97 @@ describe('listRevocations', () => {
     });
 });
 
+describe('grants', () => {
+    const link = 'archon://grant?request=abc';
+    const grants = [{ did: 'did1', status: 'pending', grant: { v: 1, client: 'did:cid:client' }, registry: 'BTC:mainnet', created: true }];
+
+    it('should create a grant from a link', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/grants', { link })
+            .reply(200, { did: 'did1' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.createGrant(link)).toBe('did1');
+    });
+
+    it('should send the options of a grant, with an expiry removed as null', async () => {
+        const options = { registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null };
+
+        nock(KeymasterURL)
+            .post('/api/v1/grants', { link, options })
+            .reply(200, { did: 'did1' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.createGrant(link, options)).toBe('did1');
+    });
+
+    it('should list grants, of the owner asked for', async () => {
+        nock(KeymasterURL)
+            .get('/api/v1/grants')
+            .reply(200, { grants })
+            .get('/api/v1/grants')
+            .query({ owner: 'Alice' })
+            .reply(200, { grants: [] });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.listGrants()).toStrictEqual(grants);
+        expect(await keymaster.listGrants('Alice')).toStrictEqual([]);
+    });
+
+    it('should update a grant, with every core kind and no expiry as null', async () => {
+        const changes = { actions: null, expiresAt: null };
+
+        nock(KeymasterURL)
+            .put('/api/v1/grants/did1', { changes })
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.updateGrant('did1', changes)).toBe(true);
+    });
+
+    it('should revoke a grant', async () => {
+        nock(KeymasterURL)
+            .delete('/api/v1/grants/did1')
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.revokeGrant('did1')).toBe(true);
+    });
+
+    it('should encode an alias with a slash as one path segment', async () => {
+        nock(KeymasterURL)
+            .put('/api/v1/grants/clients%2Fmemepool', { changes: { actions: ['memeplex:tag'] } })
+            .reply(200, { ok: true })
+            .delete('/api/v1/grants/clients%2Fmemepool')
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.updateGrant('clients/memepool', { actions: ['memeplex:tag'] })).toBe(true);
+        expect(await keymaster.revokeGrant('clients/memepool')).toBe(true);
+    });
+
+    it('should throw exception on a grant server error', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/grants').reply(500, ServerError)
+            .get('/api/v1/grants').reply(500, ServerError)
+            .put('/api/v1/grants/did1').reply(500, ServerError)
+            .delete('/api/v1/grants/did1').reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        await expect(keymaster.createGrant(link)).rejects.toMatchObject({ message: ServerError.message });
+        await expect(keymaster.listGrants()).rejects.toMatchObject({ message: ServerError.message });
+        await expect(keymaster.updateGrant('did1', { expiresAt: null })).rejects.toMatchObject({ message: ServerError.message });
+        await expect(keymaster.revokeGrant('did1')).rejects.toMatchObject({ message: ServerError.message });
+    });
+});
+
 describe('listAssets', () => {
     const mockAssets = ['did1', 'did2', 'did3'];
 

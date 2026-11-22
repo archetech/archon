@@ -669,6 +669,55 @@ export interface AssetRevocation {
     status: 'pending' | 'displaced' | 'unresolved';
 }
 
+// The `memeplexGrant` member of a grant's data: what an identity lets a client
+// publish in its name. docs/plans/memeplex-1436.md, "One grant, one client, one
+// chain".
+export interface MemeplexGrant {
+    v: 1;
+    client: string;
+    // Absent means every core kind.
+    actions?: string[];
+    nonce?: string;
+    expiresAt?: string;
+    [other: string]: unknown;
+}
+
+export interface CreateGrantOptions {
+    // One of the registries a grant may be created on. Defaults to the first of
+    // them the node supports.
+    registry?: string;
+    // The identity that grants. Defaults to the current ID.
+    controller?: string;
+    alias?: string;
+    // A narrower scope than the request asks for. Defaults to what it asks for.
+    actions?: string[];
+    // Defaults to the expiry the request asks for; `null` for a grant that
+    // lasts until it is revoked.
+    expiresAt?: string | null;
+}
+
+// A change to a grant's scope. A field left out is kept as it is.
+export interface GrantChanges {
+    // `null` widens the grant to every core kind.
+    actions?: string[] | null;
+    // `null` removes the expiry.
+    expiresAt?: string | null;
+}
+
+// One of an identity's assets, read as a grant.
+export interface GrantInfo {
+    did: string;
+    // `anchored`: the latest version of the grant is anchored on its registry.
+    // `pending`: it is not, so what it states has no effect yet. `unresolved`:
+    // the node could not resolve the asset, which may or may not be a grant.
+    status: 'anchored' | 'pending' | 'unresolved';
+    // The grant as its latest version states it.
+    grant?: MemeplexGrant;
+    registry?: string;
+    // Whether the latest version is the grant's creation.
+    created?: boolean;
+}
+
 export interface CheckDIDResult {
     did: string;
     type?: string;
@@ -813,6 +862,12 @@ export interface KeymasterInterface {
     listRevocations(owner?: string): Promise<AssetRevocation[]>;
     resolveAsset(did: string, options?: ResolveDIDOptions): Promise<unknown | null>;
     mergeData(did: string, data: Record<string, unknown>): Promise<boolean>;
+
+    // Memeplex grants
+    createGrant(link: string, options?: CreateGrantOptions): Promise<string>;
+    listGrants(owner?: string): Promise<GrantInfo[]>;
+    updateGrant(did: string, changes: GrantChanges): Promise<boolean>;
+    revokeGrant(did: string): Promise<boolean>;
 
     // Encryption
     encryptMessage(msg: string, receiver: string, options?: EncryptOptions): Promise<string>;

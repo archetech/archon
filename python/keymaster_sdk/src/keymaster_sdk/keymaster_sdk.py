@@ -1174,6 +1174,36 @@ def list_revocations(owner=None):
     return response["revocations"]
 
 
+def create_grant(link, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/grants",
+        json={"link": link, "options": options},
+    )
+    return response["did"]
+
+
+def list_grants(owner=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/grants", {"owner": owner}))
+    return response["grants"]
+
+
+def update_grant(identifier, changes):
+    response = proxy_request(
+        "PUT",
+        f"{_keymaster_api}/grants/{quote(identifier, safe='')}",
+        json={"changes": changes},
+    )
+    return response["ok"]
+
+
+def revoke_grant(identifier):
+    response = proxy_request("DELETE", f"{_keymaster_api}/grants/{quote(identifier, safe='')}")
+    return response["ok"]
+
+
 def clone_asset(identifier, options=None):
     if options is None:
         options = {}

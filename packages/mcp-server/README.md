@@ -71,6 +71,8 @@ Apply a supported repair explicitly with `archon_repair_did` and
 `{ "did": "Alice", "confirm": true }`. Inspection never submits an operation;
 repair reports `submitted` separately from `confirmed`.
 
+Use `archon_create_grant` with `{ "link": "archon://grant?request=…" }` to let a client application publish in an identity's name. It makes the checks a wallet makes before it creates a grant and refuses a link, registry, granting identity or scope that would make the grant void. `actions` narrows what the link asks for, and `expiresAt` sets the expiry, or as `null` leaves out the one the link asks for. `archon_list_grants` lists an identity's grants, `archon_update_grant` changes a grant's `actions` or `expiresAt` (`null` for every core kind, or for no expiry), and `archon_revoke_grant` revokes one with `"confirm": true`.
+
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
 ### Structured inputs
@@ -432,6 +434,10 @@ Pay a Lightning invoice:
 | `get-property` | `archon_get_property` |
 | `set-property` | `archon_set_property` |
 | `list-assets` | `archon_list_assets` |
+| `create-grant` | `archon_create_grant` |
+| `list-grants` | `archon_list_grants` |
+| `update-grant` | `archon_update_grant` |
+| `revoke-grant` | `archon_revoke_grant` |
 | `create-poll-template` | `archon_create_poll_template` |
 | `create-poll` | `archon_create_poll` |
 | `add-poll-voter` | `archon_add_poll_voter` |

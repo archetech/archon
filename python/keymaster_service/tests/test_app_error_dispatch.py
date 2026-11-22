@@ -174,6 +174,53 @@ def test_did_repair_routes_accept_encoded_slashes(monkeypatch):
         assert calls[-2:] == [("check", identifier), ("repair", identifier)]
 
 
+def test_grant_routes_accept_encoded_slashes_and_pass_null_changes(monkeypatch):
+    calls = []
+
+    async def create(link, options=None):
+        calls.append(("create", link, options))
+        return "did:cid:grant"
+
+    async def list_grants(owner=None):
+        calls.append(("list", owner))
+        return []
+
+    async def update(identifier, changes):
+        calls.append(("update", identifier, changes))
+        return True
+
+    async def revoke(identifier):
+        calls.append(("revoke", identifier))
+        return True
+
+    monkeypatch.setattr(app_module.service, "create_grant", create)
+    monkeypatch.setattr(app_module.service, "list_grants", list_grants)
+    monkeypatch.setattr(app_module.service, "update_grant", update)
+    monkeypatch.setattr(app_module.service, "revoke_grant", revoke)
+    app = FastAPI()
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    client = TestClient(app)
+    link = "archon://grant?request=abc"
+    options = {"registry": "ETH:mainnet", "expiresAt": None}
+    changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
+
+    assert client.post("/api/v1/grants", json={"link": link, "options": options}).json() == {"did": "did:cid:grant"}
+    assert client.get("/api/v1/grants").json() == {"grants": []}
+    assert client.get("/api/v1/grants", params={"owner": "Alice"}).json() == {"grants": []}
+    assert calls == [("create", link, options), ("list", None), ("list", "Alice")]
+
+    for identifier in ["clients/memepool", "Alice / grant", "did:cid:grant"]:
+        path = f"/api/v1/grants/{quote(identifier, safe='')}"
+        updated = client.put(path, json={"changes": changes})
+        revoked = client.delete(path)
+        assert updated.status_code == 200
+        assert updated.json() == {"ok": True}
+        assert revoked.status_code == 200
+        assert revoked.json() == {"ok": True}
+        assert calls[-2:] == [("update", identifier, changes), ("revoke", identifier)]
+
+
 def test_cashu_errors_dispatch_like_the_typescript_service():
     client = _client()
     assert client.get("/cashu-unavailable").status_code == 503

@@ -118,6 +118,10 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/assets', 400],
     ['GET', '/assets', 400],
     ['GET', '/revocations', 400],
+    ['POST', '/grants', 400],
+    ['GET', '/grants', 400],
+    ['PUT', '/grants/test-id', 400],
+    ['DELETE', '/grants/test-id', 400],
     ['GET', '/assets/test-id', 404],
     ['PUT', '/assets/test-id', 400],
     ['POST', '/assets/test-id/transfer', 400],
@@ -767,3 +771,29 @@ test.each(['Alice / backup', 'Alice/check', 'Alice/repair', 'did:cid:alice'])(
         expect(keymaster.repairDID).toHaveBeenCalledWith(identifier);
     },
 );
+
+test.each(['clients/memepool', 'Alice / grant', 'did:cid:grant'])(
+    'grant routes preserve encoded identifier %s', async identifier => {
+        const { app, keymaster } = mount();
+        const path = `/grants/${encodeURIComponent(identifier)}`;
+        const changes = { actions: null, expiresAt: '2028-01-01T00:00:00Z' };
+
+        expect((await request(app).put(path).send({ changes })).status).toBe(200);
+        expect((await request(app).delete(path)).status).toBe(200);
+        expect(keymaster.updateGrant).toHaveBeenCalledWith(identifier, changes);
+        expect(keymaster.revokeGrant).toHaveBeenCalledWith(identifier);
+    },
+);
+
+test('grant routes pass the link, its options and the owner', async () => {
+    const { app, keymaster } = mount();
+    const link = 'archon://grant?request=abc';
+    const options = { registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null };
+
+    expect((await request(app).post('/grants').send({ link, options })).status).toBe(200);
+    expect((await request(app).get('/grants')).status).toBe(200);
+    expect((await request(app).get('/grants').query({ owner: 'Alice' })).status).toBe(200);
+    expect(keymaster.createGrant).toHaveBeenCalledWith(link, options);
+    expect(keymaster.listGrants).toHaveBeenNthCalledWith(1, undefined);
+    expect(keymaster.listGrants).toHaveBeenNthCalledWith(2, 'Alice');
+});

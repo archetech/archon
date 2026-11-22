@@ -7359,6 +7359,331 @@
         }
       }
     },
+    "/grants": {
+      "post": {
+        "summary": "Create a Memeplex grant from a grant link.",
+        "description": "Creates the grant a client asks for with an `archon://grant?request=` link, as an asset of the granting identity. Refuses a link that does not decode or does not carry a valid grant request, a registry a grant may not be created on or the node does not support, a granting identity registered on `local`, a request that names the granting identity as its client, and a scope wider than the request asks for.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "link"
+                ],
+                "properties": {
+                  "link": {
+                    "type": "string",
+                    "description": "The grant link the client presents."
+                  },
+                  "options": {
+                    "type": "object",
+                    "properties": {
+                      "registry": {
+                        "type": "string",
+                        "description": "One of `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`. Defaults to the first of them the node supports.\n"
+                      },
+                      "controller": {
+                        "type": "string",
+                        "description": "The ID name or DID that grants. Defaults to the current ID."
+                      },
+                      "alias": {
+                        "type": "string",
+                        "description": "An alias for the grant."
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "A subset of the actions the request asks for, or of the core actions when it lists none. Defaults to what the request asks for.\n"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the grant expires. Defaults to the expiry the request asks for; `null` for a grant that lasts until it is revoked.\n"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The DID of the grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "did": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link, the registry, the granting identity or the scope is refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List the Memeplex grants among an identity's assets.",
+        "description": "A grant whose deletion a node has accepted is not listed: `GET /revocations` has it until the deletion is anchored.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The ID name or DID whose grants to list. Defaults to the current ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The grants, each as its latest version states it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "grants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "did",
+                          "status"
+                        ],
+                        "properties": {
+                          "did": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "anchored",
+                              "pending",
+                              "unresolved"
+                            ],
+                            "description": "`anchored` when the latest version of the grant is anchored on its registry, `pending` when it is not and so has no effect yet, `unresolved` when the node could not resolve the asset, which may or may not be a grant.\n"
+                          },
+                          "grant": {
+                            "type": "object",
+                            "required": [
+                              "v",
+                              "client"
+                            ],
+                            "properties": {
+                              "v": {
+                                "type": "integer",
+                                "enum": [
+                                  1
+                                ]
+                              },
+                              "client": {
+                                "type": "string",
+                                "description": "The DID of the client the grant lets publish."
+                              },
+                              "actions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "The actions the grant permits. Absent when it permits every core kind."
+                              },
+                              "nonce": {
+                                "type": "string"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          },
+                          "registry": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "boolean",
+                            "description": "Whether the latest version is the grant's creation."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The owner is not an ID in the wallet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/grants/{id}": {
+      "put": {
+        "summary": "Change the scope of a Memeplex grant of the current ID.",
+        "description": "Changes `actions`, `expiresAt` or both, and keeps every other field of the grant. Refuses a DID that is not a live, valid grant of the current ID.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID or alias of the grant."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "changes"
+                ],
+                "properties": {
+                  "changes": {
+                    "type": "object",
+                    "properties": {
+                      "actions": {
+                        "type": "array",
+                        "nullable": true,
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The actions the grant permits, from the core actions and the extension kinds it lists. `null` for every core kind.\n"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the grant expires. `null` removes the expiry."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether the node accepted the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The DID is not a grant of the current ID, or the change is refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke a Memeplex grant of the current ID.",
+        "description": "Deletes the grant's asset. The client can publish until the deletion is anchored on the grant's registry; `GET /revocations` lists it until then.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID or alias of the grant."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the node accepted the revocation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The DID is not a grant of the current ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/assets/{id}": {
       "get": {
         "summary": "Resolve (retrieve) an asset by DID or name.",

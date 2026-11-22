@@ -717,6 +717,22 @@ class StubService:
         self.calls.append(("list_revocations", owner))
         return [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]
 
+    async def create_grant(self, link, options=None):
+        self.calls.append(("create_grant", link, options))
+        return "did:test:grant"
+
+    async def list_grants(self, owner=None):
+        self.calls.append(("list_grants", owner))
+        return [{"did": "did:test:grant", "status": "pending"}]
+
+    async def update_grant(self, identifier, changes):
+        self.calls.append(("update_grant", identifier, changes))
+        return True
+
+    async def revoke_grant(self, identifier):
+        self.calls.append(("revoke_grant", identifier))
+        return True
+
     async def test_agent(self, identifier: str) -> bool:
         self.calls.append(("test_agent", identifier))
         return True
@@ -1520,6 +1536,29 @@ def test_file_and_image_handlers(stub_service: StubService):
         ("get_file", "did:test:file"),
         ("get_file", "did:test:file"),
         ("test_file", "did:test:file"),
+    ]
+
+
+def test_grant_handlers(stub_service: StubService):
+    link = "archon://grant?request=abc"
+    options = {"registry": "ETH:mainnet", "actions": ["memeplex:tag"], "expiresAt": None}
+    changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
+
+    assert run(app_module.create_grant({"link": link})) == {"did": "did:test:grant"}
+    assert run(app_module.create_grant({"link": link, "options": options})) == {"did": "did:test:grant"}
+    assert run(app_module.list_grants()) == {"grants": [{"did": "did:test:grant", "status": "pending"}]}
+    assert run(app_module.list_grants("did:test:bob")) == {"grants": [{"did": "did:test:grant", "status": "pending"}]}
+    assert run(app_module.update_grant("did:test:grant", {"changes": changes})) == {"ok": True}
+    assert run(app_module.update_grant("did:test:grant", {})) == {"ok": True}
+    assert run(app_module.revoke_grant("did:test:grant")) == {"ok": True}
+    assert stub_service.calls == [
+        ("create_grant", link, {}),
+        ("create_grant", link, options),
+        ("list_grants", None),
+        ("list_grants", "did:test:bob"),
+        ("update_grant", "did:test:grant", changes),
+        ("update_grant", "did:test:grant", None),
+        ("revoke_grant", "did:test:grant"),
     ]
 
 

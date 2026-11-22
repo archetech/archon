@@ -97,6 +97,11 @@ async function claimPaidCashuQuote(quote, mint, id) {
 // `archon create-id alice && next` runs `next` after alice failed, and no
 // script or CI step can tell. exitCode rather than exit(1), so stdout a
 // partially-completed command already wrote still flushes.
+// The actions a comma-separated option names.
+function splitActions(actions) {
+    return actions.split(',').map(action => action.trim()).filter(Boolean);
+}
+
 function fail(detail) {
     console.error(detail);
     process.exitCode = 1;
@@ -1333,6 +1338,94 @@ program
         }
         catch (error) {
             fail(error.error || error);
+        }
+    });
+
+program
+    .command('create-grant <link>')
+    .description('Create a Memeplex grant from a grant link')
+    .option('-a, --alias <alias>', 'DID alias')
+    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports)')
+    .option('--actions <actions>', 'comma-separated actions, from those the link asks for (default: all of them)')
+    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)')
+    .option('--no-expiry', 'make a grant that lasts until it is revoked')
+    .action(async (link, options) => {
+        try {
+            const { alias, registry, actions, expires, expiry } = options;
+
+            if (expires !== undefined && !expiry) {
+                fail('--expires and --no-expiry cannot be used together');
+                return;
+            }
+
+            const did = await keymaster.createGrant(link, {
+                alias,
+                registry,
+                actions: actions === undefined ? undefined : splitActions(actions),
+                expiresAt: expiry ? expires : null,
+            });
+            console.log(did);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-grants')
+    .description('List Memeplex grants made by current ID')
+    .action(async () => {
+        try {
+            const grants = await keymaster.listGrants();
+            console.log(JSON.stringify(grants, null, 4));
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('update-grant <id>')
+    .description('Change the actions or expiry of a Memeplex grant')
+    .option('--actions <actions>', 'comma-separated actions the grant permits')
+    .option('--all-actions', 'permit every core kind')
+    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z')
+    .option('--no-expiry', 'remove the expiry')
+    .action(async (id, options) => {
+        try {
+            const { actions, allActions, expires, expiry } = options;
+
+            if (actions !== undefined && allActions) {
+                fail('--actions and --all-actions cannot be used together');
+                return;
+            }
+            if (expires !== undefined && !expiry) {
+                fail('--expires and --no-expiry cannot be used together');
+                return;
+            }
+
+            const changes = {
+                ...(allActions ? { actions: null } : actions === undefined ? {} : { actions: splitActions(actions) }),
+                ...(!expiry ? { expiresAt: null } : expires === undefined ? {} : { expiresAt: expires }),
+            };
+            const ok = await keymaster.updateGrant(id, changes);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('revoke-grant <id>')
+    .description('Revoke a Memeplex grant')
+    .action(async (id) => {
+        try {
+            const ok = await keymaster.revokeGrant(id);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
         }
     });
 

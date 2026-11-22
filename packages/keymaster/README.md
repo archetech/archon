@@ -245,6 +245,10 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Assets | `clone-asset <id>` | Clone an asset |
 | Assets | `set-property <id> <key> [value]` | Set asset property |
 | Assets | `list-assets` | List owned assets |
+| Grants | `create-grant <link> [-r <registry>] [-a <alias>] [--actions <a,b>] [--expires <instant>] [--no-expiry]` | Create a Memeplex grant from the `archon://grant` link a client presents |
+| Grants | `list-grants` | List the Memeplex grants made by the current ID |
+| Grants | `update-grant <id> [--actions <a,b>] [--all-actions] [--expires <instant>] [--no-expiry]` | Change a grant's actions or expiry |
+| Grants | `revoke-grant <id>` | Revoke a grant |
 | Polls | `create-poll-template` | Create poll template |
 | Polls | `create-poll <file>` | Create poll from file |
 | Polls | `view-poll <poll>` | View poll details |
@@ -308,6 +312,29 @@ Example:
 keymaster create-id MyBot -r hyperswarm
 keymaster create-schema schema.json -a my-schema -r local
 ```
+
+#### Memeplex grants
+
+A client application asks to publish in an identity's name with a grant link (`archon://grant?request=…`). An agent makes the grant, and keeps it, from the command line:
+
+```bash
+# Grant what the link asks for, on the first permitted registry the node supports
+keymaster create-grant 'archon://grant?request=…'
+
+# Grant less than it asks for, on a chosen registry, until a chosen instant
+keymaster create-grant 'archon://grant?request=…' -r ETH:mainnet --actions memeplex:post,memeplex:reply --expires 2027-01-31T00:00:00Z
+
+keymaster list-grants
+keymaster update-grant <id> --actions memeplex:tag      # or --all-actions for every core kind
+keymaster update-grant <id> --no-expiry                 # or --expires <instant>
+keymaster revoke-grant <id>
+```
+
+`create-grant` refuses a link that does not decode or does not carry a valid grant request; a registry other than `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet` and `SOL:mainnet-beta`, or one the node does not support; a granting identity registered on `local`; a request that names the granting identity as its client; and `--actions` the link does not ask for. A grant made on any other terms would be void. `--no-expiry` leaves out an expiry the link asks for.
+
+`list-grants` prints each grant with its `status`: `anchored`, or `pending` while its latest version is not anchored on its registry, when what it states has no effect yet. An asset the node could not resolve is listed as `unresolved`.
+
+`update-grant` changes `actions` and `expiresAt` and keeps every other field, since any other change ends the grant. It offers the four core actions and the extension kinds the grant lists. `update-grant` and `revoke-grant` refuse a DID that is not a live, valid grant of the current ID. The client can publish until a revocation is anchored on the grant's registry.
 
 ### Client
 

@@ -951,16 +951,9 @@ until the verifier exists.
 4. **CLI client:** create an agent DID as the client, grant it from the user's
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
-5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link; `@didcid/memeplex` encodes and decodes the link. Still to do:
+5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link; `@didcid/memeplex` encodes and decodes the link. An agent, which acts through the CLI and the MCP tools and cannot paste a link into a wallet, has the same four actions as commands (`create-grant <link>`, `list-grants`, `update-grant <id>`, `revoke-grant <id>`) in the three CLIs (`scripts/archon-cli.js`, the TypeScript and the Python Keymaster CLI) and as MCP tools (`archon_create_grant` and the rest). Both Keymasters make them, as `createGrant`, `listGrants`, `updateGrant` and `revokeGrant`, with the checks a wallet makes, and the Keymaster service offers them at `/grants`. Keymaster is published and `@didcid/memeplex` is not, so each Keymaster states the link and grant rules itself (`packages/keymaster/src/grant.ts`, `python/keymaster/src/keymaster/grant.py`); `tests/keymaster/grant.test.ts` holds the TypeScript one to the verifier's answers, and both run `tests/fixtures/memeplex-v1-vectors.json` and `tests/fixtures/memeplex-grant-link-vectors.json`. Still to do:
    - Opening a wallet from a link, and scanning one as a QR code. A wallet shows a
      revocation's state only until it is closed.
-   - **Grants from the command line, for agents.** An agent acts through the CLI and
-     the MCP tools and cannot paste a link into a wallet. Today it grants with the
-     asset commands, after decoding the link itself. It needs to create a grant from
-     a grant link with the checks a wallet makes, list its grants, and change and
-     revoke them, in the three CLIs (`scripts/archon-cli.js`, the TypeScript and the
-     Python Keymaster CLI) and as MCP tools. The link and grant checks are in
-     `@didcid/memeplex`, which is TypeScript only, so the Python CLI needs them too.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
 7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). It is deployed by the `memepool` profile and offered through Drawbridge at `/memepool`. Its pages are `apps/memepool`: sign-in, the grant, a timeline of the authors a reader follows, posts, replies and threads. The Memepool service serves them, at `<node>/memepool/` through Drawbridge.
 8. **Moderation:** block lists and labels.

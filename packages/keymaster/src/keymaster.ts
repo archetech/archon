@@ -2,6 +2,13 @@ import { attachedJson, isCashuTokenMessage, issueCredentialMessage, type DidComm
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { CashuWallet, hasCashuState } from './cashu.js';
+import {
+    CORE_GRANT_ACTIONS,
+    PERMITTED_GRANT_REGISTRIES,
+    decodeGrantLink,
+    isInstant,
+    validateGrant,
+} from './grant.js';
 import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
@@ -44,6 +51,10 @@ import {
     CheckDIDResult,
     RepairDIDResult,
     CreateAssetOptions,
+    CreateGrantOptions,
+    GrantChanges,
+    GrantInfo,
+    MemeplexGrant,
     EncryptedMessage,
     FileAssetOptions,
     CreateResponseOptions,
@@ -2068,6 +2079,219 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return revocations;
+    }
+
+    // Whether a resolved version is anchored on a registry: it names that
+    // registry as its chain and has the height and time of a block. `confirmed`
+    // is not that, since a creation is confirmed from the start.
+    private anchoredOn(doc: DidCidDocument, registry: string): boolean {
+        const timestamp = doc.didDocumentMetadata?.timestamp;
+        const { height, timeISO } = timestamp?.upperBound ?? {};
+
+        return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string';
+    }
+
+    // The `actions` a grant states for a choice among the actions on offer, in
+    // the order they are offered: none when the choice is exactly the core
+    // actions, which a grant states by leaving `actions` out.
+    private grantActions(offered: string[], chosen: unknown, label: string): string[] | undefined {
+        if (!Array.isArray(chosen) || chosen.length === 0) {
+            throw new InvalidParameterError(`${label}: at least one action is needed`);
+        }
+
+        if (!chosen.every(action => offered.includes(action))) {
+            throw new InvalidParameterError(`${label}: every action must be one of ${offered.join(', ')}`);
+        }
+
+        const actions = offered.filter(action => chosen.includes(action));
+        const everyCore = actions.length === CORE_GRANT_ACTIONS.length
+            && CORE_GRANT_ACTIONS.every(action => actions.includes(action));
+
+        return everyCore ? undefined : actions;
+    }
+
+    private grantExpiry(expiresAt: unknown, label: string): string {
+        if (typeof expiresAt !== 'string' || !isInstant(expiresAt)) {
+            throw new InvalidParameterError(`${label}: not an instant such as 2027-01-31T00:00:00Z`);
+        }
+
+        return expiresAt;
+    }
+
+    // Creates the grant a grant link asks for, as an asset of the granting
+    // identity, and returns its DID. The checks are those a wallet makes before
+    // it creates one (docs/plans/memeplex-reference-1436.md, "Grant request
+    // flow"): each refusal here is of a grant that would be void or wider than
+    // what was asked for.
+    //
+    // The grant has the request's `client` and `nonce`, the scope the request
+    // asks for unless `options.actions` narrows it, and the expiry the request
+    // asks for unless `options.expiresAt` changes or removes it.
+    async createGrant(link: string, options: CreateGrantOptions = {}): Promise<string> {
+        const decoded = decodeGrantLink(typeof link === 'string' ? link.trim() : link);
+
+        if ('error' in decoded) {
+            const validity = decoded.validity ? ` (${decoded.validity})` : '';
+
+            throw new InvalidParameterError(`link: ${decoded.error}${validity}`);
+        }
+
+        const { request } = decoded;
+        const { controller, alias } = options;
+        const offered: string[] = request.actions ?? CORE_GRANT_ACTIONS;
+        const actions = this.grantActions(offered, options.actions ?? offered, 'options.actions');
+        const requested = options.expiresAt === undefined ? request.expiresAt : options.expiresAt;
+        const expiresAt = requested === undefined || requested === null
+            ? undefined
+            : this.grantExpiry(requested, 'options.expiresAt');
+
+        const supported = await this.listRegistries();
+        let { registry } = options;
+
+        if (!registry) {
+            registry = PERMITTED_GRANT_REGISTRIES.find(permitted => supported.includes(permitted));
+
+            if (!registry) {
+                throw new InvalidParameterError(`options.registry: this node supports none of ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
+            }
+        }
+        else if (!PERMITTED_GRANT_REGISTRIES.includes(registry)) {
+            throw new InvalidParameterError(`options.registry: a grant may be created on ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
+        }
+        else if (!supported.includes(registry)) {
+            throw new InvalidParameterError(`options.registry: this node does not support ${registry}`);
+        }
+
+        // createAsset puts a local identity's assets on `local` whatever
+        // registry is asked for, and a grant there, like a grant to oneself, is
+        // void.
+        const id = await this.fetchIdInfo(controller);
+        const grantor = await this.resolveDID(id.did, { confirm: true });
+
+        if (grantor.didDocumentRegistration?.registry === 'local') {
+            throw new InvalidParameterError('options.controller: a local identity cannot make a grant');
+        }
+        if (grantor.didDocument?.id === request.client) {
+            throw new InvalidParameterError('link: the request names the granting identity as the client');
+        }
+
+        const memeplexGrant: MemeplexGrant = {
+            v: 1,
+            client: request.client,
+            ...(actions ? { actions } : {}),
+            nonce: request.nonce,
+            ...(expiresAt ? { expiresAt } : {}),
+        };
+
+        return this.createAsset({ memeplexGrant }, { registry, controller, alias });
+    }
+
+    // The grants among the assets of an identity, each as its latest version
+    // states it. A grant whose deletion a node has accepted is not among them:
+    // listRevocations has it until the deletion is anchored. An asset the node
+    // cannot resolve is listed as `unresolved`, since it may be a grant.
+    async listGrants(owner?: string): Promise<GrantInfo[]> {
+        const grants: GrantInfo[] = [];
+
+        for (const did of await this.listAssets(owner)) {
+            let doc: DidCidDocument;
+
+            try {
+                doc = await this.resolveDID(did);
+            }
+            catch {
+                grants.push({ did, status: 'unresolved' });
+                continue;
+            }
+
+            const grant = (doc.didDocumentData as { memeplexGrant?: unknown } | undefined)?.memeplexGrant;
+
+            if (doc.didDocumentMetadata?.deactivated || validateGrant(grant) !== 'valid') {
+                continue;
+            }
+
+            const registry = doc.didDocumentRegistration?.registry ?? '';
+
+            grants.push({
+                did,
+                status: this.anchoredOn(doc, registry) ? 'anchored' : 'pending',
+                grant: grant as MemeplexGrant,
+                registry,
+                created: Number(doc.didDocumentMetadata?.versionSequence ?? 1) <= 1,
+            });
+        }
+
+        return grants;
+    }
+
+    // A live asset of the current ID that holds a valid grant.
+    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant }> {
+        const owner = await this.fetchIdInfo();
+        const did = await this.lookupDID(id);
+        const doc = await this.resolveDID(did);
+        const grant = (doc.didDocumentData as { memeplexGrant?: unknown } | undefined)?.memeplexGrant;
+
+        if (doc.didDocumentMetadata?.deactivated || doc.didDocumentRegistration?.type !== 'asset'
+            || validateGrant(grant) !== 'valid') {
+            throw new InvalidParameterError('id: not a grant');
+        }
+        if (!this.didMatch(doc.didDocument?.controller ?? '', owner.did)) {
+            throw new InvalidParameterError('id: not a grant of the current ID');
+        }
+
+        return { did, grant: grant as MemeplexGrant };
+    }
+
+    // Changes the scope of a grant of the current ID in place. Every field of
+    // the grant but `actions` and `expiresAt` is kept, since a change to any
+    // other ends the grant. The actions on offer are the core actions and the
+    // extension kinds the grant lists. Nothing is written when the change
+    // leaves the grant as it is.
+    async updateGrant(id: string, changes: GrantChanges): Promise<boolean> {
+        if (!changes || typeof changes !== 'object'
+            || (changes.actions === undefined && changes.expiresAt === undefined)) {
+            throw new InvalidParameterError('changes: actions or expiresAt is needed');
+        }
+
+        const { did, grant } = await this.ownGrant(id);
+        const updated: MemeplexGrant = { ...grant };
+
+        if (changes.actions !== undefined) {
+            const offered = [
+                ...CORE_GRANT_ACTIONS,
+                ...(grant.actions ?? []).filter(action => !CORE_GRANT_ACTIONS.includes(action)),
+            ];
+            const actions = changes.actions === null
+                ? undefined
+                : this.grantActions(offered, changes.actions, 'changes.actions');
+
+            delete updated.actions;
+            if (actions) {
+                updated.actions = actions;
+            }
+        }
+
+        if (changes.expiresAt !== undefined) {
+            delete updated.expiresAt;
+            if (changes.expiresAt !== null) {
+                updated.expiresAt = this.grantExpiry(changes.expiresAt, 'changes.expiresAt');
+            }
+        }
+
+        if (JSON.stringify([updated.actions, updated.expiresAt]) === JSON.stringify([grant.actions, grant.expiresAt])) {
+            return true;
+        }
+
+        return this.mergeData(did, { memeplexGrant: updated });
+    }
+
+    // Revokes a grant of the current ID by deleting its asset. The client can
+    // publish until the deletion is anchored on the grant's registry;
+    // listRevocations says whether it is.
+    async revokeGrant(id: string): Promise<boolean> {
+        const { did } = await this.ownGrant(id);
+
+        return this.revokeDID(did);
     }
 
     async changeRegistry(id: string, registry: string): Promise<boolean> {

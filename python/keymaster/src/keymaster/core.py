@@ -16,6 +16,14 @@ import httpx
 
 from .cashu import CashuStateError, CashuWallet, has_cashu_state
 from .errors import KeymasterError
+from .grant import (
+    CORE_GRANT_ACTIONS,
+    JS_WHITESPACE,
+    PERMITTED_GRANT_REGISTRIES,
+    decode_grant_link,
+    is_instant,
+    validate_grant,
+)
 from .net import fetch_public_https, is_private_hostname
 from bolt11 import decode as decode_bolt11
 from cryptography.exceptions import InvalidTag
@@ -2565,6 +2573,204 @@ class Keymaster:
                 await self._save_loaded_wallet(wallet, overwrite=True)
 
         return revocations
+
+    def _anchored_on(self, doc: dict[str, Any], registry: str) -> bool:
+        """Whether a resolved version is anchored on a registry: it names that
+        registry as its chain and has the height and time of a block.
+        ``confirmed`` is not that, since a creation is confirmed from the start.
+        """
+        timestamp = (doc.get("didDocumentMetadata") or {}).get("timestamp")
+        timestamp = timestamp if isinstance(timestamp, dict) else {}
+        upper_bound = timestamp.get("upperBound")
+        upper_bound = upper_bound if isinstance(upper_bound, dict) else {}
+        height = upper_bound.get("height")
+        return (
+            timestamp.get("chain") == registry
+            and isinstance(height, int)
+            and not isinstance(height, bool)
+            and abs(height) <= MAX_SAFE_INTEGER
+            and isinstance(upper_bound.get("timeISO"), str)
+        )
+
+    def _grant_actions(self, offered: list[str], chosen: Any, label: str) -> list[str] | None:
+        """The ``actions`` a grant states for a choice among the actions on
+        offer, in the order they are offered: none when the choice is exactly
+        the core actions, which a grant states by leaving ``actions`` out."""
+        if not isinstance(chosen, list) or not chosen:
+            raise KeymasterError(f"Invalid parameter: {label}: at least one action is needed")
+        if not all(isinstance(action, str) and action in offered for action in chosen):
+            raise KeymasterError(f"Invalid parameter: {label}: every action must be one of {', '.join(offered)}")
+        actions = [action for action in offered if action in chosen]
+        every_core = len(actions) == len(CORE_GRANT_ACTIONS) and all(action in actions for action in CORE_GRANT_ACTIONS)
+        return None if every_core else actions
+
+    def _grant_expiry(self, expires_at: Any, label: str) -> str:
+        if not isinstance(expires_at, str) or not is_instant(expires_at):
+            raise KeymasterError(f"Invalid parameter: {label}: not an instant such as 2027-01-31T00:00:00Z")
+        return expires_at
+
+    async def create_grant(self, link: str, options: dict[str, Any] | None = None) -> str:
+        """Creates the grant a grant link asks for, as an asset of the granting
+        identity, and returns its DID.
+
+        The checks are those a wallet makes before it creates one
+        (docs/plans/memeplex-reference-1436.md, "Grant request flow"): each
+        refusal here is of a grant that would be void or wider than what was
+        asked for.
+
+        The grant has the request's ``client`` and ``nonce``, the scope the
+        request asks for unless ``options["actions"]`` narrows it, and the
+        expiry the request asks for unless ``options["expiresAt"]`` changes it
+        or, as ``None``, removes it. ``options["registry"]`` defaults to the
+        first permitted registry the node supports.
+        """
+        options = options or {}
+        decoded = decode_grant_link(link.strip(JS_WHITESPACE) if isinstance(link, str) else link)
+        if "error" in decoded:
+            validity = f" ({decoded['validity']})" if decoded.get("validity") else ""
+            raise KeymasterError(f"Invalid parameter: link: {decoded['error']}{validity}")
+
+        request = decoded["request"]
+        controller = options.get("controller")
+        offered = list(request.get("actions") or CORE_GRANT_ACTIONS)
+        chosen = options.get("actions")
+        actions = self._grant_actions(offered, offered if chosen is None else chosen, "options.actions")
+        requested = options["expiresAt"] if "expiresAt" in options else request.get("expiresAt")
+        expires_at = None if requested is None else self._grant_expiry(requested, "options.expiresAt")
+
+        supported = await self.list_registries()
+        registry = options.get("registry")
+        permitted = ", ".join(PERMITTED_GRANT_REGISTRIES)
+        if not registry:
+            registry = next((name for name in PERMITTED_GRANT_REGISTRIES if name in supported), None)
+            if not registry:
+                raise KeymasterError(f"Invalid parameter: options.registry: this node supports none of {permitted}")
+        elif registry not in PERMITTED_GRANT_REGISTRIES:
+            raise KeymasterError(f"Invalid parameter: options.registry: a grant may be created on {permitted}")
+        elif registry not in supported:
+            raise KeymasterError(f"Invalid parameter: options.registry: this node does not support {registry}")
+
+        # create_asset puts a local identity's assets on `local` whatever
+        # registry is asked for, and a grant there, like a grant to oneself, is
+        # void.
+        id_info = await self.fetch_id_info(controller)
+        grantor = await self.resolve_did(id_info["did"], {"confirm": True})
+        if (grantor.get("didDocumentRegistration") or {}).get("registry") == "local":
+            raise KeymasterError("Invalid parameter: options.controller: a local identity cannot make a grant")
+        if (grantor.get("didDocument") or {}).get("id") == request["client"]:
+            raise KeymasterError("Invalid parameter: link: the request names the granting identity as the client")
+
+        memeplex_grant: dict[str, Any] = {"v": 1, "client": request["client"]}
+        if actions:
+            memeplex_grant["actions"] = actions
+        memeplex_grant["nonce"] = request["nonce"]
+        if expires_at:
+            memeplex_grant["expiresAt"] = expires_at
+
+        asset_options = {"registry": registry}
+        if controller:
+            asset_options["controller"] = controller
+        if options.get("alias"):
+            asset_options["alias"] = options["alias"]
+        return await self.create_asset({"memeplexGrant": memeplex_grant}, asset_options)
+
+    async def list_grants(self, owner: str | None = None) -> list[dict[str, Any]]:
+        """The grants among the assets of an identity, each as its latest
+        version states it.
+
+        A grant whose deletion a node has accepted is not among them:
+        list_revocations has it until the deletion is anchored. An asset the
+        node cannot resolve is listed as ``unresolved``, since it may be a
+        grant.
+        """
+        grants: list[dict[str, Any]] = []
+        for did in await self.list_assets(owner):
+            try:
+                doc = await self.resolve_did(did)
+            except Exception:
+                grants.append({"did": did, "status": "unresolved"})
+                continue
+
+            data = doc.get("didDocumentData")
+            grant = data.get("memeplexGrant") if isinstance(data, dict) else None
+            metadata = doc.get("didDocumentMetadata") or {}
+            if metadata.get("deactivated") or validate_grant(grant) != "valid":
+                continue
+
+            registry = (doc.get("didDocumentRegistration") or {}).get("registry") or ""
+            try:
+                sequence = int(metadata.get("versionSequence") or 1)
+            except (TypeError, ValueError):
+                sequence = 2
+            grants.append({
+                "did": did,
+                "status": "anchored" if self._anchored_on(doc, registry) else "pending",
+                "grant": grant,
+                "registry": registry,
+                "created": sequence <= 1,
+            })
+        return grants
+
+    async def _own_grant(self, identifier: str) -> tuple[str, dict[str, Any]]:
+        """A live asset of the current ID that holds a valid grant."""
+        owner = await self.fetch_id_info()
+        did = await self.lookup_did(identifier)
+        doc = await self.resolve_did(did)
+        data = doc.get("didDocumentData")
+        grant = data.get("memeplexGrant") if isinstance(data, dict) else None
+        if (
+            (doc.get("didDocumentMetadata") or {}).get("deactivated")
+            or (doc.get("didDocumentRegistration") or {}).get("type") != "asset"
+            or validate_grant(grant) != "valid"
+        ):
+            raise KeymasterError("Invalid parameter: id: not a grant")
+        if not self.did_match((doc.get("didDocument") or {}).get("controller") or "", owner["did"]):
+            raise KeymasterError("Invalid parameter: id: not a grant of the current ID")
+        return did, grant
+
+    async def update_grant(self, identifier: str, changes: dict[str, Any]) -> bool:
+        """Changes the scope of a grant of the current ID in place.
+
+        ``changes`` holds ``actions``, ``expiresAt`` or both; ``None`` for
+        ``actions`` widens the grant to every core kind, and ``None`` for
+        ``expiresAt`` removes the expiry. Every other field of the grant is
+        kept, since a change to any other ends the grant. The actions on offer
+        are the core actions and the extension kinds the grant lists. Nothing
+        is written when the change leaves the grant as it is.
+        """
+        if not isinstance(changes, dict) or ("actions" not in changes and "expiresAt" not in changes):
+            raise KeymasterError("Invalid parameter: changes: actions or expiresAt is needed")
+
+        did, grant = await self._own_grant(identifier)
+        updated = dict(grant)
+
+        if "actions" in changes:
+            offered = [
+                *CORE_GRANT_ACTIONS,
+                *[action for action in grant.get("actions") or [] if action not in CORE_GRANT_ACTIONS],
+            ]
+            actions = None if changes["actions"] is None else self._grant_actions(offered, changes["actions"], "changes.actions")
+            updated.pop("actions", None)
+            if actions:
+                updated["actions"] = actions
+
+        if "expiresAt" in changes:
+            updated.pop("expiresAt", None)
+            if changes["expiresAt"] is not None:
+                updated["expiresAt"] = self._grant_expiry(changes["expiresAt"], "changes.expiresAt")
+
+        if updated == grant:
+            return True
+        return await self.merge_data(did, {"memeplexGrant": updated})
+
+    async def revoke_grant(self, identifier: str) -> bool:
+        """Revokes a grant of the current ID by deleting its asset.
+
+        The client can publish until the deletion is anchored on the grant's
+        registry; list_revocations says whether it is.
+        """
+        did, _ = await self._own_grant(identifier)
+        return await self.revoke_did(did)
 
     async def change_registry(self, identifier: str, registry: str) -> bool:
         if not isinstance(registry, str) or not registry:

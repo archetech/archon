@@ -82,6 +82,8 @@ Source of truth:
 - [x] Service route parity for `POST /assets`
 - [x] Service route parity for `GET /revocations`
 - [x] Service route parity for `PUT /assets/:id`
+- [x] Library support for `createGrant`, `listGrants`, `updateGrant` and `revokeGrant`
+- [x] Service route parity for `POST /grants`, `GET /grants`, `PUT /grants/:id` and `DELETE /grants/:id`
 - [x] `cloneAsset`
 - [x] `transferAsset`
 - [x] Asset registry-change semantics confirmed against TypeScript behavior
