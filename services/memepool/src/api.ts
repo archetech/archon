@@ -399,8 +399,8 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // A grant request is an asset the service creates, so a session is shown
     // one and the same request until it nears the end of its hour or the
     // registries the service can publish on change.
-    const asked = new Expiring<{ link: string; registries: string }>(REQUEST_REUSE, now);
-    const asking = async (session: string, registries: string[]): Promise<string> => {
+    const asked = new Expiring<{ link: Promise<string>; registries: string }>(REQUEST_REUSE, now);
+    const asking = (session: string, registries: string[]): Promise<string> => {
         const listed = registries.join(' ');
         const held = asked.get(session);
 
@@ -408,9 +408,16 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return held.link;
         }
 
-        const { link } = await client.requestGrant({ name, registries });
+        // Kept while it is being made, so that two reads at once share one
+        // request, and dropped if it could not be made.
+        const link = client.requestGrant({ name, registries }).then(made => made.link);
 
         asked.set(session, { link, registries: listed });
+        link.catch(() => {
+            if (asked.get(session)?.link === link) {
+                asked.take(session);
+            }
+        });
 
         return link;
     };

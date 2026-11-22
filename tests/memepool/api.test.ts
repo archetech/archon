@@ -594,6 +594,11 @@ describe('the registries the service can publish on', () => {
         expect((await agent.get('/api/v1/me')).body.link).toBe(first);
         expect((await other.get('/api/v1/me')).body.link).not.toBe(first);
 
+        // Two reads at once share the request being made.
+        const third = await signIn((await keymasterFor('carol')).keymaster);
+        const [one, two] = await Promise.all([third.get('/api/v1/me'), third.get('/api/v1/me')]);
+        expect(one.body.link).toBe(two.body.link);
+
         clock += 49 * 60_000;
         expect((await agent.get('/api/v1/me')).body.link).toBe(first);
         clock += 2 * 60_000;
