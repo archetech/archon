@@ -68,6 +68,17 @@ class CommandError(Exception):
     """
 
 
+def _report_write(ok: Any, done: str = UPDATE_OK, refused: str = UPDATE_FAILED) -> None:
+    """The outcome of a write the node was asked for.
+
+    One it refused is a failure like any other: ``keymaster revoke-did <id> &&
+    next`` must not run ``next`` after a revocation that did not happen.
+    """
+    if not ok:
+        raise CommandError(refused)
+    print(done)
+
+
 class WalletLocationError(Exception):
     """The configured path cannot be opened as it stands.
 
@@ -424,7 +435,7 @@ async def cmd_change_passphrase(km: Keymaster, args: argparse.Namespace) -> None
     if ok and saved.exists():
         write_secret(str(saved), args.new_passphrase)
         print(f"Updated {saved}.", file=sys.stderr)
-    print(UPDATE_OK if ok else "Failed")
+    _report_write(ok, UPDATE_OK, "Failed")
 
 
 async def cmd_check_wallet(km: Keymaster, args: argparse.Namespace) -> None:
@@ -468,7 +479,7 @@ async def cmd_backup_wallet_file(km: Keymaster, args: argparse.Namespace) -> Non
 async def cmd_restore_wallet_file(km: Keymaster, args: argparse.Namespace) -> None:
     wallet = json.loads(Path(args.file).read_text(encoding="utf-8"))
     ok = await km.save_wallet(wallet, overwrite=True)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_show_mnemonic(km: Keymaster, args: argparse.Namespace) -> None:
@@ -506,7 +517,7 @@ async def cmd_resolve_id(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_backup_id(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.backup_id()
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_recover_id(km: Keymaster, args: argparse.Namespace) -> None:
@@ -520,7 +531,7 @@ async def cmd_remove_id(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_rename_id(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.rename_id(args.old_name, args.new_name)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_list_ids(km: Keymaster, args: argparse.Namespace) -> None:
@@ -544,7 +555,7 @@ async def cmd_use_id(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_rotate_keys(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.rotate_keys()
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 # DID -------------------------------------------------------------------------
@@ -576,14 +587,14 @@ async def cmd_resolve_did_version(km: Keymaster, args: argparse.Namespace) -> No
 async def cmd_revoke_did(km: Keymaster, args: argparse.Namespace) -> None:
     try:
         ok = await km.revoke_did(args.did)
-        print(UPDATE_OK if ok else UPDATE_FAILED)
     except Exception:
         raise CommandError(f"cannot revoke {args.did}")
+    _report_write(ok)
 
 
 async def cmd_change_registry(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.change_registry(args.id, args.registry)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 # Encryption ------------------------------------------------------------------
@@ -677,12 +688,12 @@ async def cmd_list_issued(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_update_credential(km: Keymaster, args: argparse.Namespace) -> None:
     vc = json.loads(Path(args.file).read_text(encoding="utf-8"))
     ok = await km.update_credential(args.did, vc)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_revoke_credential(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.revoke_credential(args.did)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_accept_credential(km: Keymaster, args: argparse.Namespace) -> None:
@@ -692,7 +703,7 @@ async def cmd_accept_credential(km: Keymaster, args: argparse.Namespace) -> None
         if args.alias:
             await km.add_alias(args.alias, args.did)
     else:
-        print(UPDATE_FAILED)
+        raise CommandError(UPDATE_FAILED)
 
 
 async def cmd_list_credentials(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1239,24 +1250,24 @@ async def cmd_get_asset_file(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_update_asset_json(km: Keymaster, args: argparse.Namespace) -> None:
     data = json.loads(Path(args.file).read_text(encoding="utf-8"))
     ok = await km.merge_data(args.id, data)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_update_asset_image(km: Keymaster, args: argparse.Namespace) -> None:
     data = Path(args.file).read_bytes()
     ok = await km.update_image(args.id, data, {"filename": Path(args.file).name})
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_update_asset_file(km: Keymaster, args: argparse.Namespace) -> None:
     data = Path(args.file).read_bytes()
     ok = await km.update_file(args.id, data, {"filename": Path(args.file).name, "bytes": len(data)})
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_transfer_asset(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.transfer_asset(args.id, args.controller)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_clone_asset(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1279,7 +1290,7 @@ async def cmd_set_property(km: Keymaster, args: argparse.Namespace) -> None:
         except Exception:
             parsed = args.value
     ok = await km.merge_data(args.id, {args.key: parsed})
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_list_assets(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1332,12 +1343,12 @@ async def cmd_update_grant(km: Keymaster, args: argparse.Namespace) -> None:
     elif args.expires is not None:
         changes["expiresAt"] = args.expires
     ok = await km.update_grant(args.id, changes)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_revoke_grant(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.revoke_grant(args.id)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 # Polls -----------------------------------------------------------------------
@@ -1353,12 +1364,12 @@ async def cmd_create_poll(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_add_poll_voter(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.add_poll_voter(args.poll, args.member)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_remove_poll_voter(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.remove_poll_voter(args.poll, args.member)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_list_poll_voters(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1387,22 +1398,22 @@ async def cmd_view_ballot(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_update_poll(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.update_poll(args.ballot)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_publish_poll(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.publish_poll(args.poll)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_reveal_poll(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.publish_poll(args.poll, {"reveal": True})
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_unpublish_poll(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.unpublish_poll(args.poll)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 # Vaults ----------------------------------------------------------------------
@@ -1424,12 +1435,12 @@ async def cmd_list_vault_items(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_add_vault_member(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.add_vault_member(args.id, args.member)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_remove_vault_member(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.remove_vault_member(args.id, args.member)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_list_vault_members(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1439,12 +1450,12 @@ async def cmd_list_vault_members(km: Keymaster, args: argparse.Namespace) -> Non
 async def cmd_add_vault_item(km: Keymaster, args: argparse.Namespace) -> None:
     data = Path(args.file).read_bytes()
     ok = await km.add_vault_item(args.id, Path(args.file).name, data)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_remove_vault_item(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.remove_vault_item(args.id, args.item)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_get_vault_item(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1466,7 +1477,7 @@ async def cmd_create_dmail(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_update_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     message = json.loads(Path(args.file).read_text(encoding="utf-8"))
     ok = await km.update_dmail(args.did, message)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_send_dmail(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1492,33 +1503,33 @@ async def cmd_list_dmail(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_file_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     tag_list = [t.strip() for t in args.tags.split(",")]
     ok = await km.file_dmail(args.did, tag_list)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_refresh_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.refresh_notices()
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_import_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.import_dmail(args.did)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_remove_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.remove_dmail(args.did)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_add_dmail_attachment(km: Keymaster, args: argparse.Namespace) -> None:
     data = Path(args.file).read_bytes()
     ok = await km.add_dmail_attachment(args.did, Path(args.file).name, data)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_remove_dmail_attachment(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.remove_dmail_attachment(args.did, args.name)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_get_dmail_attachment(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1556,22 +1567,22 @@ def _didcomm_pack_options(args: argparse.Namespace) -> dict[str, Any]:
 async def cmd_publish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     routing_keys = [item.strip() for item in args.routing_keys.split(",")] if args.routing_keys else None
     ok = await km.publish_didcomm(args.endpoint, args.name, routing_keys)
-    print("published" if ok else "failed")
+    _report_write(ok, "published", "failed")
 
 
 async def cmd_publish_assertion_key(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.publish_assertion_key(args.name)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_unpublish_assertion_key(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.unpublish_assertion_key(args.name)
-    print(UPDATE_OK if ok else UPDATE_FAILED)
+    _report_write(ok)
 
 
 async def cmd_unpublish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.unpublish_didcomm(args.name)
-    print("unpublished" if ok else "failed")
+    _report_write(ok, "unpublished", "failed")
 
 
 async def cmd_pack_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1600,7 +1611,11 @@ async def cmd_send_credential_didcomm(km: Keymaster, args: argparse.Namespace) -
 
 async def cmd_accept_credential_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     message = json.loads(Path(args.file).read_text(encoding="utf-8"))
-    _print_json({"ok": await km.accept_credential_didcomm(message)})
+    ok = await km.accept_credential_didcomm(message)
+    _print_json({"ok": ok})
+    # The answer is printed either way, for a caller that reads it.
+    if not ok:
+        raise CommandError("Credential not accepted")
 
 
 async def cmd_receive_didcomm(km: Keymaster, args: argparse.Namespace) -> None:

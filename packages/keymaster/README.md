@@ -298,6 +298,12 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Cashu | `cashu-messages [id]` | List token messages waiting in the DIDComm inbox |
 | Cashu | `cashu-accept [id]` | Redeem the token messages in the DIDComm inbox |
 
+#### Exit status
+
+A command exits with status 0 when it did what it was asked and 1 when it did not. A write the node refuses is a failure: the command prints `Update failed` on standard error, prints no `OK`, and exits 1. So `keymaster revoke-did <id> && next-step` does not run `next-step` after a revocation that did not happen. This holds for every command that reports `OK`, such as `revoke-did`, `rotate-keys`, `change-registry`, the `update-asset-*` commands, `update-grant` and `revoke-grant`, and for `publish-didcomm` and `unpublish-didcomm`, which print `failed`.
+
+Results go to standard output, and errors and notes to standard error.
+
 #### Command Options
 
 Many commands support these options:

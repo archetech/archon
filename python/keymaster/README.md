@@ -38,6 +38,12 @@ keymaster create-id alice
 keymaster list-ids
 ```
 
+## Exit status
+
+A command exits with status 0 when it did what it was asked and 1 when it did
+not, as the TypeScript CLI does. A write the node refuses is a failure: the
+command prints `Update failed` on standard error, prints no `OK`, and exits 1.
+
 ## CLI environment variables
 
 | Variable | Default | Description |
