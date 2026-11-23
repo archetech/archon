@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Api, Me, Publication, Reply, Responses } from './api';
+import type { Api, Me, Person, Publication, Reply, Responses } from './api';
 import Markdown from './Markdown';
 
 // Memepool's pages. A reader signs in with a wallet, grants the service once,
@@ -45,12 +45,43 @@ function Picture({ did }: { did: string }) {
     );
 }
 
-// An identity as the pages name one: its avatar and its DID, shortened.
+// Who is asked what an identity says of itself. One answer serves every place
+// an identity is shown.
+const People = createContext<((did: string) => Promise<Person>) | undefined>(undefined);
+
+function usePerson(did: string): Person {
+    const ask = useContext(People);
+    const [person, setPerson] = useState<{ did: string; found: Person }>({ did, found: {} });
+
+    useEffect(() => {
+        let current = true;
+
+        ask?.(did).then(found => { if (current) setPerson({ did, found }); }, () => undefined);
+
+        return () => { current = false; };
+    }, [ask, did]);
+
+    return person.did === did ? person.found : {};
+}
+
+// An identity as the pages name one: its avatar, the name it gives itself and
+// its address, where it has them, and its DID, shortened. A name is a claim
+// anyone can make, so the DID is always beside it: the DID is who wrote.
 function Identity({ did }: { did: string }) {
+    const { name, address } = usePerson(did);
+
     return (
         <span className="identity">
             <Picture key={did} did={did} />
-            <span className="mono" title={did}>{short(did)}</span>
+            <span className="who">
+                {(name || address) && (
+                    <span className="called">
+                        {name && <strong>{name}</strong>}
+                        {address && <span className="address">{address}</span>}
+                    </span>
+                )}
+                <span className="mono" title={did}>{short(did)}</span>
+            </span>
         </span>
     );
 }
@@ -1094,6 +1125,21 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 }
 
 export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number }) {
+    // Each identity is asked about once, however many of its posts are shown.
+    const people = useMemo(() => {
+        const asked = new Map<string, Promise<Person>>();
+
+        return (did: string) => {
+            let answer = asked.get(did);
+
+            if (!answer) {
+                answer = api.identity(did).catch(() => ({}));
+                asked.set(did, answer);
+            }
+
+            return answer;
+        };
+    }, [api]);
     const [me, setMe] = useState<Me | null | undefined>(undefined);
     const [error, setError] = useState('');
     // Counts sign-outs, so that an answer about who was signed in before one is
@@ -1149,19 +1195,21 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
 
     return (
         <Avatars.Provider value={api.avatar}>
-            {error && <p role="alert" className="error">{error}</p>}
-            <Reader
-                key={session}
-                api={api}
-                me={me}
-                onCheck={loadMe}
-                onSignedOut={() => {
-                    sessions.current += 1;
-                    setSession(sessions.current);
-                    setMe(null);
-                    setError('');
-                }}
-            />
+            <People.Provider value={people}>
+                {error && <p role="alert" className="error">{error}</p>}
+                <Reader
+                    key={session}
+                    api={api}
+                    me={me}
+                    onCheck={loadMe}
+                    onSignedOut={() => {
+                        sessions.current += 1;
+                        setSession(sessions.current);
+                        setMe(null);
+                        setError('');
+                    }}
+                />
+            </People.Provider>
         </Avatars.Provider>
     );
 }

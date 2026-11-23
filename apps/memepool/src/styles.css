@@ -68,6 +68,10 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 }
 
 .identity { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.who { display: inline-flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.called { display: inline-flex; flex-wrap: wrap; gap: 0 0.4rem; overflow-wrap: anywhere; }
+.called strong { color: var(--ink, inherit); }
+.called + .mono { font-size: 0.8em; }
 .avatar {
     position: relative;
     flex: none;

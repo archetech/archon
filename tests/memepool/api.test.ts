@@ -113,12 +113,32 @@ const images = {
         return data && data.length <= limit ? data : null;
     },
 };
+// Whose each address is, as its domain would say, and what was asked.
+let owners: Record<string, string | null | 'unreachable' | 'silent'> = {};
+let lookups: string[] = [];
+const addresses = {
+    owner: async (address: string) => {
+        lookups.push(address);
+        const owner = owners[address] ?? null;
+
+        if (owner === 'unreachable') {
+            throw new Error('the domain cannot be reached');
+        }
+        if (owner === 'silent') {
+            return new Promise<null>(() => undefined);
+        }
+
+        return owner;
+    },
+};
 const objectOf = async (did: string) => ((await gatekeeper.resolveDID(did)).didDocumentData as { memeplex: Record<string, any> }).memeplex;
 
 beforeEach(async () => {
     stored = 0;
     read = 0;
     limits = [];
+    owners = {};
+    lookups = [];
     block = 0;
     clock = Date.UTC(2026, 10, 2);
     gatekeeper = new Gatekeeper({
@@ -131,7 +151,7 @@ beforeEach(async () => {
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
         client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
-        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content, images,
+        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content, images, addresses,
     });
 });
 
@@ -1025,5 +1045,112 @@ describe('an author\'s avatar', () => {
         });
         reader = await signIn(bob);
         expect((await avatarOf(aliceDid)).status).toBe(404);
+    }, 120_000);
+});
+
+// What an identity says of itself in its document: a name, which is its own to
+// choose, and an address, which is a domain's to give.
+describe('an author\'s name and address', () => {
+    let reader: Awaited<ReturnType<typeof signIn>>;
+    const say = async (keymaster: Keymaster, did: string, more: Record<string, unknown>) => {
+        const doc = await keymaster.resolveDID(did);
+
+        await keymaster.updateDID(did, { ...doc, didDocumentData: { ...doc.didDocumentData as object, ...more } });
+    };
+    const identityOf = async (did: string) => (await reader.get(`/api/v1/identities/${encodeURIComponent(did)}`)).body;
+    // What is found out is kept a while.
+    const later = async () => {
+        clock += 11 * 60_000;
+        reader = await signIn(bob);
+    };
+
+    beforeEach(async () => {
+        reader = await signIn(bob);
+    }, 120_000);
+
+    it('gives the name an identity gives itself, and the address its domain says is its own', async () => {
+        await say(alice, aliceDid, { name: 'Alice A.', address: 'Alice@Example.org' });
+        owners['alice@example.org'] = aliceDid;
+
+        const answer = await reader.get(`/api/v1/identities/${encodeURIComponent(aliceDid)}`);
+
+        expect(answer.status).toBe(200);
+        expect(answer.headers['cache-control']).toBe('private, max-age=60');
+        expect(answer.body).toStrictEqual({ did: aliceDid, name: 'Alice A.', address: 'alice@example.org' });
+        expect(lookups).toStrictEqual(['alice@example.org']);
+
+        // Nobody who has not signed in has the service ask a domain.
+        expect((await request(app).get(`/api/v1/identities/${encodeURIComponent(aliceDid)}`)).status).toBe(401);
+    }, 120_000);
+
+    it('gives no address that its domain does not say is this identity\'s', async () => {
+        const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;
+
+        await say(alice, aliceDid, { name: 'Alice', address: 'bob@example.org' });
+
+        // The domain says it is another's.
+        owners['bob@example.org'] = bobDid;
+        expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid, name: 'Alice' });
+
+        // It says it is nobody's, cannot be reached, and does not answer.
+        for (const owner of [null, 'unreachable', 'silent'] as const) {
+            await later();
+            owners['bob@example.org'] = owner;
+            expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid, name: 'Alice' });
+        }
+        expect(lookups).toHaveLength(4);
+    }, 120_000);
+
+    it('asks no domain about what is not an address', async () => {
+        for (const address of ['alice', 'alice@', '@example.org', 'a@b@c', 'alice @example.org', `${'a'.repeat(250)}@example.org`, 7, { name: 'alice' }]) {
+            await say(alice, aliceDid, { address });
+            await later();
+            expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid });
+        }
+        expect(lookups).toStrictEqual([]);
+    }, 120_000);
+
+    it('passes a name on shortened, and with nothing in it that is not printed', async () => {
+        await say(alice, aliceDid, { name: `  Alice\u202E\n\t the\u0000  First ${'x'.repeat(100)}` });
+        const { name } = await identityOf(aliceDid);
+
+        expect(name.startsWith('Alice the First xxx')).toBe(true);
+        expect(name).toHaveLength(64);
+
+        for (const empty of ['   ', '\u200B\u202E', 7, ['Alice'], null]) {
+            await say(alice, aliceDid, { name: empty });
+            await later();
+            expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid });
+        }
+    }, 120_000);
+
+    it('asks a domain once in a while, however often it is asked itself', async () => {
+        await say(alice, aliceDid, { address: 'alice@example.org' });
+        owners['alice@example.org'] = aliceDid;
+
+        await Promise.all([identityOf(aliceDid), identityOf(aliceDid), identityOf(aliceDid)]);
+        expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid, address: 'alice@example.org' });
+        expect(lookups).toHaveLength(1);
+
+        // The domain may give the name to another, and then it is not this identity's.
+        owners['alice@example.org'] = null;
+        await later();
+        expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid });
+        expect(lookups).toHaveLength(2);
+    }, 120_000);
+
+    it('gives nothing for an identity that does not exist or is deleted, and confirms no address when it has nobody to ask', async () => {
+        expect(await identityOf('did:cid:bagaaieranosuchidentityaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).toStrictEqual({ did: 'did:cid:bagaaieranosuchidentityaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' });
+        expect((await reader.get('/api/v1/identities/alice')).status).toBe(404);
+
+        await say(alice, aliceDid, { name: 'Alice', address: 'alice@example.org' });
+        owners['alice@example.org'] = aliceDid;
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,
+            sessionLifetime: 60_000, challengeLifetime: 60_000,
+        });
+        reader = await signIn(bob);
+        expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid, name: 'Alice' });
+        expect(lookups).toStrictEqual([]);
     }, 120_000);
 });

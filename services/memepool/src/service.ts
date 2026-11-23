@@ -156,6 +156,9 @@ export async function startMemepool(
         // The node's IPFS pins what is added to it.
         content: { add: text => gatekeeper.addText(text), get: cid => gatekeeper.getText(cid) },
         images: { get: (cid, limit) => readData(settings.gatekeeperURL, cid, limit) },
+        // Keymaster asks the address's domain, by a request that reaches no
+        // address inside this network.
+        addresses: { owner: async address => (await keymaster.checkAddress(address)).did },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

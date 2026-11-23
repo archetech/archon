@@ -69,6 +69,14 @@ export interface Api {
     content(did: string, versionId?: string): Promise<string | undefined>;
     // The address of an identity's avatar, which answers 404 when it has none.
     avatar(did: string): string;
+    // What an identity says of itself: the name it gives itself, which is a
+    // claim, and the address its domain confirms is its own.
+    identity(did: string): Promise<Person>;
+}
+
+export interface Person {
+    name?: string;
+    address?: string;
 }
 
 export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
@@ -158,5 +166,16 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             return response.text();
         },
         avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,
+        async identity(did) {
+            const response = await call(bases.memepool, `/identities/${encodeURIComponent(did)}`);
+
+            if (!response.ok) {
+                return {};
+            }
+
+            const { name, address } = await response.json() as Person;
+
+            return { name: typeof name === 'string' ? name : undefined, address: typeof address === 'string' ? address : undefined };
+        },
     };
 }
