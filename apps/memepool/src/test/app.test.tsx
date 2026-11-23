@@ -890,6 +890,45 @@ describe('previewing what is written', () => {
         expect(preview.textContent).toContain('<b>not bold</b>');
     });
 
+    it('previews a post as it is published, which is without the white space around it', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // Four spaces before a line make a block of code of it.
+        await user.type(await screen.findByLabelText('Post'), '    **bold**  ');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+
+        const preview = screen.getByRole('tabpanel', { name: 'Post preview' });
+        expect(within(preview).getByText('bold').tagName).toBe('STRONG');
+        expect(preview.querySelector('pre')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: '**bold**' }]));
+    });
+
+    it('moves between the two views with the arrow keys, with one of them in the order the Tab key follows', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const write = await screen.findByRole('tab', { name: 'Write' });
+        const preview = screen.getByRole('tab', { name: 'Preview' });
+
+        expect([write.tabIndex, preview.tabIndex]).toStrictEqual([0, -1]);
+        expect(write.getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel', { name: 'Post: write' }).id);
+
+        write.focus();
+        await user.keyboard('{ArrowRight}');
+        expect(document.activeElement).toBe(preview);
+        expect(preview.getAttribute('aria-selected')).toBe('true');
+        expect([write.tabIndex, preview.tabIndex]).toStrictEqual([-1, 0]);
+        expect(screen.getByRole('tabpanel', { name: 'Post preview' }).id).toBe(preview.getAttribute('aria-controls'));
+
+        await user.keyboard('{ArrowLeft}');
+        expect(document.activeElement).toBe(write);
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
     it('shows an article with its title and summary above its body', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
