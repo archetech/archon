@@ -4,6 +4,7 @@ import type { Server } from 'http';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { WalletNotFoundError } from '@didcid/common/errors';
+import { fetchPublicHttps } from '@didcid/common/net';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
@@ -29,6 +30,71 @@ export interface MemepoolSettings {
 // Starts the service: reaches the Gatekeeper, opens the wallet that holds the
 // service's key (making the wallet and the identity on a first start), and
 // listens. Resolves once it is listening.
+// The most the service reads of a domain's answer about a name, in bytes. The
+// answer is a DID and little else.
+const NAME_ANSWER_LIMIT = 16_384;
+
+// The DID an address's domain says the address belongs to, or nothing when it
+// says none. A domain gives out its names at `/.well-known/names/<name>`, which
+// is where Keymaster asks as well.
+//
+// The domain is one a stranger chose. The request reaches no address inside
+// this network, ends when `signal` says to, and its answer is read no further
+// than the limit, so a domain that never finishes answering is not waited on
+// or held in memory.
+export async function addressOwner(address: string, signal: AbortSignal, fetcher: typeof fetchPublicHttps = fetchPublicHttps): Promise<string | null> {
+    const [name, domain, ...more] = address.split('@');
+
+    if (!name || !domain || more.length > 0) {
+        return null;
+    }
+
+    try {
+        const response = await fetcher(`https://${domain}/.well-known/names/${encodeURIComponent(name)}`, { signal });
+
+        if (!response.ok || !response.body) {
+            await response.body?.cancel();
+            return null;
+        }
+
+        const parts: Uint8Array[] = [];
+        let read = 0;
+        const reader = response.body.getReader();
+        const stop = () => { void reader.cancel().catch(() => undefined); };
+
+        signal.addEventListener('abort', stop, { once: true });
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+
+                if (done) {
+                    break;
+                }
+                read += value.length;
+                if (read > NAME_ANSWER_LIMIT || signal.aborted) {
+                    await reader.cancel();
+                    return null;
+                }
+                parts.push(value);
+            }
+        }
+        finally {
+            signal.removeEventListener('abort', stop);
+        }
+
+        if (signal.aborted) {
+            return null;
+        }
+
+        const answer = JSON.parse(Buffer.concat(parts).toString('utf8')) as { did?: unknown } | null;
+
+        return typeof answer?.did === 'string' ? answer.did : null;
+    }
+    catch {
+        return null;
+    }
+}
+
 // How long the node is given to find the bytes of a CID, in milliseconds. One
 // it does not have is looked for on the network, which can take any time.
 const DATA_TIMEOUT = 10_000;
@@ -156,9 +222,7 @@ export async function startMemepool(
         // The node's IPFS pins what is added to it.
         content: { add: text => gatekeeper.addText(text), get: cid => gatekeeper.getText(cid) },
         images: { get: (cid, limit) => readData(settings.gatekeeperURL, cid, limit) },
-        // Keymaster asks the address's domain, by a request that reaches no
-        // address inside this network.
-        addresses: { owner: async address => (await keymaster.checkAddress(address)).did },
+        addresses: { owner: (address, signal) => addressOwner(address, signal) },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

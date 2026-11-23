@@ -116,9 +116,11 @@ const images = {
 // Whose each address is, as its domain would say, and what was asked.
 let owners: Record<string, string | null | 'unreachable' | 'silent'> = {};
 let lookups: string[] = [];
+let signals: AbortSignal[] = [];
 const addresses = {
-    owner: async (address: string) => {
+    owner: async (address: string, signal: AbortSignal) => {
         lookups.push(address);
+        signals.push(signal);
         const owner = owners[address] ?? null;
 
         if (owner === 'unreachable') {
@@ -139,6 +141,7 @@ beforeEach(async () => {
     limits = [];
     owners = {};
     lookups = [];
+    signals = [];
     block = 0;
     clock = Date.UTC(2026, 10, 2);
     gatekeeper = new Gatekeeper({
@@ -1099,10 +1102,20 @@ describe('an author\'s name and address', () => {
             expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid, name: 'Alice' });
         }
         expect(lookups).toHaveLength(4);
+        // Every asking is ended, the one that had no answer among them.
+        expect(signals.map(each => each.aborted)).toStrictEqual([true, true, true, true]);
     }, 120_000);
 
     it('asks no domain about what is not an address', async () => {
-        for (const address of ['alice', 'alice@', '@example.org', 'a@b@c', 'alice @example.org', `${'a'.repeat(250)}@example.org`, 7, { name: 'alice' }]) {
+        const notOne = [
+            'alice', 'alice@', '@example.org', 'a@b@c.org', 'alice @example.org', 'alice@example', `${'a'.repeat(250)}@example.org`, 7, { name: 'alice' },
+            // What would be asked of somewhere other than the domain read.
+            'alice@example.org/names', 'alice@example.org:8443', 'alice@user:pass@example.org', 'alice@example.org?x=1', 'alice@[::1]', 'a/../b@example.org',
+            // What reads as another address than it is: text turned about, and letters that look like others.
+            '\u202Emoc.knab@evil.example', 'alice@exam\u200Bple.org', 'alice@ex\u0430mple.org', '\u0430lice@example.org',
+        ];
+
+        for (const address of notOne) {
             await say(alice, aliceDid, { address });
             await later();
             expect(await identityOf(aliceDid)).toStrictEqual({ did: aliceDid });

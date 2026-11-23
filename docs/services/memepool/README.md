@@ -69,9 +69,14 @@ author is beside the DID.
   `check-address` does) and passes it on when the answer is this identity's DID.
   One the domain gives to another, to nobody, or does not answer for within five
   seconds is left out.
+- **An address is a name at a host name**, in lower-case letters, digits and the
+  marks `. _ + -`. One with anything else in it is not asked about or shown: a
+  character that turns text about, or a letter that looks like another, makes an
+  address at one domain read as an address at another.
 - **What is found out is kept ten minutes**, so a domain is asked once in a while
   however many posts an author has. The request is one that reaches no address
-  inside the service's own network.
+  inside the service's own network, is ended after five seconds, and has no more
+  than 16 KiB of its answer read.
 - **It is for a user who has signed in**, since it has the service ask a domain a
   stranger chose.
 

@@ -39,9 +39,10 @@ export interface ImageStore {
 
 // How the service learns whose an address is: it asks the address's domain,
 // which is what gives out its names. `owner` gives the DID the domain says the
-// address belongs to, or nothing when it says none or cannot be asked.
+// address belongs to, or nothing when it says none or cannot be asked. The
+// asking ends when `signal` says to: the service waits only so long.
 export interface AddressBook {
-    owner(address: string): Promise<string | null>;
+    owner(address: string, signal: AbortSignal): Promise<string | null>;
 }
 
 export interface MemepoolOptions {
@@ -111,6 +112,12 @@ const ADDRESS_LIMIT = 254;
 // an address's domain is given to answer, in milliseconds.
 const IDENTITY_KEPT = 10 * 60_000;
 const ADDRESS_TIMEOUT = 5_000;
+// An address the service asks about and shows: a name at a host name, in the
+// letters, digits and marks both are written in. One with anything else in it
+// is not asked about, since what is confirmed has to be what is read: a
+// character that changes the direction of text makes an address at one domain
+// read as an address at another.
+const ADDRESS = /^[a-z0-9._+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
 // The largest request that publishes or changes an object. A body arrives as a
 // JSON string, in which one byte can be written as six (`\u000a`), beside the
 // object's other fields.
@@ -742,14 +749,17 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
         const claimed = typeof data.address === 'string' ? data.address.trim().toLowerCase() : '';
 
-        if (addresses && claimed.length <= ADDRESS_LIMIT && /^[^@\s]+@[^@\s]+$/.test(claimed)) {
+        if (addresses && claimed.length <= ADDRESS_LIMIT && ADDRESS.test(claimed)) {
+            // The asking is ended at the deadline, and not only left behind.
+            const asking = new AbortController();
             let giveUp: ReturnType<typeof setTimeout> | undefined;
             const owner = await Promise.race([
-                addresses.owner(claimed).catch(() => null),
+                addresses.owner(claimed, asking.signal).catch(() => null),
                 new Promise<null>(resolve => { giveUp = setTimeout(() => resolve(null), ADDRESS_TIMEOUT); }),
             ]);
 
             clearTimeout(giveUp);
+            asking.abort();
             if (owner === did) {
                 found.address = claimed;
             }
