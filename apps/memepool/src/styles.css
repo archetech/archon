@@ -78,7 +78,10 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
     display: inline-block;
 }
 .avatar svg { width: 100%; height: 100%; fill: rgb(255 255 255 / 0.85); display: block; }
-.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--line); }
+/* The figure shows until the image has loaded. Once it has, the image covers
+   the figure whole, where it is transparent too. */
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.avatar img.loaded { opacity: 1; background: var(--line); }
 
 .post .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; }
 .post .summary { font-style: italic; }

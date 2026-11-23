@@ -42,7 +42,9 @@ export async function readData(gatekeeperURL: string, cid: string, limit: number
     }
 
     try {
-        const response = await fetcher(`${gatekeeperURL}/api/v1/ipfs/data/${cid}`, { signal: AbortSignal.timeout(DATA_TIMEOUT) });
+        // The node's API is at its origin, whatever path the setting ends with,
+        // as the client that connects to it takes it.
+        const response = await fetcher(`${new URL(gatekeeperURL).origin}/api/v1/ipfs/data/${cid}`, { signal: AbortSignal.timeout(DATA_TIMEOUT) });
 
         if (!response.ok || !response.body || Number(response.headers.get('content-length') ?? 0) > limit) {
             await response.body?.cancel();

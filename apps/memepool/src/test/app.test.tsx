@@ -883,6 +883,9 @@ describe('an author\'s avatar', () => {
         // The figure is beneath a picture too, and shows until one has loaded.
         expect(of('From Bob.').querySelector('svg')).not.toBeNull();
         expect(of('From Bob.').querySelector('img')).not.toBeNull();
+        expect(of('From Bob.').querySelector('img')!.classList.contains('loaded')).toBe(false);
+        fireEvent.load(of('From Bob.').querySelector('img')!);
+        expect(of('From Bob.').querySelector('img')!.classList.contains('loaded')).toBe(true);
 
         expect(of('From Alice.').style.background).toBe(of('Alice once more.').style.background);
         expect(of('From Alice.').style.background).not.toBe(of('From Bob.').style.background);

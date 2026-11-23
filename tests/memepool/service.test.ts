@@ -140,6 +140,8 @@ describe('reading bytes a stranger named from the node', () => {
         const cid = await (await connected()).addData(data);
 
         expect(Buffer.compare((await readData(settings.gatekeeperURL, cid, 100))!, data)).toBe(0);
+        // The node's address may be given with a path, as it may be to connect.
+        expect(Buffer.compare((await readData(`${settings.gatekeeperURL}/`, cid, 100))!, data)).toBe(0);
     });
 
     it('gives nothing for more than the limit, for a CID the node cannot have, and for what is no CID', async () => {

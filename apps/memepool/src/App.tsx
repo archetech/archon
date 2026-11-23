@@ -23,6 +23,7 @@ const hueOf = (did: string) => [...did].reduce((sum, letter) => (sum * 31 + lett
 function Picture({ did }: { did: string }) {
     const address = useContext(Avatars);
     const [missing, setMissing] = useState(false);
+    const [loaded, setLoaded] = useState(false);
 
     return (
         <span className="avatar" aria-hidden="true" style={{ background: `hsl(${hueOf(did)} 35% 55%)` }}>
@@ -30,7 +31,16 @@ function Picture({ did }: { did: string }) {
                 <circle cx="12" cy="9" r="4" />
                 <path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8z" />
             </svg>
-            {address && !missing && <img src={address(did)} alt="" loading="lazy" onError={() => setMissing(true)} />}
+            {address && !missing && (
+                <img
+                    src={address(did)}
+                    alt=""
+                    loading="lazy"
+                    className={loaded ? 'loaded' : undefined}
+                    onLoad={() => setLoaded(true)}
+                    onError={() => setMissing(true)}
+                />
+            )}
         </span>
     );
 }
