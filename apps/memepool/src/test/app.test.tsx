@@ -873,8 +873,25 @@ describe('an article', () => {
             { kind: 'post', title: 'On DIDs', summary: 'A summary.', body: 'Every post is one.' },
         ]));
         // Waiting to be anchored, under its title, and the short form is back.
-        expect(await screen.findByText('On DIDs')).toBeTruthy();
+        expect((await screen.findByRole('heading', { name: 'On DIDs' })).closest('.waiting')).not.toBeNull();
         expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('shows a waiting article\'s title as it was written, and a waiting post\'s text as Markdown', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'A **bold** post.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        expect((await screen.findByText('bold')).tagName).toBe('STRONG');
+
+        await user.click(screen.getByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), '**Important**');
+        await user.type(screen.getByLabelText('Article'), 'The body.');
+        await user.click(screen.getByRole('button', { name: 'Publish article' }));
+
+        expect(await screen.findByRole('heading', { name: '**Important**' })).toBeTruthy();
     });
 
     it('keeps what was written when the service refuses it, and leaves when cancelled', async () => {
