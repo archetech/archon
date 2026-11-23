@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Publication, Reply, Responses } from './api';
+import Markdown from './Markdown';
 
 // Memepool's pages. A reader signs in with a wallet, grants the service once,
 // and then reads the authors they follow and publishes posts and replies.
@@ -251,7 +252,7 @@ function Article({ api, did, version }: { api: Api; did: string; version?: strin
         return <p className="muted">The full text is kept apart from this entry, and this service does not hold it.</p>;
     }
 
-    return <div className="text article">{body.text}</div>;
+    return <Markdown text={body.text} className="text article" />;
 }
 
 // `full` shows the body of an article, where a list shows its summary alone.
@@ -261,7 +262,8 @@ function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; 
 
     return (
         <>
-            {words && <p className={article ? 'text summary' : 'text'}>{words}</p>}
+            {/* A post's text is Markdown. An article's summary is a line about it, shown as it is. */}
+            {words && (article ? <p className="text summary">{words}</p> : <Markdown text={words} />)}
             {article && (full ? <Article api={full.api} did={full.did} version={full.version} /> : <p className="muted">Open it to read the full text.</p>)}
             {!words && !article && object.target && (
                 <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
@@ -744,7 +746,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             ))}
             {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
                 <article key={each.did} className="post waiting">
-                    <p className="text">{each.text}</p>
+                    <Markdown text={each.text} />
                     <footer className="muted">Waiting to be anchored</footer>
                 </article>
             ))}
@@ -905,7 +907,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         <h2>Timeline <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
                         {waiting.filter(each => !each.target).map(each => (
                             <article key={each.did} className="post waiting">
-                                <p className="text">{each.text}</p>
+                                <Markdown text={each.text} />
                                 <footer className="muted">Waiting to be anchored</footer>
                             </article>
                         ))}

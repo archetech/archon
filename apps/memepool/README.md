@@ -23,8 +23,15 @@ publishes for the user under their grant. Everything they read comes from the
    anchors it and the indexer has it: it is not a publication before then.
    **An article** is a post with a title, a summary and a body. The body is sent to
    the service, which stores it; a timeline shows the title and summary, and the
-   body is read when the article is opened. It is shown as it was written: the page
-   does not render Markdown.
+   body is read when the article is opened.
+
+Text is shown as the protocol says a client shows it: a post, a reply and an
+article's body are GitHub Flavored Markdown. It is written by strangers, so HTML in
+it is shown as text and never made into elements, a link is followed only to an
+`https:` address, and no image is loaded: one at an `https:` address is a link the
+reader may follow, since fetching it would tell its host who is reading. An embed,
+which is an image whose address is a version-pinned `did:` URL, is shown by its
+description for now, and math is not rendered yet.
 5. **Thread.** A post with the replies under it, how many have boosted it, how it is
    rated, and the tags and reactions on it.
 6. **Respond.** A boost, a thumb up or down, a like, a tag, each offered only when

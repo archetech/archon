@@ -69,6 +69,25 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 
 .post .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; }
 .post .summary { font-style: italic; }
+
+/* Markdown is laid out by its own elements, and not by the line breaks in it. */
+.post .markdown { white-space: normal; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown blockquote, .markdown pre, .markdown table { margin: 0.5rem 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: 0.9rem 0 0.4rem; line-height: 1.25; }
+.markdown h1 { font-size: 1.35rem; }
+.markdown h2 { font-size: 1.2rem; }
+.markdown h3, .markdown h4 { font-size: 1.05rem; }
+.markdown ul, .markdown ol { padding-left: 1.4rem; }
+.markdown li > p { margin: 0.2rem 0; }
+.markdown blockquote { border-left: 3px solid var(--line); padding-left: 0.75rem; color: var(--soft); }
+.markdown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.markdown pre { overflow-x: auto; padding: 0.6rem; border: 1px solid var(--line); border-radius: 6px; }
+.markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 0.25rem 0.5rem; text-align: left; }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 0.9rem 0; }
+.markdown input[type="checkbox"] { display: inline; width: auto; margin: 0 0.35rem 0 0; }
 .post .article { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .post.waiting { border-style: dashed; }
 
