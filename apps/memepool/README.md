@@ -16,7 +16,9 @@ publishes for the user under their grant. Everything they read comes from the
    cannot send its answer back gives the reader a response to paste.
 2. **Grant.** With no grant, the page shows the grant link for the wallet to approve.
    With a grant made and not yet anchored on its chain, it says so.
-3. **Timeline.** The reader's own posts and those of the authors they follow.
+3. **Timeline.** The reader's own posts and those of the authors they follow. Each post
+   has a button that copies its DID, which is its address: what a wallet or another
+   node resolves it by.
 4. **Post and reply.** What the reader publishes is shown as waiting until its chain
    anchors it and the indexer has it: it is not a publication before then.
    **An article** is a post with a title, a summary and a body. The body is sent to

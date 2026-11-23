@@ -155,7 +155,9 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: strin
 // A button that puts a link on the clipboard, and says whether it did. Where a
 // page may not write to the clipboard, the link beside it is selected for the
 // reader to copy by hand.
-function Copy({ text, label }: { text: string; label: string }) {
+// `unable` is what is said when the browser will not copy. Where the text is
+// not on the page to be selected, it says the text.
+function Copy({ text, label, unable = 'Could not copy. Select the link and copy it.' }: { text: string; label: string; unable?: string }) {
     const [said, setSaid] = useState('');
 
     const copy = async () => {
@@ -164,7 +166,7 @@ function Copy({ text, label }: { text: string; label: string }) {
             setSaid('Copied');
         }
         catch {
-            setSaid('Could not copy. Select the link and copy it.');
+            setSaid(unable);
         }
     };
 
@@ -286,6 +288,8 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
             <footer>
                 {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
+                {/* A post's DID is its address: what another wallet or node resolves it by. */}
+                {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
             </footer>
         </article>
     );

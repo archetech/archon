@@ -180,6 +180,39 @@ describe('the grant', () => {
         await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Could not copy/));
     });
 
+    it('copies a post\'s DID, and says the DID when it could not', async () => {
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'First.'), post('did:cid:2', BOB, 'Second.')] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        // Each post has its own, the reader's and another author's alike.
+        const copies = await screen.findAllByRole('button', { name: 'Copy DID' });
+        expect(copies).toHaveLength(2);
+        await user.click(copies[1]);
+        expect(write).toHaveBeenCalledWith('did:cid:2');
+        expect((await screen.findByRole('status')).textContent).toMatch(/Copied/);
+
+        write.mockRejectedValue(new Error('not allowed'));
+        await user.click(copies[0]);
+        await waitFor(() => expect(screen.getAllByRole('status').some(said => /Could not copy\. The DID is did:cid:1/.test(said.textContent ?? ''))).toBe(true));
+        localStorage.clear();
+    });
+
+    it('copies the DID of a post that is open, and offers none for one that was withdrawn', async () => {
+        const withdrawn = { ...post('did:cid:2', ALICE, 'Gone.'), state: 'withdrawn' as const };
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'First.'), withdrawn] });
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        expect(await screen.findAllByRole('button', { name: 'Copy DID' })).toHaveLength(1);
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Copy DID' }));
+        expect(write).toHaveBeenCalledWith('did:cid:1');
+    });
+
     it('says a grant is waiting to be anchored, and checks again when asked', async () => {
         const { api, state } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' } });
         render(<App api={api} />);
