@@ -945,6 +945,8 @@ describe('previewing what is written', () => {
         expect(within(preview).getByText('A summary.')).toBeTruthy();
         expect(within(preview).getByRole('heading', { name: 'A section' })).toBeTruthy();
         expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
+        // The body is set apart from what is above it, as an opened article's is.
+        expect(preview.querySelector('.markdown')?.classList.contains('article')).toBe(true);
         // The title and summary are still there to change.
         expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('On DIDs');
     });

@@ -311,7 +311,7 @@ function Heading({ title, summary }: { title: string; summary: string }) {
 // A text the reader writes, which is Markdown, with a view of how it will be
 // shown. The view is made by what shows a published entry, so it is what
 // readers will see. `before` is what an entry shows above its text: an
-// article's title and summary. `published` is the text as it will be published,
+// article's title and summary, under which its body is set apart. `published` is the text as it will be published,
 // where that is not the text as it is typed: a post is published trimmed, and
 // white space before a line changes what Markdown makes of it.
 //
@@ -371,7 +371,9 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
             ) : (
                 <div role="tabpanel" id={`${id}-preview`} aria-label={`${label} preview`} className="post preview">
                     {before}
-                    {published.trim() ? <Markdown text={published} /> : <p className="muted">Nothing to preview.</p>}
+                    {published.trim()
+                        ? <Markdown text={published} className={before ? 'text article' : 'text'} />
+                        : <p className="muted">Nothing to preview.</p>}
                 </div>
             )}
         </div>
