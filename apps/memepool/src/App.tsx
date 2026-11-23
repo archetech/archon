@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Publication, Reply, Responses } from './api';
 import Markdown from './Markdown';
@@ -297,6 +298,51 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
     );
 }
 
+// What an article shows above its body, as it was written.
+function Heading({ title, summary }: { title: string; summary: string }) {
+    return (
+        <>
+            {title.trim() && <h3>{title.trim()}</h3>}
+            {summary.trim() && <p className="text summary">{summary.trim()}</p>}
+        </>
+    );
+}
+
+// A text the reader writes, which is Markdown, with a view of how it will be
+// shown. The view is made by what shows a published entry, so it is what
+// readers will see. `before` is what an entry shows above its text: an
+// article's title and summary.
+function Draft({ label, value, onChange, disabled, rows, before }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    rows: number;
+    before?: ReactNode;
+}) {
+    const [showing, setShowing] = useState<'write' | 'preview'>('write');
+
+    return (
+        <div className="draft">
+            <div role="tablist" aria-label={`${label}: write or preview`}>
+                <button role="tab" className="quiet" aria-selected={showing === 'write'} onClick={() => setShowing('write')}>Write</button>
+                <button role="tab" className="quiet" aria-selected={showing === 'preview'} onClick={() => setShowing('preview')}>Preview</button>
+            </div>
+            {showing === 'write' ? (
+                <label>
+                    {label}
+                    <textarea value={value} disabled={disabled} onChange={event => onChange(event.target.value)} rows={rows} />
+                </label>
+            ) : (
+                <div role="tabpanel" aria-label={`${label} preview`} className="post preview">
+                    {before}
+                    {value.trim() ? <Markdown text={value} /> : <p className="muted">Nothing to preview.</p>}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function Composer({ label, onPublish }: { label: string; onPublish: (text: string) => Promise<void> }) {
     const [text, setText] = useState('');
     const [busy, setBusy] = useState(false);
@@ -319,10 +365,7 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 
     return (
         <div className="composer">
-            <label>
-                {label}
-                <textarea value={text} disabled={busy} onChange={event => setText(event.target.value)} rows={3} />
-            </label>
+            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} />
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !text.trim()} onClick={publish}>Publish</button>
         </div>
@@ -363,10 +406,14 @@ function ArticleComposer({ onPublish, onCancel }: {
                 Summary
                 <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
             </label>
-            <label>
-                Article
-                <textarea value={body} disabled={busy} onChange={event => setBody(event.target.value)} rows={14} />
-            </label>
+            <Draft
+                label="Article"
+                value={body}
+                onChange={setBody}
+                disabled={busy}
+                rows={14}
+                before={<Heading title={title} summary={summary} />}
+            />
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
             <button className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
@@ -650,10 +697,14 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                     Summary
                     <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
                 </label>
-                <label>
-                    Article
-                    <textarea value={body} disabled={busy || held === undefined} onChange={event => setBody(event.target.value)} rows={14} />
-                </label>
+                <Draft
+                    label="Article"
+                    value={body}
+                    onChange={setBody}
+                    disabled={busy || held === undefined}
+                    rows={14}
+                    before={<Heading title={title} summary={summary} />}
+                />
                 {error && <p role="alert" className="error">{error}</p>}
                 <button disabled={busy || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
                 <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
@@ -663,10 +714,7 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
     return (
         <div className="composer">
-            <label>
-                Edit
-                <textarea value={text} disabled={busy} onChange={event => setText(event.target.value)} rows={3} />
-            </label>
+            <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} />
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
             <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
