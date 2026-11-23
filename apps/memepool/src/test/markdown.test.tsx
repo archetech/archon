@@ -80,6 +80,14 @@ describe('what a stranger cannot do with text', () => {
         expect(screen.getByText('this post').getAttribute('title')).toBe('did:cid:bagaaieraexample');
     });
 
+    it('makes one link of an image that is the words of a link, to where the author pointed', () => {
+        const page = shown('[![a chart](https://example.org/chart.png)](https://example.org/article)');
+
+        expect(page.querySelectorAll('a')).toHaveLength(1);
+        expect(screen.getByRole('link', { name: 'a chart' }).getAttribute('href')).toBe('https://example.org/article');
+        expect(page.querySelector('img')).toBeNull();
+    });
+
     it('loads no image, from anywhere', () => {
         const page = shown('![a chart](https://tracker.example/chart.png) ![a photo](did:cid:bagaaieraphoto?versionId=bafyreiaaaa) ![](data:image/png;base64,AAAA) ![local](/x.png)');
 

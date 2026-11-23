@@ -82,7 +82,8 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 .markdown ul, .markdown ol { padding-left: 1.4rem; }
 .markdown li > p { margin: 0.2rem 0; }
 .markdown blockquote { border-left: 3px solid var(--line); padding-left: 0.75rem; color: var(--soft); }
-.markdown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.markdown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; white-space: pre-wrap; }
+.markdown pre code { white-space: pre; }
 .markdown pre { overflow-x: auto; padding: 0.6rem; border: 1px solid var(--line); border-radius: 6px; }
 .markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 0.25rem 0.5rem; text-align: left; }

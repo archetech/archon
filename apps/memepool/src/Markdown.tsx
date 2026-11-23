@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,6 +26,25 @@ export function safeUrl(url: string): string {
     return named === 'https' || named === 'did' ? url.trim() : '';
 }
 
+// Whether what is being rendered is the words of a link. An image there is the
+// link's description, and is not made a link of its own inside it.
+const InLink = createContext(false);
+
+function Image({ src, alt }: { src?: unknown; alt?: string }) {
+    const linked = useContext(InLink);
+    const address = typeof src === 'string' ? src : '';
+    const words = alt || 'image';
+
+    if (linked) {
+        return <>{words}</>;
+    }
+    if (scheme(address) === 'https') {
+        return <a href={address} target="_blank" rel="noreferrer noopener">{words}</a>;
+    }
+
+    return <span className="muted" title={address || undefined}>{words}</span>;
+}
+
 const components: Components = {
     a({ href, children }) {
         // An address that is not followed leaves the words it was on.
@@ -36,18 +56,13 @@ const components: Components = {
             return <span className="mono" title={href}>{children}</span>;
         }
 
-        return <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>;
+        return (
+            <a href={href} target="_blank" rel="noreferrer noopener">
+                <InLink.Provider value={true}>{children}</InLink.Provider>
+            </a>
+        );
     },
-    img({ src, alt }) {
-        const address = typeof src === 'string' ? src : '';
-        const words = alt || 'image';
-
-        if (scheme(address) === 'https') {
-            return <a href={address} target="_blank" rel="noreferrer noopener">{words}</a>;
-        }
-
-        return <span className="muted" title={address || undefined}>{words}</span>;
-    },
+    img: ({ src, alt }) => <Image src={src} alt={alt} />,
 };
 
 export default function Markdown({ text, className = 'text' }: { text: string; className?: string }) {

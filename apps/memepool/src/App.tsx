@@ -378,7 +378,10 @@ function ArticleComposer({ onPublish, onCancel }: {
 // not a publication until then, and the indexer does not show it.
 interface Waiting {
     did: string;
-    text: string;
+    // A post's or a reply's text, which is Markdown.
+    text?: string;
+    // An article's title, which is shown as it was written.
+    title?: string;
     target?: string;
 }
 
@@ -746,7 +749,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             ))}
             {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
                 <article key={each.did} className="post waiting">
-                    <Markdown text={each.text} />
+                    {each.text !== undefined && <Markdown text={each.text} />}
                     <footer className="muted">Waiting to be anchored</footer>
                 </article>
             ))}
@@ -897,7 +900,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                             onPublish={async article => {
                                 const did = await api.publish({ kind: 'post', ...article });
 
-                                setWaiting(current => [...current, { did, text: article.title }]);
+                                setWaiting(current => [...current, { did, title: article.title }]);
                                 setWriting(false);
                             }}
                         />
@@ -907,7 +910,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         <h2>Timeline <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
                         {waiting.filter(each => !each.target).map(each => (
                             <article key={each.did} className="post waiting">
-                                <Markdown text={each.text} />
+                                {each.title !== undefined && <h3>{each.title}</h3>}
+                                {each.text !== undefined && <Markdown text={each.text} />}
                                 <footer className="muted">Waiting to be anchored</footer>
                             </article>
                         ))}
