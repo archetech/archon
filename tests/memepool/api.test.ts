@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
+import sharp from 'sharp';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -8,7 +9,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { parseGrantLink, readGrantRequest } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
-import { BODY_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
+import { AVATAR_LIMIT, BODY_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
 
 // The Memepool service: a Memeplex client whose key the service holds. Users
 // sign in with a wallet, grant the service, and publish through it. The
@@ -103,11 +104,21 @@ const content = {
     add: (text: string) => { stored += 1; return gatekeeper.addText(text); },
     get: (cid: string) => { read += 1; return gatekeeper.getText(cid); },
 };
+let limits: number[] = [];
+const images = {
+    get: async (cid: string, limit: number) => {
+        limits.push(limit);
+        const data = await gatekeeper.getData(cid);
+
+        return data && data.length <= limit ? data : null;
+    },
+};
 const objectOf = async (did: string) => ((await gatekeeper.resolveDID(did)).didDocumentData as { memeplex: Record<string, any> }).memeplex;
 
 beforeEach(async () => {
     stored = 0;
     read = 0;
+    limits = [];
     block = 0;
     clock = Date.UTC(2026, 10, 2);
     gatekeeper = new Gatekeeper({
@@ -120,7 +131,7 @@ beforeEach(async () => {
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
         client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
-        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content,
+        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content, images,
     });
 });
 
@@ -903,5 +914,116 @@ describe('an article', () => {
         expect(refused.status).toBe(400);
         expect(refused.body.error).toMatch(/stores no content/);
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).status).toBe(200);
+    }, 120_000);
+});
+
+// An identity's avatar is the image asset its document names as `avatar`. It
+// is whatever the identity's owner chose.
+describe('an author\'s avatar', () => {
+    const picture = () => sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 255, g: 0, b: 0 } } }).png().toBuffer();
+    const name = async (keymaster: Keymaster, did: string, avatar: unknown) => {
+        const doc = await keymaster.resolveDID(did);
+
+        await keymaster.updateDID(did, { ...doc, didDocumentData: { ...doc.didDocumentData as object, avatar } });
+    };
+    let reader: Awaited<ReturnType<typeof signIn>>;
+    const avatarOf = (did: string, by: { get: (path: string) => request.Test } = reader) => by.get(`/api/v1/avatars/${encodeURIComponent(did)}`).buffer(true).parse((res, done) => {
+        const parts: Buffer[] = [];
+
+        res.on('data', (part: Buffer) => parts.push(part));
+        res.on('end', () => done(null, Buffer.concat(parts)));
+    });
+    // An asset that says it is an image, of bytes that are whatever is given.
+    const claimed = async (data: Buffer, file: Record<string, unknown> = {}) => alice.createAsset({
+        file: { cid: await gatekeeper.addData(data), type: 'image/png', bytes: data.length, ...file },
+        image: { width: 8, height: 8 },
+    }, { registry: 'hyperswarm' });
+
+    beforeEach(async () => {
+        reader = await signIn(bob);
+    }, 120_000);
+
+    it('is served as the image it is, to a user who has signed in, for the browser to keep a while and take for nothing else', async () => {
+        const image = await picture();
+
+        await name(alice, aliceDid, await alice.createImage(image, { registry: 'hyperswarm' }));
+        const served = await avatarOf(aliceDid);
+
+        expect(served.status).toBe(200);
+        expect(served.headers['content-type']).toBe('image/png');
+        expect(served.headers['x-content-type-options']).toBe('nosniff');
+        expect(served.headers['cache-control']).toBe('private, max-age=300');
+        expect(Buffer.compare(served.body, image)).toBe(0);
+        expect(limits).toStrictEqual([AVATAR_LIMIT]);
+
+        // Nobody else has the node read it.
+        expect((await avatarOf(aliceDid, request(app))).status).toBe(401);
+        expect(limits).toStrictEqual([AVATAR_LIMIT]);
+    }, 120_000);
+
+    it('is not found for an identity that names none, for one that does not exist, and for what is no DID', async () => {
+        expect((await avatarOf(aliceDid)).status).toBe(404);
+        expect((await avatarOf('did:cid:bagaaieranosuchidentityaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).status).toBe(404);
+        expect((await avatarOf('alice')).status).toBe(404);
+        expect(limits).toStrictEqual([]);
+    }, 120_000);
+
+    it('is not found when what is named is not an image the service serves', async () => {
+        const image = await picture();
+        const refused = async (avatar: unknown) => {
+            await name(alice, aliceDid, avatar);
+            expect((await avatarOf(aliceDid)).status).toBe(404);
+        };
+
+        // Not a DID, and a DID that is no image asset: an identity, and an asset with no file.
+        await refused('https://tracker.example/me.png');
+        await refused({ did: aliceDid });
+        await refused(aliceDid);
+        await refused(await alice.createAsset({ note: 'no file' }, { registry: 'hyperswarm' }));
+        // A file that is not said to be an image.
+        await refused(await alice.createAsset({ file: { cid: await gatekeeper.addData(image), type: 'image/png', bytes: image.length } }, { registry: 'hyperswarm' }));
+        // A document that can hold a script, and bytes of no kind.
+        await refused(await claimed(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), { type: 'image/svg+xml' }));
+        await refused(await claimed(image, { type: 'text/html' }));
+        await refused(await claimed(image, { type: undefined }));
+        // None of them was read from the node.
+        expect(limits).toStrictEqual([]);
+
+        // A deleted image.
+        const deleted = await alice.createImage(image, { registry: 'hyperswarm' });
+        await alice.revokeDID(deleted);
+        await refused(deleted);
+        expect(limits).toStrictEqual([]);
+    }, 120_000);
+
+    it('is not found when it is larger than the service serves, whatever size it says it is', async () => {
+        const large = Buffer.alloc(AVATAR_LIMIT + 1, 1);
+
+        // One that says so is not read.
+        await name(alice, aliceDid, await claimed(large));
+        expect((await avatarOf(aliceDid)).status).toBe(404);
+        expect(limits).toStrictEqual([]);
+
+        // One that says it is small is read no further than the limit.
+        await name(alice, aliceDid, await claimed(large, { bytes: 10 }));
+        expect((await avatarOf(aliceDid)).status).toBe(404);
+        expect(limits).toStrictEqual([AVATAR_LIMIT]);
+
+        await name(alice, aliceDid, await claimed(large, { bytes: undefined }));
+        expect((await avatarOf(aliceDid)).status).toBe(404);
+    }, 120_000);
+
+    it('serves a JPEG named the short way as a JPEG, and none when the service reads no images', async () => {
+        const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 0, b: 255 } } }).jpeg().toBuffer();
+
+        await name(alice, aliceDid, await claimed(image, { type: ' Image/JPG ' }));
+        expect((await avatarOf(aliceDid)).headers['content-type']).toBe('image/jpeg');
+
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,
+            sessionLifetime: 60_000, challengeLifetime: 60_000,
+        });
+        reader = await signIn(bob);
+        expect((await avatarOf(aliceDid)).status).toBe(404);
     }, 120_000);
 });

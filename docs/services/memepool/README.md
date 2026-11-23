@@ -48,9 +48,30 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
 | `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
+| `GET /avatars/:did` | An identity's avatar, as the image it is, or 404 when it has none the service serves |
 
 The service states an object's `v`, `author` and `grant` itself, from the session
 and the grant, whatever the request carries.
+
+### Avatars
+
+An identity's avatar is the image asset its document names as `avatar`, which is
+where a wallet puts one. `GET /avatars/:did` serves it, so that the pages can show
+an author's beside what the author wrote, from their own origin.
+
+It is whatever the identity's owner chose, and the service did not store it:
+
+- **It is served only as an image**: AVIF, GIF, JPEG, PNG or WebP, with a header
+  that tells a browser to take it for nothing else. SVG is refused, being a document
+  that can hold a script.
+- **It may be 1,000,000 bytes.** One whose asset says it is larger is not read, and
+  one that says it is smaller is read no further than that.
+- **The node is given ten seconds to find it**, since bytes it does not have are
+  looked for on the network.
+- **It is for a user who has signed in**, as publishing is: reading one has the node
+  look for bytes a stranger named.
+
+Anything else is a 404, and the pages show a figure in the avatar's place.
 
 ### Content
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
@@ -48,6 +48,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async () => undefined),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
+        avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
     };
 
     return { api, state };
@@ -847,6 +848,56 @@ describe('a grant that allows some kinds', () => {
             expect(await screen.findByRole('button', { name })).toBeTruthy();
         }
         expect(screen.getByLabelText('Reply')).toBeTruthy();
+    });
+});
+
+describe('an author\'s avatar', () => {
+    const pictures = (within: ParentNode) => [...within.querySelectorAll('.avatar')] as HTMLElement[];
+
+    it('is beside every post, asked for from the service by the author\'s DID', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.')] });
+        render(<App api={api} />);
+
+        const posts = (await screen.findAllByRole('article')).filter(each => !each.classList.contains('waiting'));
+        const asked = posts.map(each => pictures(each)[0].querySelector('img')?.getAttribute('src'));
+
+        expect(asked.sort()).toStrictEqual([ALICE, BOB].map(did => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`).sort());
+        // A picture says nothing a screen reader needs: the author is named beside it.
+        expect(pictures(posts[0])[0].getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('is a figure where the author has none, of a colour that is the author\'s own', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.'), post('did:cid:3', ALICE, 'Alice once more.')] });
+        render(<App api={api} />);
+
+        const posts = (await screen.findAllByRole('article')).filter(each => !each.classList.contains('waiting'));
+        const of = (text: string) => pictures(posts.find(each => each.textContent?.includes(text))!)[0];
+
+        // The service has no avatar for Alice.
+        fireEvent.error(of('From Alice.').querySelector('img')!);
+
+        expect(of('From Alice.').querySelector('img')).toBeNull();
+        expect(of('From Alice.').querySelector('svg')).not.toBeNull();
+        // The figure is beneath a picture too, and shows until one has loaded.
+        expect(of('From Bob.').querySelector('svg')).not.toBeNull();
+        expect(of('From Bob.').querySelector('img')).not.toBeNull();
+
+        expect(of('From Alice.').style.background).toBe(of('Alice once more.').style.background);
+        expect(of('From Alice.').style.background).not.toBe(of('From Bob.').style.background);
+    });
+
+    it('is beside the reader\'s own DID and each author followed', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+
+        await screen.findByRole('button', { name: 'Unfollow' });
+        const asked = pictures(document.body).map(each => each.querySelector('img')?.getAttribute('src'));
+
+        expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(ALICE)}`);
+        expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(BOB)}`);
     });
 });
 

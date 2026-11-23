@@ -29,6 +29,49 @@ export interface MemepoolSettings {
 // Starts the service: reaches the Gatekeeper, opens the wallet that holds the
 // service's key (making the wallet and the identity on a first start), and
 // listens. Resolves once it is listening.
+// How long the node is given to find the bytes of a CID, in milliseconds. One
+// it does not have is looked for on the network, which can take any time.
+const DATA_TIMEOUT = 10_000;
+
+// The bytes of a CID from a node's IPFS, or nothing when the node has none,
+// takes too long, or has more than `limit`. The CID is one a stranger chose, so
+// no more than `limit` is read, whatever length the node says it has.
+export async function readData(gatekeeperURL: string, cid: string, limit: number, fetcher: typeof fetch = fetch): Promise<Buffer | null> {
+    if (!/^[A-Za-z0-9]{1,128}$/.test(cid)) {
+        return null;
+    }
+
+    try {
+        const response = await fetcher(`${gatekeeperURL}/api/v1/ipfs/data/${cid}`, { signal: AbortSignal.timeout(DATA_TIMEOUT) });
+
+        if (!response.ok || !response.body || Number(response.headers.get('content-length') ?? 0) > limit) {
+            await response.body?.cancel();
+            return null;
+        }
+
+        const parts: Uint8Array[] = [];
+        let read = 0;
+        const reader = response.body.getReader();
+
+        for (;;) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                return Buffer.concat(parts);
+            }
+            read += value.length;
+            if (read > limit) {
+                await reader.cancel();
+                return null;
+            }
+            parts.push(value);
+        }
+    }
+    catch {
+        return null;
+    }
+}
+
 export async function startMemepool(
     settings: MemepoolSettings,
     version: { version: string; commit: string },
@@ -110,6 +153,7 @@ export async function startMemepool(
         registries: () => gatekeeper.listRegistries(),
         // The node's IPFS pins what is added to it.
         content: { add: text => gatekeeper.addText(text), get: cid => gatekeeper.getText(cid) },
+        images: { get: (cid, limit) => readData(settings.gatekeeperURL, cid, limit) },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

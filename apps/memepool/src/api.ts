@@ -67,6 +67,8 @@ export interface Api {
     // none for the object. `versionId` names the version whose body is wanted:
     // the one a reader is shown, where the latest may be an edit not anchored.
     content(did: string, versionId?: string): Promise<string | undefined>;
+    // The address of an identity's avatar, which answers 404 when it has none.
+    avatar(did: string): string;
 }
 
 export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
@@ -155,5 +157,6 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
 
             return response.text();
         },
+        avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,
     };
 }

@@ -25,6 +25,12 @@ publishes for the user under their grant. Everything they read comes from the
    the service, which stores it; a timeline shows the title and summary, and the
    body is read when the article is opened.
 
+An author's avatar is shown beside each post, beside the reader's own DID and
+beside each author followed. It is asked of the Memepool service, which serves the
+image an identity names as its avatar; where there is none, the place holds a figure
+of a colour worked out from the DID, so that two authors without avatars are still
+told apart.
+
 Wherever the reader writes text (a post, a reply, an article's body, an edit) there
 are two views, **Write** and **Preview**. The preview is made by what shows a
 published entry, so it is what readers will see, an article with its title and
