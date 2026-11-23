@@ -96,10 +96,10 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
-    "rollup": "^4.68.3"
+    "rollup": "^4.68.7"
   },
   "dependencies": {
-    "socks": "^2.8.10",
+    "socks": "^2.8.11",
     "undici": "^6.29.1"
   }
 }
