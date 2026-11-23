@@ -48,10 +48,37 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
 | `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
+| `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
 | `GET /avatars/:did` | An identity's avatar, as the image it is, or 404 when it has none the service serves |
 
 The service states an object's `v`, `author` and `grant` itself, from the session
 and the grant, whatever the request carries.
+
+### Names and addresses
+
+An identity's document may carry a `name` and an `address`, which is where a wallet
+puts them. `GET /identities/:did` passes them on, so that the pages can say who an
+author is beside the DID.
+
+- **A name is a claim.** Any identity can give itself any name, and nothing checks
+  one. It is passed on shortened to 64 characters, with nothing in it but what is
+  printed, and the pages always show the DID beside it.
+- **An address is passed on only when its domain confirms it.** An address such as
+  `alice@example.org` is a name that `example.org` gives out, so the service asks
+  that domain whose it is (`/.well-known/names/alice`, as Keymaster's
+  `check-address` does) and passes it on when the answer is this identity's DID.
+  One the domain gives to another, to nobody, or does not answer for within five
+  seconds is left out.
+- **An address is a name at a host name**, in lower-case letters, digits and the
+  marks `. _ + -`. One with anything else in it is not asked about or shown: a
+  character that turns text about, or a letter that looks like another, makes an
+  address at one domain read as an address at another.
+- **What is found out is kept ten minutes**, so a domain is asked once in a while
+  however many posts an author has. The request is one that reaches no address
+  inside the service's own network, is ended after five seconds, and has no more
+  than 16 KiB of its answer read.
+- **It is for a user who has signed in**, since it has the service ask a domain a
+  stranger chose.
 
 ### Avatars
 

@@ -30,6 +30,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
         // The bodies the service holds, by the DID of the entry.
         bodies: {} as Record<string, string>,
+        // What the service says of each identity, by its DID.
+        people: {} as Record<string, { name?: string; address?: string }>,
     };
     const api: Api = {
         me: vi.fn(async () => state.me),
@@ -49,6 +51,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         publication: vi.fn(async () => undefined),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
+        identity: vi.fn(async (did: string) => state.people[did] ?? {}),
     };
 
     return { api, state };
@@ -901,6 +904,54 @@ describe('an author\'s avatar', () => {
 
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(ALICE)}`);
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(BOB)}`);
+    });
+});
+
+describe('an author\'s name and address', () => {
+    it('are beside the author\'s posts, with the DID, and asked for once for each author', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'From Bob.'), post('did:cid:2', BOB, 'Bob once more.'), post('did:cid:3', ALICE, 'From Alice.')] });
+        state.people[BOB] = { name: 'Bob B.', address: 'bob@example.org' };
+        state.people[ALICE] = { name: 'Alice' };
+        render(<App api={api} />);
+
+        const first = (await screen.findByText('From Bob.')).closest('article')!;
+        expect(await within(first).findByText('Bob B.')).toBeTruthy();
+        expect(within(first).getByText('bob@example.org')).toBeTruthy();
+        // A name is a claim, so who wrote is still there to see.
+        expect(within(first).getByTitle(BOB)).toBeTruthy();
+        expect(await within(screen.getByText('Bob once more.').closest('article')!).findByText('Bob B.')).toBeTruthy();
+
+        const hers = screen.getByText('From Alice.').closest('article')!;
+        expect(await within(hers).findByText('Alice')).toBeTruthy();
+        expect(hers.querySelector('.address')).toBeNull();
+
+        expect((api.identity as ReturnType<typeof vi.fn>).mock.calls.map(([did]) => did).sort()).toStrictEqual([ALICE, BOB].sort());
+    });
+
+    it('shows the DID alone for an author with neither, and when the service cannot say', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'From Bob.')] });
+        (api.identity as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('the service is away'));
+        render(<App api={api} />);
+
+        const first = (await screen.findByText('From Bob.')).closest('article')!;
+        await waitFor(() => expect(api.identity).toHaveBeenCalled());
+
+        expect(within(first).getByTitle(BOB)).toBeTruthy();
+        expect(first.querySelector('.called')).toBeNull();
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('shows a name as the text it is', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'From Bob.')] });
+        state.people[BOB] = { name: '<b>Bob</b> **B**' };
+        render(<App api={api} />);
+
+        const first = (await screen.findByText('From Bob.')).closest('article')!;
+        expect(await within(first).findByText('<b>Bob</b> **B**')).toBeTruthy();
+        expect(first.querySelector('header b')).toBeNull();
     });
 });
 

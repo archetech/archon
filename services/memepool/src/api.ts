@@ -37,6 +37,14 @@ export interface ImageStore {
     get(cid: string, limit: number): Promise<Buffer | null>;
 }
 
+// How the service learns whose an address is: it asks the address's domain,
+// which is what gives out its names. `owner` gives the DID the domain says the
+// address belongs to, or nothing when it says none or cannot be asked. The
+// asking ends when `signal` says to: the service waits only so long.
+export interface AddressBook {
+    owner(address: string, signal: AbortSignal): Promise<string | null>;
+}
+
 export interface MemepoolOptions {
     client: MemeplexClient;
     keymaster: LoginKeymaster;
@@ -64,6 +72,9 @@ export interface MemepoolOptions {
     // Where an author's avatar is read from. Without it the service serves no
     // avatar, and the pages show every author without one.
     images?: ImageStore;
+    // Who is asked whose an address is. Without it the service confirms no
+    // address, and names no author by one.
+    addresses?: AddressBook;
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -93,6 +104,20 @@ const AVATAR_KEPT = 300;
 // The kinds of image served as an avatar. SVG is not one: it is a document that
 // can hold a script, and this is served from the pages' own origin.
 const AVATAR_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+// The longest name the service passes on, in characters, and the longest
+// address it asks a domain about.
+const NAME_LIMIT = 64;
+const ADDRESS_LIMIT = 254;
+// How long what the service found out about an identity is kept, and how long
+// an address's domain is given to answer, in milliseconds.
+const IDENTITY_KEPT = 10 * 60_000;
+const ADDRESS_TIMEOUT = 5_000;
+// An address the service asks about and shows: a name at a host name, in the
+// letters, digits and marks both are written in. One with anything else in it
+// is not asked about, since what is confirmed has to be what is read: a
+// character that changes the direction of text makes an address at one domain
+// read as an address at another.
+const ADDRESS = /^[a-z0-9._+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
 // The largest request that publishes or changes an object. A body arrives as a
 // JSON string, in which one byte can be written as six (`\u000a`), beside the
 // object's other fields.
@@ -161,7 +186,7 @@ function cookieOf(req: Request, wanted = COOKIE): string | undefined {
 type Signed = Request & { user: string };
 
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
-    const { client, keymaster, name, version, content, images } = options;
+    const { client, keymaster, name, version, content, images, addresses } = options;
     const seen = new Set<string>();
     const registriesNow = async (): Promise<string[]> => {
         try {
@@ -692,6 +717,74 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         catch {
             res.status(502).json({ error: 'the node does not have the body' });
         }
+    });
+
+    // What an identity says of itself in its document, which is where a wallet
+    // puts a name and an address.
+    //
+    // A name is whatever the identity's owner wrote, and any identity can write
+    // any name: it is passed on as a claim, shortened and with nothing in it but
+    // what can be printed. An address is a claim on a domain's name, so it is
+    // passed on only when that domain says the address is this identity's.
+    //
+    // Asking a domain is a request to somewhere a stranger chose, so what is
+    // found out is kept a while, and it is for a user who has signed in.
+    const identities = new Expiring<Promise<{ name?: string; address?: string }>>(IDENTITY_KEPT, now);
+    const identityOf = async (did: string): Promise<{ name?: string; address?: string }> => {
+        const doc = await keymaster.resolveDID(did);
+        const data = doc.didDocumentData as { name?: unknown; address?: unknown } | undefined;
+
+        if (doc.didDocumentMetadata?.deactivated || !data || typeof data !== 'object') {
+            return {};
+        }
+
+        const found: { name?: string; address?: string } = {};
+        const named = typeof data.name === 'string'
+            ? data.name.replace(/[\p{C}\p{Z}]+/gu, ' ').trim().slice(0, NAME_LIMIT).trim()
+            : '';
+
+        if (named) {
+            found.name = named;
+        }
+
+        const claimed = typeof data.address === 'string' ? data.address.trim().toLowerCase() : '';
+
+        if (addresses && claimed.length <= ADDRESS_LIMIT && ADDRESS.test(claimed)) {
+            // The asking is ended at the deadline, and not only left behind.
+            const asking = new AbortController();
+            let giveUp: ReturnType<typeof setTimeout> | undefined;
+            const owner = await Promise.race([
+                addresses.owner(claimed, asking.signal).catch(() => null),
+                new Promise<null>(resolve => { giveUp = setTimeout(() => resolve(null), ADDRESS_TIMEOUT); }),
+            ]);
+
+            clearTimeout(giveUp);
+            asking.abort();
+            if (owner === did) {
+                found.address = claimed;
+            }
+        }
+
+        return found;
+    };
+
+    router.get('/identities/:did', async (req, res) => {
+        const did = String(req.params.did);
+
+        if (!did.startsWith('did:')) {
+            res.status(404).json({ error: 'no such identity' });
+            return;
+        }
+
+        let asked = identities.get(did);
+
+        if (!asked) {
+            asked = identityOf(did).catch(() => ({}));
+            identities.set(did, asked);
+        }
+
+        res.setHeader('Cache-Control', 'private, max-age=60');
+        res.json({ did, ...await asked });
     });
 
     // An identity's avatar: the image asset its document names as `avatar`,

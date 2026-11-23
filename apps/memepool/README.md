@@ -25,6 +25,10 @@ publishes for the user under their grant. Everything they read comes from the
    the service, which stores it; a timeline shows the title and summary, and the
    body is read when the article is opened.
 
+An author is shown by the name the identity gives itself and by its address, where
+it has them, with the DID always beside them: a name is a claim anyone can make, and
+the service passes on an address only when the address's domain confirms it.
+
 An author's avatar is shown beside each post, beside the reader's own DID and
 beside each author followed. It is asked of the Memepool service, which serves the
 image an identity names as its avatar; where there is none, the place holds a figure
