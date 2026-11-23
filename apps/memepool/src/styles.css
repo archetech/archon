@@ -91,6 +91,9 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 .markdown input[type="checkbox"] { display: inline; width: auto; margin: 0 0.35rem 0 0; }
 .post .article { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .post.waiting { border-style: dashed; }
+.draft [role="tablist"] { display: flex; gap: 0.25rem; margin-bottom: 0.25rem; }
+.draft [role="tab"][aria-selected="true"] { font-weight: 600; text-decoration: underline; }
+.post.preview { margin: 0.25rem 0 0.5rem; min-height: 3rem; }
 
 .respond { margin: 0.25rem 0 0.75rem; }
 .respond .tag { overflow-wrap: anywhere; }

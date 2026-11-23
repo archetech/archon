@@ -850,6 +850,126 @@ describe('a grant that allows some kinds', () => {
     });
 });
 
+describe('previewing what is written', () => {
+    it('shows a post as it will be shown, keeps what was written, and publishes from either view', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'A **bold** post.{Enter}On one line.');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+
+        const preview = screen.getByRole('tabpanel', { name: 'Post preview' });
+        expect(within(preview).getByText('bold').tagName).toBe('STRONG');
+        // Markdown joins the lines of a paragraph, which is what readers will see.
+        expect(preview.querySelectorAll('p')).toHaveLength(1);
+        expect(screen.queryByLabelText('Post')).toBeNull();
+
+        await user.click(screen.getByRole('tab', { name: 'Write' }));
+        expect((screen.getByLabelText('Post') as HTMLTextAreaElement).value).toBe('A **bold** post.\nOn one line.');
+
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: 'A **bold** post.\nOn one line.' }]));
+    });
+
+    it('says there is nothing to preview before anything is written, and makes nothing of HTML', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('tab', { name: 'Preview' }));
+        expect(screen.getByText('Nothing to preview.')).toBeTruthy();
+
+        await user.click(screen.getByRole('tab', { name: 'Write' }));
+        await user.type(screen.getByLabelText('Post'), '<b>not bold</b>');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+        const preview = screen.getByRole('tabpanel', { name: 'Post preview' });
+
+        expect(preview.querySelector('b')).toBeNull();
+        expect(preview.textContent).toContain('<b>not bold</b>');
+    });
+
+    it('previews a post as it is published, which is without the white space around it', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // Four spaces before a line make a block of code of it.
+        await user.type(await screen.findByLabelText('Post'), '    **bold**  ');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+
+        const preview = screen.getByRole('tabpanel', { name: 'Post preview' });
+        expect(within(preview).getByText('bold').tagName).toBe('STRONG');
+        expect(preview.querySelector('pre')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: '**bold**' }]));
+    });
+
+    it('moves between the two views with the arrow keys, with one of them in the order the Tab key follows', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const write = await screen.findByRole('tab', { name: 'Write' });
+        const preview = screen.getByRole('tab', { name: 'Preview' });
+
+        expect([write.tabIndex, preview.tabIndex]).toStrictEqual([0, -1]);
+        expect(write.getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel', { name: 'Post: write' }).id);
+
+        write.focus();
+        await user.keyboard('{ArrowRight}');
+        expect(document.activeElement).toBe(preview);
+        expect(preview.getAttribute('aria-selected')).toBe('true');
+        expect([write.tabIndex, preview.tabIndex]).toStrictEqual([-1, 0]);
+        expect(screen.getByRole('tabpanel', { name: 'Post preview' }).id).toBe(preview.getAttribute('aria-controls'));
+
+        await user.keyboard('{ArrowLeft}');
+        expect(document.activeElement).toBe(write);
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('shows an article with its title and summary above its body', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), 'On DIDs');
+        await user.type(screen.getByLabelText('Summary'), 'A summary.');
+        await user.type(screen.getByLabelText('Article'), '## A section{Enter}{Enter}- one{Enter}- two');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+
+        const preview = screen.getByRole('tabpanel', { name: 'Article preview' });
+        expect(within(preview).getByRole('heading', { name: 'On DIDs' })).toBeTruthy();
+        expect(within(preview).getByText('A summary.')).toBeTruthy();
+        expect(within(preview).getByRole('heading', { name: 'A section' })).toBeTruthy();
+        expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
+        // The body is set apart from what is above it, as an opened article's is.
+        expect(preview.querySelector('.markdown')?.classList.contains('article')).toBe(true);
+        // The title and summary are still there to change.
+        expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('On DIDs');
+    });
+
+    it('shows a reply, and an edit, as each will be shown', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api } = services({ me: granted, timeline: [mine] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'A `coded` reply.');
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+        expect(within(screen.getByRole('tabpanel', { name: 'Reply preview' })).getByText('coded').tagName).toBe('CODE');
+
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
+        await user.type(screen.getByLabelText('Edit'), ' And *more*.');
+        const editor = screen.getByLabelText('Edit').closest('.draft') as HTMLElement;
+        await user.click(within(editor).getByRole('tab', { name: 'Preview' }));
+        expect(within(screen.getByRole('tabpanel', { name: 'Edit preview' })).getByText('more').tagName).toBe('EM');
+    });
+});
+
 describe('an article', () => {
     const BODY = '# On DIDs\n\nEvery post is one.\n';
     const article = (did: string, author = ALICE): Publication => under({

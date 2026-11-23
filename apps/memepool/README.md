@@ -25,6 +25,11 @@ publishes for the user under their grant. Everything they read comes from the
    the service, which stores it; a timeline shows the title and summary, and the
    body is read when the article is opened.
 
+Wherever the reader writes text (a post, a reply, an article's body, an edit) there
+are two views, **Write** and **Preview**. The preview is made by what shows a
+published entry, so it is what readers will see, an article with its title and
+summary above its body.
+
 Text is shown as the protocol says a client shows it: a post, a reply and an
 article's body are GitHub Flavored Markdown. It is written by strangers, so HTML in
 it is shown as text and never made into elements, a link is followed only to an
