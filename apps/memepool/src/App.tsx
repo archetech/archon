@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Publication, Reply, Responses } from './api';
@@ -10,6 +10,50 @@ import Markdown from './Markdown';
 // Follows are the reader's own: kept in this browser and published nowhere.
 
 const FOLLOWS = 'memepool.follows';
+
+// Where an identity's avatar is asked for.
+const Avatars = createContext<((did: string) => string) | undefined>(undefined);
+
+// A number from a DID, the same each time, to tell one author's place from
+// another's where neither has an avatar.
+const hueOf = (did: string) => [...did].reduce((sum, letter) => (sum * 31 + letter.charCodeAt(0)) % 360, 7);
+
+// An identity's avatar: the image it names, over a figure that shows where
+// there is none, or none the service will serve.
+function Picture({ did }: { did: string }) {
+    const address = useContext(Avatars);
+    const [missing, setMissing] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+
+    return (
+        <span className="avatar" aria-hidden="true" style={{ background: `hsl(${hueOf(did)} 35% 55%)` }}>
+            <svg viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="9" r="4" />
+                <path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8z" />
+            </svg>
+            {address && !missing && (
+                <img
+                    src={address(did)}
+                    alt=""
+                    loading="lazy"
+                    className={loaded ? 'loaded' : undefined}
+                    onLoad={() => setLoaded(true)}
+                    onError={() => setMissing(true)}
+                />
+            )}
+        </span>
+    );
+}
+
+// An identity as the pages name one: its avatar and its DID, shortened.
+function Identity({ did }: { did: string }) {
+    return (
+        <span className="identity">
+            <Picture key={did} did={did} />
+            <span className="mono" title={did}>{short(did)}</span>
+        </span>
+    );
+}
 
 export const short = (did: string) => (did.length > 24 ? `${did.slice(0, 14)}…${did.slice(-6)}` : did);
 
@@ -283,7 +327,7 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
     return (
         <article className="post">
             <header>
-                <span className="mono" title={object.author}>{short(object.author)}</span>
+                <Identity did={object.author} />
                 <time>{when(publication)}</time>
             </header>
             {object.title && <h3>{object.title}</h3>}
@@ -946,7 +990,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         <main>
             <header className="top">
                 <h1>Memepool</h1>
-                <span className="mono" title={me.did}>{short(me.did)}</span>
+                <Identity did={me.did} />
                 <button className="quiet" onClick={signOut}>Sign out</button>
             </header>
 
@@ -1033,7 +1077,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         </p>
                         {follows.map(did => (
                             <p key={did}>
-                                <span className="mono" title={did}>{short(did)}</span>{' '}
+                                <Identity did={did} />{' '}
                                 <button className="quiet" onClick={() => unfollow(did)}>Unfollow</button>
                             </p>
                         ))}
@@ -1104,7 +1148,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     }
 
     return (
-        <>
+        <Avatars.Provider value={api.avatar}>
             {error && <p role="alert" className="error">{error}</p>}
             <Reader
                 key={session}
@@ -1118,6 +1162,6 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                     setError('');
                 }}
             />
-        </>
+        </Avatars.Provider>
     );
 }

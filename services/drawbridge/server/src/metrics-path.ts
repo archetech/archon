@@ -102,8 +102,9 @@ export function normalizePath(path: string): string {
         // The Memeplex indexer's views of one object carry its DID, or whatever
         // a caller sends in its place.
         .replace(/\/memeplex\/api\/v1\/(publications|threads|boosts|ratings|tags|coauthors)\/[^/]+/, '/memeplex/api/v1/$1/:did')
-        // An object Memepool changes or withdraws is named by its DID.
-        .replace(/\/memepool\/api\/v1\/objects\/[^/]+/, '/memepool/api/v1/objects/:did');
+        // An object Memepool changes or withdraws is named by its DID, as is
+        // the identity whose avatar it serves.
+        .replace(/\/memepool\/api\/v1\/(objects|avatars)\/[^/]+/, '/memepool/api/v1/$1/:did');
 
     // The indexer's routes are few and fixed, and its mount is public, so a
     // path under it that is none of them shares one label.
@@ -118,5 +119,5 @@ export function normalizePath(path: string): string {
     return label;
 }
 
-const MEMEPOOL_ROUTES = /^\/memepool\/api\/v1\/(?:ready|version|config|challenge|callback|login|logout|me|objects(?:\/:did(?:\/content)?)?)$/;
+const MEMEPOOL_ROUTES = /^\/memepool\/api\/v1\/(?:ready|version|config|challenge|callback|login|logout|me|objects(?:\/:did(?:\/content)?)?|avatars\/:did)$/;
 const MEMEPLEX_ROUTES = /^\/memeplex\/api\/v1\/(?:ready|version|status|timeline|(?:publications|threads|boosts|ratings|tags|coauthors)\/:did)$/;

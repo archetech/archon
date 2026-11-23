@@ -31,6 +31,12 @@ export interface ContentStore {
     get(cid: string): Promise<string | null>;
 }
 
+// Where the service reads an image from: its node's IPFS. `get` gives the bytes
+// of a CID, or nothing when the node has none or they are more than `limit`.
+export interface ImageStore {
+    get(cid: string, limit: number): Promise<Buffer | null>;
+}
+
 export interface MemepoolOptions {
     client: MemeplexClient;
     keymaster: LoginKeymaster;
@@ -55,6 +61,9 @@ export interface MemepoolOptions {
     // body itself and takes no reference to bytes it has not stored. Without a
     // store it publishes no body.
     content?: ContentStore;
+    // Where an author's avatar is read from. Without it the service serves no
+    // avatar, and the pages show every author without one.
+    images?: ImageStore;
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -77,6 +86,13 @@ const MAX_HELD = 10_000;
 const REQUEST_REUSE = 50 * 60_000;
 // The largest body the service stores, in bytes of UTF-8.
 export const BODY_LIMIT = 200_000;
+// The largest avatar the service serves, in bytes, and how long a browser may
+// keep one before asking again, in seconds.
+export const AVATAR_LIMIT = 1_000_000;
+const AVATAR_KEPT = 300;
+// The kinds of image served as an avatar. SVG is not one: it is a document that
+// can hold a script, and this is served from the pages' own origin.
+const AVATAR_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 // The largest request that publishes or changes an object. A body arrives as a
 // JSON string, in which one byte can be written as six (`\u000a`), beside the
 // object's other fields.
@@ -145,7 +161,7 @@ function cookieOf(req: Request, wanted = COOKIE): string | undefined {
 type Signed = Request & { user: string };
 
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
-    const { client, keymaster, name, version, content } = options;
+    const { client, keymaster, name, version, content, images } = options;
     const seen = new Set<string>();
     const registriesNow = async (): Promise<string[]> => {
         try {
@@ -675,6 +691,57 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         }
         catch {
             res.status(502).json({ error: 'the node does not have the body' });
+        }
+    });
+
+    // An identity's avatar: the image asset its document names as `avatar`,
+    // which is where a wallet puts one. It is whatever the identity's owner
+    // chose, so it is served only as an image of a kind and size the service
+    // accepts, and a browser is told not to take it for anything else. Reading
+    // one has the node look for bytes a stranger named, so it is for a user who
+    // has signed in, as the rest of what is below is.
+    router.get('/avatars/:did', async (req, res) => {
+        const none = () => { res.status(404).json({ error: 'no avatar' }); };
+        const did = String(req.params.did);
+
+        if (!images || !did.startsWith('did:')) {
+            none();
+            return;
+        }
+
+        try {
+            const identity = await keymaster.resolveDID(did);
+            const named = (identity.didDocumentData as { avatar?: unknown } | undefined)?.avatar;
+
+            if (identity.didDocumentMetadata?.deactivated || typeof named !== 'string' || !named.trim().startsWith('did:')) {
+                none();
+                return;
+            }
+
+            const asset = await keymaster.resolveDID(named.trim());
+            const held = asset.didDocumentData as { file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: unknown } | undefined;
+            const file = held?.file;
+            const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
+
+            if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !AVATAR_TYPES.has(type)
+                || (typeof file.bytes === 'number' && file.bytes > AVATAR_LIMIT)) {
+                none();
+                return;
+            }
+
+            const data = await images.get(file.cid, AVATAR_LIMIT);
+
+            if (!data || data.length === 0 || data.length > AVATAR_LIMIT) {
+                none();
+                return;
+            }
+
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Cache-Control', `private, max-age=${AVATAR_KEPT}`);
+            res.type(type).send(data);
+        }
+        catch {
+            none();
         }
     });
 

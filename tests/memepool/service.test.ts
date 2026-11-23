@@ -12,7 +12,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { createGatekeeperApp } from '../../services/gatekeeper/server/src/gatekeeper-api.ts';
-import { startMemepool } from '../../services/memepool/src/service.ts';
+import { readData, startMemepool } from '../../services/memepool/src/service.ts';
 import type { MemepoolSettings } from '../../services/memepool/src/service.ts';
 
 // The service's start: it reaches a Gatekeeper over HTTP, keeps its key in a
@@ -133,3 +133,36 @@ it('does not start with no passphrase, or with the wrong one for its wallet', as
     await start();
     await expect(start({ passphrase: 'another passphrase' })).rejects.toThrow();
 }, 60_000);
+
+describe('reading bytes a stranger named from the node', () => {
+    it('gives the bytes of a CID the node has', async () => {
+        const data = Buffer.from('some bytes');
+        const cid = await (await connected()).addData(data);
+
+        expect(Buffer.compare((await readData(settings.gatekeeperURL, cid, 100))!, data)).toBe(0);
+        // The node's address may be given with a path, as it may be to connect.
+        expect(Buffer.compare((await readData(`${settings.gatekeeperURL}/`, cid, 100))!, data)).toBe(0);
+    });
+
+    it('gives nothing for more than the limit, for a CID the node cannot have, and for what is no CID', async () => {
+        const cid = await (await connected()).addData(Buffer.alloc(101, 1));
+
+        expect(await readData(settings.gatekeeperURL, cid, 100)).toBeNull();
+        expect(await readData(settings.gatekeeperURL, '../../version', 100)).toBeNull();
+        expect(await readData(settings.gatekeeperURL, 'bafk?x=1', 100)).toBeNull();
+        expect(await readData('http://127.0.0.1:1', cid, 1000)).toBeNull();
+    });
+
+    it('reads no further than the limit from a node that does not say how much it has', async () => {
+        let sent = 0;
+        const endless = (async () => new Response(new ReadableStream({
+            pull(controller) {
+                sent += 1;
+                controller.enqueue(new Uint8Array(60));
+            },
+        }))) as typeof fetch;
+
+        expect(await readData('http://node', 'bafkreiexample', 100, endless)).toBeNull();
+        expect(sent).toBeLessThan(10);
+    });
+});
