@@ -88,6 +88,18 @@ describe('what a stranger cannot do with text', () => {
         expect(page.querySelector('img')).toBeNull();
     });
 
+    it.each([
+        ['a DID', 'did:cid:bagaaieraexample'],
+        ['an address that is not followed', `${SCRIPT}:alert(1)`],
+        ['a relative address', '/memepool/api/v1/logout'],
+    ])('makes no link of an image that is the words of a link to %s', (_name, url) => {
+        const page = shown(`[![a chart](https://tracker.example/chart.png)](${url})`);
+
+        expect(page.querySelector('a')).toBeNull();
+        expect(page.querySelector('img')).toBeNull();
+        expect(page.textContent).toContain('a chart');
+    });
+
     it('loads no image, from anywhere', () => {
         const page = shown('![a chart](https://tracker.example/chart.png) ![a photo](did:cid:bagaaieraphoto?versionId=bafyreiaaaa) ![](data:image/png;base64,AAAA) ![local](/x.png)');
 

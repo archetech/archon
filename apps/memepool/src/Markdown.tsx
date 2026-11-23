@@ -47,20 +47,20 @@ function Image({ src, alt }: { src?: unknown; alt?: string }) {
 
 const components: Components = {
     a({ href, children }) {
+        // What is inside is the words of a link whether or not the link is
+        // followed, so an image there is a description wherever it points.
+        const words = <InLink.Provider value={true}>{children}</InLink.Provider>;
+
         // An address that is not followed leaves the words it was on.
         if (!href) {
-            return <span>{children}</span>;
+            return <span>{words}</span>;
         }
         // A DID is not somewhere a browser can go.
         if (scheme(href) === 'did') {
-            return <span className="mono" title={href}>{children}</span>;
+            return <span className="mono" title={href}>{words}</span>;
         }
 
-        return (
-            <a href={href} target="_blank" rel="noreferrer noopener">
-                <InLink.Provider value={true}>{children}</InLink.Provider>
-            </a>
-        );
+        return <a href={href} target="_blank" rel="noreferrer noopener">{words}</a>;
     },
     img: ({ src, alt }) => <Image src={src} alt={alt} />,
 };
