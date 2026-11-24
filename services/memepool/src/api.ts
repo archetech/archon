@@ -104,6 +104,11 @@ const AVATAR_KEPT = 300;
 // The kinds of image served as an avatar. SVG is not one: it is a document that
 // can hold a script, and this is served from the pages' own origin.
 const AVATAR_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+// An image embedded in text, as Text formatting bounds one: its kinds, its
+// bytes, and the pixels its asset says it has.
+const IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+export const IMAGE_LIMIT = 10_000_000;
+const IMAGE_PIXELS = 40_000_000;
 // The longest name the service passes on, in characters, and the longest
 // address it asks a domain about.
 const NAME_LIMIT = 64;
@@ -787,6 +792,35 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         res.json({ did, ...await asked });
     });
 
+    // The bytes of an image asset, where it is an image the service serves: of
+    // one of the kinds given, no larger than the limit, and no more pixels than
+    // it may have. The asset is whatever its owner made it, and the service did
+    // not store it. What it says of its own size is its owner's claim, used to
+    // refuse early, and no more than the limit is read whatever it says.
+    const imageOf = async (did: string, serves: { types: Set<string>; limit: number; pixels?: number; versionId?: string }): Promise<{ type: string; data: Buffer } | null> => {
+        if (!images || !did.startsWith('did:')) {
+            return null;
+        }
+
+        const asset = await keymaster.resolveDID(did, serves.versionId === undefined ? undefined : { versionId: serves.versionId });
+        const held = asset.didDocumentData as {
+            file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: { width?: unknown; height?: unknown };
+        } | undefined;
+        const file = held?.file;
+        const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
+        const { width, height } = held?.image && typeof held.image === 'object' ? held.image : {} as { width?: unknown; height?: unknown };
+
+        if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !serves.types.has(type)
+            || (typeof file.bytes === 'number' && file.bytes > serves.limit)
+            || (serves.pixels !== undefined && typeof width === 'number' && typeof height === 'number' && width * height > serves.pixels)) {
+            return null;
+        }
+
+        const data = await images.get(file.cid, serves.limit);
+
+        return data && data.length > 0 && data.length <= serves.limit ? { type, data } : null;
+    };
+
     // An identity's avatar: the image asset its document names as `avatar`,
     // which is where a wallet puts one. It is whatever the identity's owner
     // chose, so it is served only as an image of a kind and size the service
@@ -795,43 +829,55 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // has signed in, as the rest of what is below is.
     router.get('/avatars/:did', async (req, res) => {
         const none = () => { res.status(404).json({ error: 'no avatar' }); };
-        const did = String(req.params.did);
 
-        if (!images || !did.startsWith('did:')) {
+        // Only a DID is resolved: a name would have the wallet look it up, and
+        // an address would have it ask the address's domain.
+        if (!images || !String(req.params.did).startsWith('did:')) {
             none();
             return;
         }
 
         try {
-            const identity = await keymaster.resolveDID(did);
+            const identity = await keymaster.resolveDID(String(req.params.did));
             const named = (identity.didDocumentData as { avatar?: unknown } | undefined)?.avatar;
+            const image = identity.didDocumentMetadata?.deactivated || typeof named !== 'string'
+                ? null
+                : await imageOf(named.trim(), { types: AVATAR_TYPES, limit: AVATAR_LIMIT });
 
-            if (identity.didDocumentMetadata?.deactivated || typeof named !== 'string' || !named.trim().startsWith('did:')) {
-                none();
-                return;
-            }
-
-            const asset = await keymaster.resolveDID(named.trim());
-            const held = asset.didDocumentData as { file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: unknown } | undefined;
-            const file = held?.file;
-            const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
-
-            if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !AVATAR_TYPES.has(type)
-                || (typeof file.bytes === 'number' && file.bytes > AVATAR_LIMIT)) {
-                none();
-                return;
-            }
-
-            const data = await images.get(file.cid, AVATAR_LIMIT);
-
-            if (!data || data.length === 0 || data.length > AVATAR_LIMIT) {
+            if (!image) {
                 none();
                 return;
             }
 
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.setHeader('Cache-Control', `private, max-age=${AVATAR_KEPT}`);
-            res.type(type).send(data);
+            res.type(image.type).send(image.data);
+        }
+        catch {
+            none();
+        }
+    });
+
+    // An image embedded in text: an image asset at one version, which is what
+    // an embed names. Text formatting says which kinds and how large. A
+    // version does not change, so a browser may keep what it is given.
+    router.get('/images/:did', async (req, res) => {
+        const none = () => { res.status(404).json({ error: 'no image the service serves' }); };
+        const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
+
+        try {
+            const image = versionId && String(req.params.did).startsWith('did:')
+                ? await imageOf(String(req.params.did), { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS, versionId })
+                : null;
+
+            if (!image) {
+                none();
+                return;
+            }
+
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+            res.type(image.type).send(image.data);
         }
         catch {
             none();

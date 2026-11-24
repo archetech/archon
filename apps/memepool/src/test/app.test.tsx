@@ -57,6 +57,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
+        image: (did: string, version: string) => `/memepool/api/v1/images/${encodeURIComponent(did)}?versionId=${version}`,
     };
 
     return { api, state };
@@ -1262,6 +1263,143 @@ describe('a boost', () => {
         expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
         expect(screen.queryByText('At the end.')).toBeNull();
         expect(vi.mocked(api.revision).mock.calls.length).toBe(5);
+    });
+});
+
+describe('a post embedded in another', () => {
+    const QUOTED = 'did:cid:bagaaieraquotedquotedquotedquotedquotedquotedquotedquote';
+    // A version is named by the CID of the operation that made it.
+    const at = (did: string, author: string, text: string, opid = 'bafyv1'): Publication =>
+        ({ ...post(did, author, text), versions: [{ opid, type: 'create', outcome: 'attributed', position: { block: 1, time: '2026-11-21T12:00:00Z' } }] });
+    const embed = (version = 'bafyv1') => `![what Bob wrote](${QUOTED}?versionId=${version})`;
+    const has = (state: ReturnType<typeof services>['state'], publication: Publication) => {
+        state.known[publication.did!] = publication;
+        state.revisions[`${publication.did} ${publication.versions[0].opid}`] = publication;
+    };
+
+    it('is shown as a card with its author and what that version said, whatever it says since', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `I agree with this:\n\n${embed()}`)] });
+        const first = at(QUOTED, BOB, 'What **Bob** wrote.');
+        has(state, first);
+        state.known[QUOTED] = { ...post(QUOTED, BOB, 'Something else.'), current: 1, versions: [first.versions[0], { opid: 'op-edit', type: 'update', outcome: 'attributed' }] };
+        state.people[BOB] = { name: 'Bob B.' };
+        render(<App api={api} />);
+
+        const card = (await screen.findByText('Bob')).closest('.embed.card') as HTMLElement;
+
+        expect(card).not.toBeNull();
+        expect(await within(card).findByText('Bob B.')).toBeTruthy();
+        expect(screen.getByText('I agree with this:')).toBeTruthy();
+        expect(screen.queryByText('Something else.')).toBeNull();
+        expect(api.revision).toHaveBeenCalledWith(QUOTED, 'bafyv1');
+    });
+
+    it('is opened as it is, from the card', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, embed())] });
+        has(state, at(QUOTED, BOB, 'What Bob wrote.'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const card = (await screen.findByText('What Bob wrote.')).closest('.embed.card') as HTMLElement;
+        await user.click(within(card).getByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+        expect(api.thread).toHaveBeenCalledWith(QUOTED);
+    });
+
+    it('is read anew when the timeline is refreshed, and when the thread it is in is', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `See:\n\n${embed()}`)] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The indexer has not read the post quoted.
+        await waitFor(() => expect(api.revision).toHaveBeenCalledTimes(1));
+        expect(screen.queryByText('What Bob wrote.')).toBeNull();
+
+        has(state, at(QUOTED, BOB, 'What Bob wrote.'));
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect((await screen.findByText('What Bob wrote.')).closest('.embed.card')).not.toBeNull();
+
+        // In the thread of the post that quotes it, a replay puts the version out of the history.
+        // The post's own way to be opened, and not the card's.
+        await user.click(within(screen.getByText('See:').closest('article')!.querySelector(':scope > footer') as HTMLElement).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        delete state.revisions[`${QUOTED} bafyv1`];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/this version is no longer in its history/)).toBeTruthy();
+        expect(screen.queryByText('What Bob wrote.')).toBeNull();
+    });
+
+    it('shows the post as it is when it is opened from a card inside its own thread', async () => {
+        // A reply to the post quotes the post, at the version it answered.
+        const first = at(QUOTED, BOB, 'What Bob wrote.');
+        const { api, state } = services({ me: granted, timeline: [first] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        has(state, first);
+        vi.mocked(api.thread).mockResolvedValue([{ depth: 0, publication: post('did:cid:reply', ALICE, `On this: ${embed()}`) }]);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('What Bob wrote.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        const card = await waitFor(() => { const found = document.querySelector('.embed.card'); expect(found).not.toBeNull(); return found as HTMLElement; });
+
+        // Bob edits the post, and the thread still shows it as it was read.
+        state.known[QUOTED] = { ...at(QUOTED, BOB, 'What Bob wrote, corrected.'), current: 1, versions: [first.versions[0], { opid: 'bafyv2', type: 'update', outcome: 'attributed' }] };
+        await user.click(within(card).getByRole('button', { name: 'Open' }));
+
+        expect(await screen.findAllByText('What Bob wrote, corrected.')).not.toHaveLength(0);
+    });
+
+    it('shows a card\'s own embeds by their words, so that no card is inside another', async () => {
+        const INNER = 'did:cid:bagaaierainnerinnerinnerinnerinnerinnerinnerinnerinnerinn';
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, embed())] });
+        has(state, at(QUOTED, BOB, `Bob quotes: ![the inner post](${INNER}?versionId=bafyinner)`));
+        has(state, at(INNER, BOB, 'Never shown here.', 'bafyinner'));
+        render(<App api={api} />);
+
+        const card = (await screen.findByText(/Bob quotes/)).closest('.embed.card') as HTMLElement;
+
+        expect(within(card).getByText('the inner post')).toBeTruthy();
+        expect(screen.queryByText('Never shown here.')).toBeNull();
+        expect(card.querySelector('.card')).toBeNull();
+    });
+
+    it('is shown as an image when the DID is no object\'s, asked of the service', async () => {
+        const IMAGE = 'did:cid:bagaaieraimageimageimageimageimageimageimageimageimageim';
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `![a chart](${IMAGE}?versionId=bafyv1)`)] });
+        render(<App api={api} />);
+
+        await waitFor(() => expect(document.querySelector('.embed img')).not.toBeNull());
+        const image = document.querySelector('.embed img') as HTMLImageElement;
+
+        expect(image.getAttribute('src')).toBe(`/memepool/api/v1/images/${encodeURIComponent(IMAGE)}?versionId=bafyv1`);
+        expect(image.getAttribute('alt')).toBe('a chart');
+    });
+
+    it('is what a post\'s Copy embed gives, at the version shown, and is shown in a preview', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'Mine.')] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        has(state, { ...at(QUOTED, BOB, 'What Bob wrote.'), memeplex: { kind: 'post', author: BOB, text: 'What Bob wrote.', title: 'On [DIDs]' } });
+        state.timeline.push(state.known[QUOTED]);
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        const theirs = (await screen.findByText('What Bob wrote.')).closest('article')!;
+        await user.click(within(theirs).getByRole('button', { name: 'Copy embed' }));
+
+        const copied = `![On  DIDs](${QUOTED}?versionId=bafyv1)`;
+        expect(write).toHaveBeenCalledWith(copied);
+
+        // Pasted into a post, the preview shows the card.
+        await user.click(screen.getByLabelText('Post'));
+        await user.paste(`See:\n\n${copied}`);
+        await user.click(screen.getAllByRole('tab', { name: 'Preview' })[0]);
+        const preview = screen.getByRole('tabpanel', { name: 'Post preview' });
+
+        expect((await within(preview).findByText('What Bob wrote.')).closest('.embed.card')).not.toBeNull();
     });
 });
 

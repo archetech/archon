@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useId, useMemo, useR
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Person, Publication, Reply, Responses } from './api';
-import Markdown from './Markdown';
+import Markdown, { Embeds } from './Markdown';
+import type { Embedding } from './Markdown';
 
 // Memepool's pages. A reader signs in with a wallet, grants the service once,
 // and then reads the authors they follow and publishes posts and replies.
@@ -304,6 +305,14 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
 // Which version of a publication is shown, as something to compare.
 const versionKey = (publication: Publication) => `${publication.current ?? 0} ${publication.versions[publication.current ?? 0]?.opid ?? ''}`;
 
+// The Markdown that embeds the version of a publication that is shown. Its
+// words are what is shown where the embed cannot be: the title, or what it is.
+const embedFor = (publication: Publication) => {
+    const words = String(publication.memeplex?.title ?? publication.memeplex?.kind ?? 'post').replace(/[[\]\\\n]/g, ' ').trim();
+
+    return `![${words}](${publication.did}?versionId=${shownVersion(publication)})`;
+};
+
 // The version of a publication that is shown: the last one attributed.
 const shownVersion = (publication: Publication) => publication.versions[publication.current ?? 0]?.opid;
 
@@ -340,14 +349,16 @@ function Article({ api, did, version }: { api: Api; did: string; version?: strin
 }
 
 // `full` shows the body of an article, where a list shows its summary alone.
-function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string; version?: string } }) {
+function Body({ object, full, embeds = true }: {
+    object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string; version?: string }; embeds?: boolean;
+}) {
     const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
     const article = object.text === undefined && object.content !== undefined;
 
     return (
         <>
             {/* A post's text is Markdown. An article's summary is a line about it, shown as it is. */}
-            {words && (article ? <p className="text summary">{words}</p> : <Markdown text={words} />)}
+            {words && (article ? <p className="text summary">{words}</p> : <Markdown text={words} embeds={embeds} />)}
             {article && (full ? <Article api={full.api} did={full.did} version={full.version} /> : <p className="muted">Open it to read the full text.</p>)}
             {!words && !article && object.target && (
                 <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
@@ -372,6 +383,76 @@ const Reads = createContext(0);
 
 // How many boosts of boosts are followed to the post they pass on.
 const BOOST_DEPTH = 5;
+
+// How a reader opens a publication from inside another's text.
+const Opens = createContext<((publication: Publication) => void) | undefined>(undefined);
+
+// A publication as it is, where it is one that can be opened: read at this
+// moment, and published. A version read earlier is not opened in its place,
+// since an answer would be to a version the post may have left behind.
+const asItIs = async (read: Reading | undefined, did: string): Promise<Publication | undefined> => {
+    const now = await read?.now(did).catch(() => undefined);
+
+    return now?.state === 'published' && now.memeplex ? now : undefined;
+};
+
+// What a reader's pages are given to go by: the way to an author's posts, the
+// way to open a publication, and how an embed is shown.
+function Ways({ visit, open, embedding, children }: {
+    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding; children: ReactNode;
+}) {
+    return (
+        <Visits.Provider value={visit}>
+            <Opens.Provider value={open}>
+                <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+            </Opens.Provider>
+        </Visits.Provider>
+    );
+}
+
+// An object embedded in another's text, as a card: who wrote it, when, and what
+// it said at the version embedded. Its own embeds are shown by their words, so
+// that a card is never inside a card.
+function Quoted({ publication }: { publication: Publication }) {
+    const read = useContext(Publications);
+    const onOpen = useContext(Opens);
+    const [opening, setOpening] = useState(false);
+    const [unopened, setUnopened] = useState(false);
+    const object = publication.memeplex!;
+    const withdrawn = publication.state === 'withdrawn';
+
+    const open = async () => {
+        setOpening(true);
+        setUnopened(false);
+        try {
+            const now = await asItIs(read, publication.did!);
+
+            if (now) {
+                onOpen?.(now);
+            }
+            else {
+                setUnopened(true);
+            }
+        }
+        finally {
+            setOpening(false);
+        }
+    };
+
+    return (
+        <>
+            <header>
+                <Identity did={object.author} />
+                <time>{when(publication)}</time>
+            </header>
+            {object.title && <h3>{object.title}</h3>}
+            <Body object={object} embeds={false} />
+            {withdrawn && <p className="muted note">Its author has since withdrawn this.</p>}
+            {unopened && <p role="alert" className="error">It cannot be opened as it is. Refresh, and try once more.</p>}
+            {onOpen && !withdrawn && publication.did && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
+        </>
+    );
+}
 
 // What a boost is of, or nothing for an object that is not a boost: a post
 // with no words of its own that names another, and the version of it.
@@ -450,9 +531,9 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
         setOpening(true);
         setUnopened(false);
         try {
-            const now = await read?.now(shown!.did!).catch(() => undefined);
+            const now = await asItIs(read, shown!.did!);
 
-            if (now?.state === 'published' && now.memeplex) {
+            if (now) {
                 onOpen?.(now);
             }
             else {
@@ -527,6 +608,10 @@ function Post({ publication, onOpen, onWithdraw, full }: {
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
                 {/* A post's DID is its address: what another wallet or node resolves it by. */}
                 {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
+                {/* What another text is given to show this version of the post inside it. */}
+                {publication.did && shownVersion(publication) && (
+                    <Copy text={embedFor(publication)} label="Copy embed" unable={`Could not copy. The embed is ${embedFor(publication)}`} />
+                )}
             </footer>
         </article>
     );
@@ -993,12 +1078,18 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     );
 }
 
-function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack }: {
+function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack, onRead }: {
     api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
     onPublished: (waiting: Waiting) => void; onBack: () => void;
+    // Told each time the thread has been read, so that what its texts embed is read anew.
+    onRead?: () => void;
 }) {
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
+
+    // A post opened anew is given as it is at that moment, which may be a later
+    // version than the one shown here.
+    useEffect(() => { setRoot(opened); }, [opened]);
     const [editing, setEditing] = useState(false);
     // The version an edit was made of, while its chain has not anchored the
     // edit: the edit is anchored once another version is the one shown.
@@ -1014,6 +1105,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             const [thread, latest] = await Promise.all([api.thread(opened.did!), api.publication(opened.did!)]);
 
             if (mine === reads.current) {
+                onRead?.();
                 setReplies(thread);
                 if (latest) {
                     setRoot(latest);
@@ -1027,7 +1119,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                 setError(message(failure));
             }
         }
-    }, [api, opened.did]);
+    }, [api, opened.did, onRead]);
 
     useEffect(() => {
         load();
@@ -1192,6 +1284,20 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // shown is one it belongs in: the reader's timeline, or the reader's posts.
     const pending = author && author !== me.did ? [] : waiting.filter(each => !each.target);
 
+    // How an embed in a text is shown: an object at its version from the
+    // indexer, as a card, and an image from the service.
+    //
+    // What an embed shows is read apart from the list or thread it is in, and
+    // is read anew when that is: the indexer may not have had it, and a replay
+    // may have put its version out of the history.
+    const read = useCallback(() => setRefreshes(count => count + 1), []);
+    const embedding = useMemo<Embedding>(() => ({
+        object: api.revision,
+        image: api.image,
+        card: object => <Quoted publication={object as Publication} />,
+        read: refreshes,
+    }), [api, refreshes]);
+
     // Signed out only when the service says so: the session is a cookie the
     // page cannot remove, and a reader who is told they are signed out must be.
     const signOut = async () => {
@@ -1206,7 +1312,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     };
 
     return (
-        <Visits.Provider value={visit}>
+        <Ways visit={visit} open={setOpen} embedding={embedding}>
             <main>
                 <header className="top">
                     <h1>Memepool</h1>
@@ -1219,6 +1325,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                 {open ? (
                     <Thread
+                        key={open.did}
                         api={api}
                         me={me}
                         grants={grants}
@@ -1227,6 +1334,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         waiting={waiting}
                         onPublished={published => setWaiting(current => [...current, published])}
                         onBack={() => { setOpen(null); loadTimeline(); }}
+                        onRead={read}
                     />
                 ) : (
                     <>
@@ -1322,7 +1430,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                     </>
                 )}
             </main>
-        </Visits.Provider>
+        </Ways>
     );
 }
 
