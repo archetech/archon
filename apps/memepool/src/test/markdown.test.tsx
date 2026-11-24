@@ -176,6 +176,42 @@ describe('an embed', () => {
         expect(page.querySelector('img')).toBeNull();
     });
 
+    it('may give its address apart from itself, in each way Markdown allows', async () => {
+        const { value, asked } = embedding({ [`${POST} bafyv1`]: { text: 'Quoted.' } });
+        const page = shownWith(`![a post][one]\n\n![two][]\n\n![three]\n\n![nowhere][none]\n\n[one]: ${POST}?versionId=bafyv1\n[two]: ${IMAGE}?versionId=bafyv2\n[three]: ${IMAGE}?versionId=bafyv3`, value);
+
+        expect((await screen.findByText('Quoted.')).closest('.embed.card')).not.toBeNull();
+        await waitFor(() => expect(page.querySelectorAll('img')).toHaveLength(2));
+        expect([...page.querySelectorAll('img')].map(each => each.getAttribute('alt'))).toStrictEqual(['two', 'three']);
+        expect(asked).toStrictEqual([`${POST} bafyv1`, `${IMAGE} bafyv2`, `${IMAGE} bafyv3`]);
+        // A name with no address is the text it is.
+        expect(page.textContent).toContain('![nowhere][none]');
+    });
+
+    it('is read anew when what it is shown in is, and shows what it showed meanwhile', async () => {
+        const objects: Record<string, unknown> = {};
+        const { value, asked } = embedding(objects);
+        const text = `![a post](${POST}?versionId=bafyv1)`;
+        const view = render(<Embeds.Provider value={{ ...value, read: 1 }}><Markdown text={text} /></Embeds.Provider>);
+
+        // The indexer has no such object yet: it may be an image, and the service has none.
+        await waitFor(() => expect(view.container.querySelector('img')).not.toBeNull());
+        fireEvent.error(view.container.querySelector('img')!);
+        expect(screen.getByText('a post')).toBeTruthy();
+
+        objects[`${POST} bafyv1`] = { text: 'Quoted.' };
+        view.rerender(<Embeds.Provider value={{ ...value, read: 2 }}><Markdown text={text} /></Embeds.Provider>);
+        expect(await screen.findByText('Quoted.')).toBeTruthy();
+
+        // A replay puts the version out of the history.
+        objects[`${POST} bafyv1`] = 'no-revision';
+        view.rerender(<Embeds.Provider value={{ ...value, read: 3 }}><Markdown text={text} /></Embeds.Provider>);
+        expect(screen.queryByText('Reading what is embedded.')).toBeNull();
+        expect(await screen.findByText(/this version is no longer in its history/)).toBeTruthy();
+        expect(screen.queryByText('Quoted.')).toBeNull();
+        expect(asked).toHaveLength(3);
+    });
+
     it('is ended a paragraph for and taken up after, so that a card is in no paragraph', async () => {
         const { value } = embedding({ [`${POST} bafyv1`]: { text: 'Quoted.' } });
         const page = shownWith(`As ![a post](${POST}?versionId=bafyv1) says, and so on.`, value);

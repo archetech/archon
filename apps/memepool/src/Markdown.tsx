@@ -54,6 +54,9 @@ export interface Embedding {
     image: (did: string, version: string) => string;
     // The card for an object that `object` gave.
     card: (object: unknown) => ReactNode;
+    // Counts the reads of what the text is shown in. An embed is read anew at
+    // each, and shows what it showed meanwhile.
+    read?: number;
 }
 
 export const Embeds = createContext<Embedding | undefined>(undefined);
@@ -61,6 +64,8 @@ export const Embeds = createContext<Embedding | undefined>(undefined);
 interface Node {
     type: string;
     url?: string;
+    alt?: string | null;
+    identifier?: string;
     children?: Node[];
     data?: { hProperties?: Record<string, unknown> };
 }
@@ -72,7 +77,18 @@ interface Node {
 // shown by its words.
 const liftEmbeds = (limit: number) => () => (tree: Node) => {
     let lifted = 0;
-    const embeds = (node: Node) => node.type === 'image' && embedOf(node.url ?? '') !== undefined;
+    // An image may give its address apart from itself, `![words][name]` with
+    // `[name]: address` elsewhere in the text. It is the same image.
+    const defined = new Map<string, string>();
+    const define = (node: Node) => {
+        if (node.type === 'definition' && node.identifier !== undefined && node.url !== undefined && !defined.has(node.identifier)) {
+            defined.set(node.identifier, node.url);
+        }
+        node.children?.forEach(define);
+    };
+    const addressOf = (node: Node) =>
+        (node.type === 'image' ? node.url : node.type === 'imageReference' ? defined.get(node.identifier ?? '') : undefined);
+    const embeds = (node: Node) => embedOf(addressOf(node) ?? '') !== undefined;
     const walk = (parent: Node) => {
         parent.children = parent.children?.flatMap(child => {
             if (child.type !== 'paragraph' || !child.children?.some(embeds)) {
@@ -94,7 +110,7 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
                 if (embeds(each) && lifted < limit) {
                     lifted += 1;
                     end();
-                    parts.push({ ...each, data: { ...each.data, hProperties: { ...each.data?.hProperties, 'data-embed': 'true' } } });
+                    parts.push({ type: 'image', url: addressOf(each), alt: each.alt, data: { ...each.data, hProperties: { ...each.data?.hProperties, 'data-embed': 'true' } } });
                 }
                 else {
                     run.push(each);
@@ -106,6 +122,7 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
         });
     };
 
+    define(tree);
     walk(tree);
 };
 
@@ -117,18 +134,20 @@ function Embed({ did, version, words }: { did: string; version: string; words: s
     const [held, setHeld] = useState<{ of: string; found: unknown } | undefined>(undefined);
     const [imageless, setImageless] = useState(false);
     const of = `${did} ${version}`;
+    const read = embeds?.read;
+    const object = embeds?.object;
 
     useEffect(() => {
         let current = true;
 
         setImageless(false);
-        (embeds ? embeds.object(did, version) : Promise.resolve(undefined)).then(
+        (object ? object(did, version) : Promise.resolve(undefined)).then(
             found => { if (current) setHeld({ of, found }); },
             () => { if (current) setHeld({ of, found: undefined }); },
         );
 
         return () => { current = false; };
-    }, [embeds, did, version, of]);
+    }, [object, read, did, version, of]);
 
     const address = `${did}?versionId=${version}`;
     const byWords = <span className="muted" title={address}>{words}</span>;

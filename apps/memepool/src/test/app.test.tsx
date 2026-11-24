@@ -1307,6 +1307,31 @@ describe('a post embedded in another', () => {
         expect(api.thread).toHaveBeenCalledWith(QUOTED);
     });
 
+    it('is read anew when the timeline is refreshed, and when the thread it is in is', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `See:\n\n${embed()}`)] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The indexer has not read the post quoted.
+        await waitFor(() => expect(api.revision).toHaveBeenCalledTimes(1));
+        expect(screen.queryByText('What Bob wrote.')).toBeNull();
+
+        has(state, at(QUOTED, BOB, 'What Bob wrote.'));
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect((await screen.findByText('What Bob wrote.')).closest('.embed.card')).not.toBeNull();
+
+        // In the thread of the post that quotes it, a replay puts the version out of the history.
+        // The post's own way to be opened, and not the card's.
+        await user.click(within(screen.getByText('See:').closest('article')!.querySelector(':scope > footer') as HTMLElement).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        delete state.revisions[`${QUOTED} bafyv1`];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/this version is no longer in its history/)).toBeTruthy();
+        expect(screen.queryByText('What Bob wrote.')).toBeNull();
+    });
+
     it('shows a card\'s own embeds by their words, so that no card is inside another', async () => {
         const INNER = 'did:cid:bagaaierainnerinnerinnerinnerinnerinnerinnerinnerinnerinn';
         const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, embed())] });

@@ -1078,9 +1078,11 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     );
 }
 
-function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack }: {
+function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack, onRead }: {
     api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
     onPublished: (waiting: Waiting) => void; onBack: () => void;
+    // Told each time the thread has been read, so that what its texts embed is read anew.
+    onRead?: () => void;
 }) {
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
@@ -1099,6 +1101,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             const [thread, latest] = await Promise.all([api.thread(opened.did!), api.publication(opened.did!)]);
 
             if (mine === reads.current) {
+                onRead?.();
                 setReplies(thread);
                 if (latest) {
                     setRoot(latest);
@@ -1112,7 +1115,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                 setError(message(failure));
             }
         }
-    }, [api, opened.did]);
+    }, [api, opened.did, onRead]);
 
     useEffect(() => {
         load();
@@ -1279,11 +1282,17 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
     // How an embed in a text is shown: an object at its version from the
     // indexer, as a card, and an image from the service.
+    //
+    // What an embed shows is read apart from the list or thread it is in, and
+    // is read anew when that is: the indexer may not have had it, and a replay
+    // may have put its version out of the history.
+    const read = useCallback(() => setRefreshes(count => count + 1), []);
     const embedding = useMemo<Embedding>(() => ({
         object: api.revision,
         image: api.image,
         card: object => <Quoted publication={object as Publication} />,
-    }), [api]);
+        read: refreshes,
+    }), [api, refreshes]);
 
     // Signed out only when the service says so: the session is a cookie the
     // page cannot remove, and a reader who is told they are signed out must be.
@@ -1321,6 +1330,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         waiting={waiting}
                         onPublished={published => setWaiting(current => [...current, published])}
                         onBack={() => { setOpen(null); loadTimeline(); }}
+                        onRead={read}
                     />
                 ) : (
                     <>
