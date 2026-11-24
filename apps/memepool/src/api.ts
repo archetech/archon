@@ -73,6 +73,9 @@ export interface Api {
     content(did: string, versionId?: string): Promise<string | undefined>;
     // The address of an identity's avatar, which answers 404 when it has none.
     avatar(did: string): string;
+    // The address of an image asset at a version, which answers 404 for what
+    // is not an image the service serves.
+    image(did: string, versionId: string): string;
     // What an identity says of itself: the name it gives itself, which is a
     // claim, and the address its domain confirms is its own.
     identity(did: string): Promise<Person>;
@@ -185,6 +188,7 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             return response.text();
         },
         avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,
+        image: (did, versionId) => `${bases.memepool}/api/v1/images/${encodeURIComponent(did)}?versionId=${encodeURIComponent(versionId)}`,
         async identity(did) {
             const response = await call(bases.memepool, `/identities/${encodeURIComponent(did)}`);
 

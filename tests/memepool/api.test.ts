@@ -9,7 +9,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { parseGrantLink, readGrantRequest } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
-import { AVATAR_LIMIT, BODY_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
+import { AVATAR_LIMIT, BODY_LIMIT, IMAGE_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
 
 // The Memepool service: a Memeplex client whose key the service holds. Users
 // sign in with a wallet, grant the service, and publish through it. The
@@ -1048,6 +1048,88 @@ describe('an author\'s avatar', () => {
         });
         reader = await signIn(bob);
         expect((await avatarOf(aliceDid)).status).toBe(404);
+    }, 120_000);
+});
+
+// An image embedded in text is an image asset at one version.
+describe('an embedded image', () => {
+    let reader: Awaited<ReturnType<typeof signIn>>;
+    const picture = (colour: number) => sharp({ create: { width: 8, height: 8, channels: 3, background: { r: colour, g: 0, b: 0 } } }).png().toBuffer();
+    const versionOf = async (did: string) => (await gatekeeper.resolveDID(did)).didDocumentMetadata!.versionId!;
+    const imageAt = (did: string, versionId?: string, by: { get: (path: string) => request.Test } = reader) =>
+        by.get(`/api/v1/images/${encodeURIComponent(did)}`).query(versionId ? { versionId } : {}).buffer(true).parse((res, done) => {
+            const parts: Buffer[] = [];
+
+            res.on('data', (part: Buffer) => parts.push(part));
+            res.on('end', () => done(null, Buffer.concat(parts)));
+        });
+    const claimed = async (data: Buffer, file: Record<string, unknown> = {}, image: Record<string, unknown> = { width: 8, height: 8 }) => alice.createAsset({
+        file: { cid: await gatekeeper.addData(data), type: 'image/png', bytes: data.length, ...file }, image,
+    }, { registry: 'hyperswarm' });
+
+    beforeEach(async () => {
+        reader = await signIn(bob);
+    }, 120_000);
+
+    it('is served at the version named, for a browser to keep, and to a user who has signed in', async () => {
+        const first = await picture(255);
+        const did = await alice.createImage(first, { registry: 'hyperswarm' });
+        const version = await versionOf(did);
+
+        // The image is replaced since, which is another version.
+        await alice.updateImage(did, await picture(10));
+        expect(await versionOf(did)).not.toBe(version);
+
+        const served = await imageAt(did, version);
+
+        expect(served.status).toBe(200);
+        expect(served.headers['content-type']).toBe('image/png');
+        expect(served.headers['x-content-type-options']).toBe('nosniff');
+        expect(served.headers['cache-control']).toBe('private, max-age=31536000, immutable');
+        expect(Buffer.compare(served.body, first)).toBe(0);
+        expect(limits).toStrictEqual([IMAGE_LIMIT]);
+
+        expect((await imageAt(did, version, request(app))).status).toBe(401);
+    }, 120_000);
+
+    it('is not found without a version, at a version that is not the asset\'s, or for what is no DID', async () => {
+        const did = await alice.createImage(await picture(255), { registry: 'hyperswarm' });
+
+        expect((await imageAt(did)).status).toBe(404);
+        expect((await imageAt(did, 'bafyreinotaversionofthisasset')).status).toBe(404);
+        expect((await imageAt('alice', await versionOf(did))).status).toBe(404);
+        expect(limits).toStrictEqual([]);
+    }, 120_000);
+
+    it('is not found for what is not an image of a kind and size that text may embed', async () => {
+        const image = await picture(255);
+        const refused = async (did: string) => expect((await imageAt(did, await versionOf(did))).status).toBe(404);
+
+        await refused(aliceDid);
+        await refused(await alice.createAsset({ note: 'no file' }, { registry: 'hyperswarm' }));
+        await refused(await claimed(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), { type: 'image/svg+xml' }));
+        // A kind an avatar may be and an embed may not.
+        await refused(await claimed(image, { type: 'image/avif' }));
+        await refused(await claimed(image, { type: 'text/html' }));
+        // More bytes than an image may have, and more pixels, by its own account.
+        await refused(await claimed(image, { bytes: IMAGE_LIMIT + 1 }));
+        await refused(await claimed(image, {}, { width: 8000, height: 5001 }));
+        expect(limits).toStrictEqual([]);
+
+        // A deleted image has no version that is served.
+        const deleted = await alice.createImage(image, { registry: 'hyperswarm' });
+        await alice.revokeDID(deleted);
+        await refused(deleted);
+        expect(limits).toStrictEqual([]);
+    }, 120_000);
+
+    it('serves a JPEG named the short way, and one whose asset gives no size', async () => {
+        const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 0, b: 255 } } }).jpeg().toBuffer();
+        const did = await claimed(image, { type: 'image/jpg', bytes: undefined }, { note: 'no size' });
+        const served = await imageAt(did, await versionOf(did));
+
+        expect(served.status).toBe(200);
+        expect(served.headers['content-type']).toBe('image/jpeg');
     }, 120_000);
 });
 

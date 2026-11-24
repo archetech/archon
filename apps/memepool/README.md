@@ -57,17 +57,25 @@ summary above its body.
 Text is shown as the protocol says a client shows it: a post, a reply and an
 article's body are GitHub Flavored Markdown. It is written by strangers, so HTML in
 it is shown as text and never made into elements, a link is followed only to an
-`https:` address, and no image is loaded: one at an `https:` address is a link the
-reader may follow, since fetching it would tell its host who is reading. An embed,
-which is an image whose address is a version-pinned `did:` URL, is shown by its
-description for now, and math is not rendered yet.
-5. **Thread.** A post with the replies under it, how many have boosted it, how it is
-   rated, and the tags and reactions on it.
-6. **Respond.** A boost, a thumb up or down, a like, a tag, each offered only when
-   the reader's grant allows it. Each is an object of the
-   reader's, about the version of the post that is shown. A reader has one rating of
-   an object, so a second thumb changes the first.
-7. **Edit and withdraw**, for what the reader published through this service.
+`https:` address, and no image is loaded from elsewhere: one at an `https:` address
+is a link the reader may follow, since fetching it would tell its host who is
+reading. Math is not rendered yet.
+
+An embed is an image whose address is a DID and a version of it,
+`![words](did:cid:…?versionId=…)`, and what it shows depends on what the DID is:
+
+- **An object** is shown as a card: who wrote it, when, and what it said at that
+  version, whatever it says since, with the way to open it as it is. This is how one
+  post quotes another. A card's own embeds are shown by their words, so that no card
+  is inside another.
+- **An image asset** is shown as the image, which the Memepool service serves.
+- **Anything else**, a DID with no version, and an embed in a heading, a table or the
+  words of a link, is shown by its words. So is every embed past the twentieth in
+  one text.
+
+A version that is no longer in an object's history is said to be, and no other is
+shown in its place. Each post has **Copy embed**, which gives the Markdown that
+embeds the version shown; pasted into a post, the preview shows the card.
 
 Follows are kept in the browser (`localStorage`) and published nowhere, so the
 network does not learn whom anyone follows. The indexer does see which authors a

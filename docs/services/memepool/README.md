@@ -49,6 +49,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
 | `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
 | `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
+| `GET /images/:did?versionId=` | An image asset at a version, as the image it is, for text that embeds it; 404 for anything else |
 | `GET /avatars/:did` | An identity's avatar, as the image it is, or 404 when it has none the service serves |
 
 The service states an object's `v`, `author` and `grant` itself, from the session
@@ -99,6 +100,24 @@ It is whatever the identity's owner chose, and the service did not store it:
   look for bytes a stranger named.
 
 Anything else is a 404, and the pages show a figure in the avatar's place.
+
+### Embedded images
+
+Text may embed an image asset at a version, `![words](did:cid:…?versionId=…)`, and
+the pages show it from `GET /images/:did?versionId=`, on their own origin. It is
+served under the rules Text formatting gives for images:
+
+- **PNG, JPEG, WebP or GIF**, with a header that tells a browser to take it for
+  nothing else. SVG is refused.
+- **At most 10,000,000 bytes**, and at most 40 megapixels by the width and height
+  its asset gives. One that says it is larger is not read, and one that says less
+  is read no further than the limit.
+- **Only at a version.** A version does not change, so a browser is told it may
+  keep the image.
+- **For a user who has signed in**, as an avatar is.
+
+The service does not decode an image, so it does not check its pixels against the
+image's own header or count an animation's frames: a browser does the decoding.
 
 ### Content
 
