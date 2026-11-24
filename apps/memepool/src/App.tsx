@@ -862,6 +862,59 @@ interface Waiting {
     // An article's title, which is shown as it was written.
     title?: string;
     target?: string;
+    // The chain it waits to be anchored on, once the service has said.
+    registry?: string;
+    // Whether the service says it will never be published.
+    failed?: boolean;
+}
+
+// What the reader has published and the indexer has not shown is kept in this
+// browser, for each reader, so that it is still there when the page is read
+// anew. It is put away when the indexer shows it, or the service says it is
+// published, and it is the reader's to put away when it never will be.
+const WAITING = 'memepool.waiting.';
+
+function readWaiting(reader: string): Waiting[] {
+    try {
+        const stored = JSON.parse(localStorage.getItem(WAITING + reader) ?? '[]');
+
+        return Array.isArray(stored)
+            ? stored.filter(each => each && typeof each === 'object' && typeof each.did === 'string').map(each => ({
+                did: each.did,
+                ...(typeof each.text === 'string' ? { text: each.text } : {}),
+                ...(typeof each.title === 'string' ? { title: each.title } : {}),
+                ...(typeof each.target === 'string' ? { target: each.target } : {}),
+                ...(typeof each.registry === 'string' ? { registry: each.registry } : {}),
+                ...(each.failed === true ? { failed: true } : {}),
+            }))
+            : [];
+    }
+    catch {
+        return [];
+    }
+}
+
+// What the reader published that the indexer does not show yet, as the post it
+// will be and marked as waiting: who wrote it, where it waits, and what it says.
+function Awaited({ entry, author, onDismiss }: { entry: Waiting; author: string; onDismiss: (did: string) => void }) {
+    return (
+        <article className={`post waiting${entry.failed ? ' failed' : ''}`}>
+            <header>
+                <Identity did={author} />
+                <span className="badge" role="status">
+                    {entry.failed ? 'Not published' : ['Waiting to be anchored', ...(entry.registry ? ['on', entry.registry] : [])].join(' ')}
+                </span>
+            </header>
+            {entry.title !== undefined && <h3>{entry.title}</h3>}
+            {entry.text !== undefined && <Markdown text={entry.text} />}
+            {entry.failed && (
+                <footer>
+                    <span className="muted">This was not anchored under a grant in force, and will not be published.</span>{' '}
+                    <button className="quiet" onClick={() => onDismiss(entry.did)}>Dismiss</button>
+                </footer>
+            )}
+        </article>
+    );
 }
 
 // A word as a tag is published: lower case, composed, with the spaces inside
@@ -1154,9 +1207,9 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     );
 }
 
-function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack, onRead }: {
+function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onDismiss, onBack, onRead }: {
     api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
-    onPublished: (waiting: Waiting) => void; onBack: () => void;
+    onPublished: (waiting: Waiting) => void; onDismiss: (did: string) => void; onBack: () => void;
     // Told each time the thread has been read, with the replies it shows: what its
     // texts embed is read anew, and a reply of the reader's that is shown waits no more.
     onRead?: (shown: string[]) => void;
@@ -1236,10 +1289,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
                 </div>
             ))}
             {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
-                <article key={each.did} className="post waiting">
-                    {each.text !== undefined && <Markdown text={each.text} />}
-                    <footer className="muted">Waiting to be anchored</footer>
-                </article>
+                <Awaited key={each.did} entry={each} author={me.did} onDismiss={onDismiss} />
             ))}
             {may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} />}
         </section>
@@ -1259,7 +1309,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     const [fetched, setFetched] = useState(0);
     const [total, setTotal] = useState(0);
     const reads = useRef(0);
-    const [waiting, setWaiting] = useState<Waiting[]>([]);
+    const [waiting, setWaiting] = useState<Waiting[]>(() => readWaiting(me.did));
+    const dismiss = useCallback((did: string) => setWaiting(current => current.filter(each => each.did !== did)), []);
     // Whether the reader is writing an article, which has a form of its own.
     const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
@@ -1396,6 +1447,57 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         setRefreshes(count => count + 1);
         setWaiting(current => (current.some(each => shown.includes(each.did)) ? current.filter(each => !shown.includes(each.did)) : current));
     }, []);
+    useEffect(() => {
+        try {
+            localStorage.setItem(WAITING + me.did, JSON.stringify(waiting));
+        }
+        catch {
+            // A browser that keeps nothing still shows what waits, until the page is left.
+        }
+    }, [me.did, waiting]);
+
+    // Asks the service where each thing that waits stands, when the list or a
+    // thread is read and when there is something new to ask about. The indexer
+    // shows only what is published, so it cannot say that something never will be.
+    const held = waiting.map(each => each.did).join(' ');
+
+    useEffect(() => {
+        let current = true;
+        const dids = held ? held.split(' ') : [];
+
+        Promise.all(dids.map(async did => [did, await api.state(did).catch(() => undefined)] as const)).then(answers => {
+            const said = new Map(answers);
+
+            if (!current) {
+                return;
+            }
+            setWaiting(now => {
+                const next = now.flatMap(each => {
+                    const answer = said.get(each.did);
+
+                    if (!answer) {
+                        return [each];
+                    }
+                    // What is published is the indexer's to show.
+                    if (answer.state === 'published' || answer.state === 'withdrawn') {
+                        return [];
+                    }
+
+                    const failed = answer.state === 'none' || answer.state === 'unsupported';
+                    const registry = answer.registry ?? each.registry;
+
+                    return Boolean(each.failed) === failed && each.registry === registry
+                        ? [each]
+                        : [{ did: each.did, text: each.text, title: each.title, target: each.target, registry, ...(failed ? { failed } : {}) }];
+                });
+
+                return next.length === now.length && next.every((each, index) => each === now[index]) ? now : next;
+            });
+        });
+
+        return () => { current = false; };
+    }, [api, held, refreshes]);
+
     const embedding = useMemo<Embedding>(() => ({
         object: api.revision,
         image: api.image,
@@ -1438,6 +1540,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         mine={changeable(open)}
                         waiting={waiting}
                         onPublished={published => setWaiting(current => [...current, published])}
+                        onDismiss={dismiss}
                         onBack={() => { setOpen(null); loadTimeline(); }}
                         onRead={read}
                     />
@@ -1489,13 +1592,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                         <section id={author ? 'author-list' : undefined} role={author ? 'tabpanel' : undefined} aria-label={author ? (replies ? 'Replies' : 'Posts') : undefined}>
                             <h2>{author ? (replies ? 'Replies' : 'Posts') : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
-                            {pending.map(each => (
-                                <article key={each.did} className="post waiting">
-                                    {each.title !== undefined && <h3>{each.title}</h3>}
-                                    {each.text !== undefined && <Markdown text={each.text} />}
-                                    <footer className="muted">Waiting to be anchored</footer>
-                                </article>
-                            ))}
+                            {pending.map(each => <Awaited key={each.did} entry={each} author={me.did} onDismiss={dismiss} />)}
                             {timeline === null && <p className="muted">Loading…</p>}
                             {timeline?.length === 0 && pending.length === 0 && <p className="muted">Nothing here yet.</p>}
                             <Reads.Provider value={refreshes}>{timeline?.map(each => (

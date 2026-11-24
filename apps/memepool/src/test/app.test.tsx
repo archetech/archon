@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
@@ -37,6 +37,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         people: {} as Record<string, { name?: string; address?: string }>,
         // The publications the indexer has, by DID, beside those of a timeline.
         known: {} as Record<string, Publication>,
+        // Where the service says each of the reader's objects stands, by DID.
+        states: {} as Record<string, { state: Publication['state']; registry?: string }>,
         // Publications as they were at a version, by DID and version.
         revisions: {} as Record<string, Publication>,
     };
@@ -56,6 +58,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         thread: vi.fn(async () => []),
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async (did: string) => state.known[did]),
+        state: vi.fn(async (did: string) => state.states[did]),
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
@@ -1199,6 +1202,121 @@ describe('an author\'s own posts', () => {
     });
 });
 
+describe('what the reader published that waits to be anchored', () => {
+    const publishing = async (text: string, did: string) => {
+        const made = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'Anchored.')] });
+        vi.mocked(made.api.publish).mockResolvedValue(did);
+        const view = render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), text);
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+        return { ...made, view, user };
+    };
+    const waitingCard = async (text: string) => (await screen.findByText(text)).closest('article.waiting') as HTMLElement;
+
+    it('is shown as the reader\'s post, marked as waiting, with the chain it waits on once the service says', async () => {
+        const { state, user } = await publishing('Not anchored **yet**.', 'did:cid:new');
+        const card = await waitingCard('yet');
+
+        // It is the reader's, shown as a post is: who wrote it and what it says.
+        expect(within(card).getByTitle(ALICE)).toBeTruthy();
+        expect(within(card).getByText('yet').tagName).toBe('STRONG');
+        expect(within(card).getByRole('status').textContent).toBe('Waiting to be anchored');
+
+        state.states['did:cid:new'] = { state: 'pending', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(within(card).getByRole('status').textContent).toBe('Waiting to be anchored on BTC:mainnet'));
+    });
+
+    it('is still there when the page is read anew, for the reader who published it and no other', async () => {
+        const { api, state, view } = await publishing('Kept across a reload.', 'did:cid:new');
+        state.states['did:cid:new'] = { state: 'pending', registry: 'SOL:mainnet-beta' };
+        await waitingCard('Kept across a reload.');
+        view.unmount();
+
+        const again = render(<App api={api} />);
+        const card = await waitingCard('Kept across a reload.');
+        await waitFor(() => expect(within(card).getByRole('status').textContent).toBe('Waiting to be anchored on SOL:mainnet-beta'));
+        again.unmount();
+
+        // Another reader signs in on this browser.
+        state.me = { did: BOB, grant: 'did:cid:bobs', registry: 'BTC:mainnet' };
+        render(<App api={api} />);
+        await screen.findByRole('button', { name: 'Sign out' });
+        await screen.findByRole('heading', { name: /Timeline/ });
+        expect(screen.queryByText('Kept across a reload.')).toBeNull();
+    });
+
+    it('is put away once the indexer shows it, or the service says it is published', async () => {
+        const { api, state, view, user } = await publishing('Soon published.', 'did:cid:new');
+        await waitingCard('Soon published.');
+
+        // The service says so before the indexer has it.
+        state.states['did:cid:new'] = { state: 'published', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(document.querySelector('article.waiting')).toBeNull());
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)).toStrictEqual([]);
+        view.unmount();
+
+        // And it is not back when the page is read anew.
+        render(<App api={api} />);
+        await screen.findByText('Anchored.');
+        expect(screen.queryByText('Soon published.')).toBeNull();
+    });
+
+    it('says when it will never be published, and is the reader\'s to put away', async () => {
+        const { state, user } = await publishing('Too late.', 'did:cid:new');
+        state.states['did:cid:new'] = { state: 'none' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        const card = await waitingCard('Too late.');
+        await waitFor(() => expect(within(card).getByRole('status').textContent).toBe('Not published'));
+        expect(within(card).getByText(/will not be published/)).toBeTruthy();
+
+        await user.click(within(card).getByRole('button', { name: 'Dismiss' }));
+        expect(screen.queryByText('Too late.')).toBeNull();
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)).toStrictEqual([]);
+    });
+
+    it('stays as it is when the service cannot say, and is not undone by what the browser kept that is no entry', async () => {
+        localStorage.setItem(`memepool.waiting.${ALICE}`, JSON.stringify([{ did: 'did:cid:kept', text: 'Kept.' }, 'nonsense', { text: 'no did' }, null, { did: 7 }]));
+        const { api } = services({ me: granted });
+        vi.mocked(api.state).mockRejectedValue(new Error('the service is away'));
+        render(<App api={api} />);
+
+        const card = await waitingCard('Kept.');
+        await waitFor(() => expect(api.state).toHaveBeenCalledWith('did:cid:kept'));
+        expect(within(card).getByRole('status').textContent).toBe('Waiting to be anchored');
+        expect(document.querySelectorAll('article.waiting')).toHaveLength(1);
+
+        localStorage.setItem(`memepool.waiting.${BOB}`, '{not json');
+        cleanup();
+        render(<App api={services({ me: { did: BOB, grant: 'did:cid:bobs' } }).api} />);
+        expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
+    });
+
+    it('is a reply in its thread, kept and marked in the same way', async () => {
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
+        vi.mocked(api.publish).mockResolvedValue('did:cid:reply');
+        state.states['did:cid:reply'] = { state: 'pending', registry: 'BTC:mainnet' };
+        const view = render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'A reply that waits.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        const card = await waitingCard('A reply that waits.');
+        await waitFor(() => expect(within(card).getByRole('status').textContent).toBe('Waiting to be anchored on BTC:mainnet'));
+        view.unmount();
+
+        render(<App api={api} />);
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        expect(await waitingCard('A reply that waits.')).not.toBeNull();
+    });
+});
+
 describe('a boost', () => {
     const ORIGINAL = 'did:cid:bagaaieraoriginaloriginaloriginaloriginaloriginalorigina';
     const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';
@@ -2051,6 +2169,13 @@ describe('the services\' client', () => {
         // What the indexer gave is what the next page comes after.
         expect(page.read).toBe(2);
         expect(asked[0].url).toBe('/memeplex/api/v1/timeline?author=did%3Acid%3Aa&kind=post&kind=paper');
+    });
+
+    it('asks the service where an object stands, and says nothing when the service does not', async () => {
+        const { api } = answering({ 'GET /memepool/api/v1/objects/did%3Acid%3A1/state': { status: 200, body: { state: 'pending', registry: 'BTC:mainnet' } } });
+
+        expect(await api.state('did:cid:1')).toStrictEqual({ state: 'pending', registry: 'BTC:mainnet' });
+        expect(await api.state('did:cid:2')).toBeUndefined();
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

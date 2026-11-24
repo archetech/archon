@@ -34,6 +34,15 @@ boosted is no longer in the post's history, which a replay can bring about, no o
 version is shown in its place. Opening a boost opens the post as it is, and the
 reader who made a boost can undo it, which withdraws the boost and leaves the post.
 
+What a reader publishes is not a publication until its chain anchors it, which can
+be minutes or an hour. Until the indexer shows it, the pages show it themselves, as
+the reader's post with a mark saying it waits and the chain it waits on. It is kept
+in the browser, for each reader, so it is still there when the page is read anew.
+The pages ask the Memepool service where each such object stands: one that is
+published is put away for the indexer to show, and one that will never be, made
+under a grant that ended before it was anchored, says so and is the reader's to
+dismiss.
+
 A reader's timeline is the posts, articles and boosts of the reader and of those
 they follow. It holds no replies: a reply is part of a conversation, and is read in
 the thread of what it answers.

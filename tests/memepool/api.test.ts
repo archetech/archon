@@ -732,6 +732,40 @@ describe('publishing', () => {
         expect((await client.publication(did, grantDid)).state).toBe('withdrawn');
     }, 120_000);
 
+    it('says where an object of the user\'s stands: waiting, published, withdrawn, or never to be', async () => {
+        const { agent, grantDid } = await granted(alice);
+        const stateOf = async (did: string, by = agent) => (await by.get(`/api/v1/objects/${encodeURIComponent(did)}/state`)).body;
+        const { did } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body;
+
+        expect(await stateOf(did)).toStrictEqual({ state: 'pending', registry: REGISTRY });
+        await anchor();
+        expect(await stateOf(did)).toStrictEqual({ state: 'published', registry: REGISTRY });
+
+        await agent.delete(`/api/v1/objects/${did}`);
+        await anchor();
+        expect(await stateOf(did)).toStrictEqual({ state: 'withdrawn', registry: REGISTRY });
+
+        // An object made under a grant that is revoked before it is anchored is never published.
+        const late = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Too late.' })).body.did;
+        await alice.revokeDID(grantDid);
+        await anchor();
+        expect(await stateOf(late)).toStrictEqual({ state: 'none' });
+    }, 120_000);
+
+    it('says nothing of an object that is another user\'s, that it did not publish, or to nobody signed in', async () => {
+        const { agent } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body;
+        const other = await signIn(bob);
+        const stateOf = (of: string, by: { get: (path: string) => request.Test }) => by.get(`/api/v1/objects/${encodeURIComponent(of)}/state`);
+
+        expect((await stateOf(did, other)).status).toBe(404);
+        expect((await stateOf(did, request(app))).status).toBe(401);
+        // An asset of the user's own that the service did not make, an identity, and what is no DID.
+        expect((await stateOf(await alice.createAsset({ memeplex: { v: 1, kind: 'post', author: aliceDid, grant: 'did:cid:any', text: 'x' } }, { registry: 'hyperswarm' }), agent)).status).toBe(404);
+        expect((await stateOf(aliceDid, agent)).status).toBe(404);
+        expect((await stateOf('memepool', agent)).status).toBe(404);
+    }, 120_000);
+
     it('refuses what is not a valid object, and an edit that would change what an object is', async () => {
         const { agent } = await granted(alice);
         const { did } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body;

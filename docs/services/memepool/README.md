@@ -47,6 +47,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`, and for an article its `body`; returns its `did` |
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
+| `GET /objects/:did/state` | Where an object the user published through this service stands: `{ state, registry? }`, with `pending` while it waits to be anchored and `none` when it never will be |
 | `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
 | `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
 | `GET /images/:did?versionId=` | An image asset at a version, as the image it is, for text that embeds it; 404 for anything else |
