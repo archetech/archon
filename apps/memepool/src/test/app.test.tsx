@@ -32,6 +32,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         bodies: {} as Record<string, string>,
         // What the service says of each identity, by its DID.
         people: {} as Record<string, { name?: string; address?: string }>,
+        // The publications the indexer has, by DID, beside those of a timeline.
+        known: {} as Record<string, Publication>,
     };
     const api: Api = {
         me: vi.fn(async () => state.me),
@@ -48,7 +50,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         }),
         thread: vi.fn(async () => []),
         responses: vi.fn(async () => state.responses),
-        publication: vi.fn(async () => undefined),
+        publication: vi.fn(async (did: string) => state.known[did]),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
@@ -546,7 +548,6 @@ describe('reading and publishing', () => {
             timeline: [
                 { ...post('did:cid:1', ALICE, ''), memeplex: { kind: 'post', author: ALICE, content: { cid: 'bafy' } } },
                 { ...post('did:cid:2', ALICE, ''), memeplex: { kind: 'paper', author: ALICE, title: 'On DIDs', summary: 'A summary.', content: { cid: 'bafy' } } },
-                { ...post('did:cid:3', ALICE, ''), memeplex: { kind: 'post', author: ALICE, target: 'did:cid:bagaaieraboostedboostedboostedboostedboostedboosted' } },
             ],
         });
         render(<App api={api} />);
@@ -556,7 +557,6 @@ describe('reading and publishing', () => {
         // A list shows what an article says of itself, and reads no body.
         expect(screen.getAllByText('Open it to read the full text.')).toHaveLength(2);
         expect(api.content).not.toHaveBeenCalled();
-        expect(screen.getByText(/A boost of/)).toBeTruthy();
     });
 
     it('shows a reader as signed in, with the way to sign out, when the read after signing in fails', async () => {
@@ -904,6 +904,82 @@ describe('an author\'s avatar', () => {
 
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(ALICE)}`);
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(BOB)}`);
+    });
+});
+
+describe('a boost', () => {
+    const ORIGINAL = 'did:cid:bagaaieraoriginaloriginaloriginaloriginaloriginalorigina';
+    const boostOf = (did: string, author: string, target: string): Publication => ({ ...post(did, author, ''), memeplex: { kind: 'post', author, target, grant: 'did:cid:grant' } });
+
+    it('is shown as the post it is of, under who boosted it', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What **Bob** wrote.');
+        state.people[ALICE] = { name: 'Alice' };
+        state.people[BOB] = { name: 'Bob B.' };
+        render(<App api={api} />);
+
+        const entry = (await screen.findByText('boosted')).closest('article')!;
+
+        // Who boosted, and then the post as it is shown anywhere: its author and its text.
+        expect(await within(entry.querySelector('.boosted') as HTMLElement).findByText('Alice')).toBeTruthy();
+        const original = await waitFor(() => entry.querySelector('.original') as HTMLElement);
+        expect(await within(original).findByText('Bob B.')).toBeTruthy();
+        expect(within(original).getByText('Bob').tagName).toBe('STRONG');
+        expect(api.publication).toHaveBeenCalledWith(ORIGINAL);
+        expect(screen.queryByText(/A boost of/)).toBeNull();
+    });
+
+    it('opens the post boosted, and copies its DID', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        await screen.findByText('What Bob wrote.');
+        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
+
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        // The thread is the post's own: it is what there is to answer.
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+        expect(api.thread).toHaveBeenCalledWith(ORIGINAL);
+        expect(screen.queryByText('boosted')).toBeNull();
+    });
+
+    it('is undone by the reader who made it, which withdraws the boost and not the post', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('What Bob wrote.');
+        expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'Undo boost' }));
+
+        await waitFor(() => expect(api.withdraw).toHaveBeenCalledWith('did:cid:boost'));
+    });
+
+    it('says so when the post cannot be shown, was withdrawn, or cannot be read', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        const view = render(<App api={api} />);
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(screen.getByTitle(ORIGINAL)).toBeTruthy();
+        // There is nothing to open.
+        expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+        view.unmount();
+
+        state.known[ORIGINAL] = { ...post(ORIGINAL, BOB, 'Gone.'), state: 'withdrawn' };
+        const again = render(<App api={api} />);
+        expect(await screen.findByText(/The post was withdrawn/)).toBeTruthy();
+        expect(screen.queryByText('Gone.')).toBeNull();
+        again.unmount();
+
+        vi.mocked(api.publication).mockRejectedValue(new Error('the indexer is away'));
+        render(<App api={api} />);
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
     });
 });
 

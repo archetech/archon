@@ -348,11 +348,85 @@ function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; 
     );
 }
 
-function Post({ publication, onOpen, onWithdraw, full }: { publication: Publication; onOpen?: () => void; onWithdraw?: () => void; full?: Api }) {
+// Who is asked for a publication by its DID: the indexer.
+const Publications = createContext<((did: string) => Promise<Publication | undefined>) | undefined>(undefined);
+
+// The object a boost is of, or nothing for an object that is not a boost: a
+// post with no words of its own that names another.
+const boosted = (object: NonNullable<Publication['memeplex']>): string | undefined =>
+    (object.kind === 'post' && object.text === undefined && object.content === undefined && typeof object.target === 'string' ? object.target : undefined);
+
+// A boost, shown as what it passes on: the post it is of, as that post is
+// shown, under a line saying who boosted it. Opening it opens the post, which
+// is what there is to read and answer.
+function Boost({ publication, target, onOpen, onWithdraw }: {
+    publication: Publication; target: string; onOpen?: (publication: Publication) => void; onWithdraw?: () => void;
+}) {
+    const read = useContext(Publications);
+    // The post boosted: not read yet, or one the indexer cannot show.
+    const [original, setOriginal] = useState<Publication | null | undefined>(undefined);
+    const author = publication.memeplex!.author;
+
+    useEffect(() => {
+        let current = true;
+
+        setOriginal(undefined);
+        (read ? read(target) : Promise.resolve(undefined)).then(
+            found => { if (current) setOriginal(found ?? null); },
+            () => { if (current) setOriginal(null); },
+        );
+
+        return () => { current = false; };
+    }, [read, target]);
+
+    const shown = original && original.state !== 'withdrawn' && original.memeplex ? original : undefined;
+
+    return (
+        <article className="post boost">
+            <p className="boosted">
+                <Identity did={author} />
+                <span>boosted</span>
+                <time>{when(publication)}</time>
+            </p>
+            {original === undefined && <p className="muted">Reading the post.</p>}
+            {original !== undefined && !shown && (
+                <p className="muted">
+                    {original?.state === 'withdrawn' ? 'The post was withdrawn: ' : 'The post cannot be shown: '}
+                    <span className="mono" title={target}>{short(target)}</span>
+                </p>
+            )}
+            {shown && (
+                <div className="original">
+                    <header>
+                        <Identity did={shown.memeplex!.author} />
+                        <time>{when(shown)}</time>
+                    </header>
+                    {shown.memeplex!.title && <h3>{shown.memeplex!.title}</h3>}
+                    <Body object={shown.memeplex!} />
+                </div>
+            )}
+            <footer>
+                {onOpen && shown && <button className="quiet" onClick={() => onOpen(shown)}>Open</button>}
+                {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
+                <Copy text={target} label="Copy DID" unable={`Could not copy. The DID is ${target}`} />
+            </footer>
+        </article>
+    );
+}
+
+function Post({ publication, onOpen, onWithdraw, full }: {
+    publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api;
+}) {
     const object = publication.memeplex;
 
     if (publication.state === 'withdrawn' || !object) {
         return <article className="post muted">Withdrawn</article>;
+    }
+
+    const target = boosted(object);
+
+    if (target) {
+        return <Boost publication={publication} target={target} onOpen={onOpen} onWithdraw={onWithdraw} />;
     }
 
     return (
@@ -364,7 +438,7 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
             {object.title && <h3>{object.title}</h3>}
             <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
             <footer>
-                {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
+                {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
                 {/* A post's DID is its address: what another wallet or node resolves it by. */}
                 {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
@@ -1081,7 +1155,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                             <Post
                                 key={each.did}
                                 publication={each}
-                                onOpen={() => setOpen(each)}
+                                onOpen={setOpen}
                                 onWithdraw={changeable(each)
                                     ? async () => {
                                         try {
@@ -1196,19 +1270,21 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     return (
         <Avatars.Provider value={api.avatar}>
             <People.Provider value={people}>
-                {error && <p role="alert" className="error">{error}</p>}
-                <Reader
-                    key={session}
-                    api={api}
-                    me={me}
-                    onCheck={loadMe}
-                    onSignedOut={() => {
-                        sessions.current += 1;
-                        setSession(sessions.current);
-                        setMe(null);
-                        setError('');
-                    }}
-                />
+                <Publications.Provider value={api.publication}>
+                    {error && <p role="alert" className="error">{error}</p>}
+                    <Reader
+                        key={session}
+                        api={api}
+                        me={me}
+                        onCheck={loadMe}
+                        onSignedOut={() => {
+                            sessions.current += 1;
+                            setSession(sessions.current);
+                            setMe(null);
+                            setError('');
+                        }}
+                    />
+                </Publications.Provider>
             </People.Provider>
         </Avatars.Provider>
     );
