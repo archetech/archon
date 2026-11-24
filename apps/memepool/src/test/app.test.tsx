@@ -910,6 +910,158 @@ describe('an author\'s avatar', () => {
     });
 });
 
+describe('an author\'s own posts', () => {
+    const both = () => [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.'), post('did:cid:3', BOB, 'Bob once more.')];
+    // What the indexer was last asked for: whose posts, and from where.
+    const lastRead = (api: Api) => vi.mocked(api.timeline).mock.calls.slice(-1)[0];
+    const authorOf = (text: string) => within(screen.getByText(text).closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ });
+
+    it('are what is shown when the reader goes to the author, and the timeline is a step back', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.people[BOB] = { name: 'Bob B.' };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Alice.');
+        await user.click(authorOf('From Bob.'));
+
+        // Bob's posts and no other's, asked of the indexer for Bob alone.
+        expect(await screen.findByRole('heading', { name: /Posts/ })).toBeTruthy();
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(screen.getByText('Bob once more.')).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+        // Who it is, and nowhere to write: these are another's posts.
+        expect(within(document.querySelector('.author') as HTMLElement).getByText('Bob B.')).toBeTruthy();
+        expect(screen.queryByLabelText('Post')).toBeNull();
+        expect(screen.queryByRole('heading', { name: 'Following' })).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[ALICE, BOB], 0]);
+    });
+
+    it('can be followed and unfollowed from there, which is kept as any follow is', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        // The reader came on Bob by a boost or a reply, and does not follow him.
+        vi.mocked(api.timeline).mockImplementation(async authors => {
+            const publications = authors.includes(ALICE) ? both() : both().filter(each => authors.includes(each.memeplex!.author));
+
+            return { total: publications.length, publications };
+        });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(authorOf('From Bob.'));
+        await user.click(await screen.findByRole('button', { name: 'Follow' }));
+
+        expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([BOB]);
+        // Still Bob's posts: following changes the reader's timeline, not this list.
+        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+
+        await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
+        expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([]);
+    });
+
+    it('are the reader\'s own when the reader goes to themselves, with nobody to follow', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: both() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+
+        await waitFor(() => expect(screen.queryByText('From Bob.')).toBeNull());
+        expect(screen.getByText('From Alice.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Follow' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Unfollow' })).toBeNull();
+    });
+
+    it('are reached from an open post as well, which closes it', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: both() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        await user.click(authorOf('From Bob.'));
+
+        expect(await screen.findByRole('button', { name: 'Back to your timeline' })).toBeTruthy();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(await screen.findByText('Bob once more.')).toBeTruthy();
+    });
+
+    it('are still there when a post opened from them is left by way of its author', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: both() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(authorOf('From Bob.'));
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        await user.click(authorOf('From Bob.'));
+
+        // The same author's list, read anew and not left waiting.
+        expect(await screen.findByText('Bob once more.')).toBeTruthy();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(screen.queryByText('Loading…')).toBeNull();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+
+        // And the reader's timeline likewise, from a post opened on it.
+        await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+    });
+
+    it('say there is nothing for an author with none, whatever of the reader\'s is waiting', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'Not anchored yet.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
+
+        // Bob, whom the reader follows, has published nothing.
+        await user.click(within(screen.getByRole('heading', { name: 'Following' }).closest('section')!).getByRole('button', { name: /did:cid/ }));
+
+        expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
+        expect(screen.queryByText('Waiting to be anchored')).toBeNull();
+
+        // The reader's own posts hold what is waiting.
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
+    });
+
+    it('show older posts a page at a time, of that author', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const many = Array.from({ length: PAGE + 2 }, (_, index) => post(`did:cid:b${index}`, BOB, `Bob ${index}.`));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.'), ...many] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(authorOf(await screen.findByText('Bob 0.').then(() => 'Bob 0.')));
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        await user.click(await screen.findByRole('button', { name: 'Older' }));
+
+        expect(await screen.findByText(`Bob ${PAGE + 1}.`)).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[BOB], PAGE]);
+    });
+});
+
 describe('a boost', () => {
     const ORIGINAL = 'did:cid:bagaaieraoriginaloriginaloriginaloriginaloriginalorigina';
     const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';

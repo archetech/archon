@@ -34,6 +34,11 @@ boosted is no longer in the post's history, which a replay can bring about, no o
 version is shown in its place. Opening a boost opens the post as it is, and the
 reader who made a boost can undo it, which withdraws the boost and leaves the post.
 
+An author, wherever one is shown, is the way to that author's own posts: a list of
+what the author published and nothing else, read from the indexer a page at a time,
+with the way to follow or unfollow the author and a step back to the reader's
+timeline.
+
 An author is shown by the name the identity gives itself and by its address, where
 it has them, with the DID always beside them: a name is a claim anyone can make, and
 the service passes on an address only when the address's domain confirms it.
