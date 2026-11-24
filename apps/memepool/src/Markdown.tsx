@@ -2,7 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 
 // Text as Memeplex says a client shows it: docs/plans/memeplex-reference-1436.md,
 // "Text formatting". It is GitHub Flavored Markdown, and it is written by
@@ -21,7 +23,11 @@ import remarkGfm from 'remark-gfm';
 // shown as the image, which the pages' own service serves. Anything else, and
 // a DID with no version, is shown by its words.
 //
-// Math is not rendered yet.
+// Math is written as it is in Pandoc, Jupyter and GitHub: between single
+// dollars in a line, between double dollars set apart, and in a fenced block
+// marked `math`. It is LaTeX, which KaTeX renders to elements, with the
+// commands that reach outside the math turned off. Math that cannot be
+// rendered is shown as it was written.
 
 const scheme = (url: string) => /^([a-z][a-z0-9+.-]*):/i.exec(url.trim())?.[1].toLowerCase();
 
@@ -63,6 +69,9 @@ export const Embeds = createContext<Embedding | undefined>(undefined);
 
 interface Node {
     type: string;
+    value?: string;
+    lang?: string | null;
+    position?: { start: { offset?: number }; end: { offset?: number } };
     url?: string;
     alt?: string | null;
     identifier?: string;
@@ -90,7 +99,12 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
         (node.type === 'image' ? node.url : node.type === 'imageReference' ? defined.get(node.identifier ?? '') : undefined);
     const embeds = (node: Node) => embedOf(addressOf(node) ?? '') !== undefined;
     const walk = (parent: Node) => {
-        parent.children = parent.children?.flatMap(child => {
+        // A node that holds nothing is given no list of what it holds: one
+        // that is there and empty of meaning is read as a list by what follows.
+        if (!parent.children) {
+            return;
+        }
+        parent.children = parent.children.flatMap(child => {
             if (child.type !== 'paragraph' || !child.children?.some(embeds)) {
                 walk(child);
                 return [child];
@@ -125,6 +139,67 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
     define(tree);
     walk(tree);
 };
+
+// The longest math rendered, in characters of LaTeX. Longer is shown as written.
+export const MATH_LIMIT = 4000;
+
+const DOLLAR = String.fromCharCode(36);
+
+// Keeps as math only what Text formatting says is math, and leaves the rest
+// the text it was written as.
+//
+// The parser takes any two dollars in a line for math, so a sentence naming
+// two prices would be. The rule shared with Pandoc is narrower: an opening
+// dollar has something other than a space straight after it, and a closing
+// dollar has something other than a space straight before it and no digit
+// after it.
+//
+// Math between two dollars each side is set apart, wherever it is written.
+const keepMath = () => (tree: Node, file: unknown) => {
+    const source = String(file);
+    const walk = (parent: Node) => {
+        if (!parent.children) {
+            return;
+        }
+        parent.children = parent.children.map(child => {
+            const from = child.position?.start.offset;
+            const to = child.position?.end.offset;
+
+            if (child.type === 'math' || (child.type === 'code' && child.lang === 'math')) {
+                // Too long to render: a block of the LaTeX as it was written.
+                return (child.value ?? '').length > MATH_LIMIT ? { type: 'code', value: child.value } : child;
+            }
+            if (child.type !== 'inlineMath' || from === undefined || to === undefined) {
+                walk(child);
+                return child;
+            }
+
+            const written = source.slice(from, to);
+            let dollars = 0;
+
+            while (written.charAt(dollars) === DOLLAR) {
+                dollars += 1;
+            }
+
+            const inside = written.slice(dollars, written.length - dollars);
+
+            if (!inside || /^\s|\s$/.test(inside) || /\d/.test(source.charAt(to)) || inside.length > MATH_LIMIT) {
+                return { type: 'text', value: written };
+            }
+
+            return dollars > 1
+                ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
+                : child;
+        });
+    };
+
+    walk(tree);
+};
+
+// How KaTeX is asked to render: what is written is a stranger's, so no command
+// that makes a link, loads an image or sets a class or an attribute is run, and
+// a macro may expand only so far.
+const MATH = [[rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 500, maxSize: 20 }]];
 
 // One embed, as what its DID turns out to be.
 function Embed({ did, version, words }: { did: string; version: string; words: string }) {
@@ -222,11 +297,11 @@ const components: Components = {
 // shown inside a card has its own embeds shown by their words, so that an embed
 // is never inside another.
 export default function Markdown({ text, className = 'text', embeds = true }: { text: string; className?: string; embeds?: boolean }) {
-    const plugins = useMemo(() => [remarkGfm, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
+    const plugins = useMemo(() => [remarkGfm, remarkMath, keepMath, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
 
     return (
         <div className={`${className} markdown`}>
-            <ReactMarkdown remarkPlugins={plugins as never} urlTransform={safeUrl} components={components}>
+            <ReactMarkdown remarkPlugins={plugins as never} rehypePlugins={MATH as never} urlTransform={safeUrl} components={components}>
                 {text}
             </ReactMarkdown>
         </div>

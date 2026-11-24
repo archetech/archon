@@ -75,7 +75,25 @@ article's body are GitHub Flavored Markdown. It is written by strangers, so HTML
 it is shown as text and never made into elements, a link is followed only to an
 `https:` address, and no image is loaded from elsewhere: one at an `https:` address
 is a link the reader may follow, since fetching it would tell its host who is
-reading. Math is not rendered yet.
+reading.
+
+Math is written between dollars, as in Pandoc, Jupyter and GitHub: single dollars
+for math in a line, double dollars for math set apart, and a fenced block marked
+`math` for longer equations. It is LaTeX, rendered by KaTeX, whose styles and fonts
+the pages carry themselves.
+
+- **A dollar is math only where the protocol says so.** An opening dollar has
+  something other than a space straight after it, and a closing one has something
+  other than a space straight before it and no digit after it, so a sentence that
+  names two prices stays text.
+- **It is a stranger's LaTeX.** The commands that make a link, load an image or set a
+  class or an attribute are turned off, a macro may expand only so far, and math
+  longer than 4,000 characters is not rendered.
+- **Math that cannot be rendered is shown as it was written.**
+
+A dollar that is not math and comes before one that is can take that one's opening
+dollar for its own closing one, and both are then shown as text. Writing the first
+as `\$` keeps the math.
 
 An embed is an image whose address is a DID and a version of it,
 `![words](did:cid:…?versionId=…)`, and what it shows depends on what the DID is:
