@@ -31,7 +31,9 @@ and the reader who made a boost can undo it, which withdraws the boost and leave
 the post. Where the indexer cannot show the post, or it was withdrawn, the entry
 says so. A boost is of one version of a post, and the indexer gives a post as it
 is: where the post has been edited since, the entry says that as well, since what
-is shown is not what was boosted.
+is shown is not what was boosted. Where the version boosted is no longer in the post's
+history at all, which a replay can bring about, no other version is shown in its
+place.
 
 An author is shown by the name the identity gives itself and by its address, where
 it has them, with the DID always beside them: a name is a claim anyone can make, and

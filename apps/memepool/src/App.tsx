@@ -355,6 +355,11 @@ const Publications = createContext<((did: string) => Promise<Publication | undef
 // is read apart from that list, and is read anew when the list is.
 const Reads = createContext(0);
 
+// How what is shown stands to the version a boost cites: it is that version,
+// it is a later one of a post whose history still holds the cited one, or the
+// cited one is not in the history, which a replay can bring about.
+type Cited = 'shown' | 'edited' | 'displaced';
+
 // How many boosts of boosts are followed to the post they pass on.
 const BOOST_DEPTH = 5;
 
@@ -373,7 +378,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     const reads = useContext(Reads);
     // The post boosted, with the target it was read for: not read yet, or one
     // the indexer cannot show.
-    const [held, setHeld] = useState<{ target: string; original: Publication | null; changed?: boolean } | undefined>(undefined);
+    const [held, setHeld] = useState<{ target: string; original: Publication | null; cited?: Cited } | undefined>(undefined);
     const author = publication.memeplex!.author;
     const version = typeof publication.memeplex!.targetVersion === 'string' ? publication.memeplex!.targetVersion : undefined;
 
@@ -382,26 +387,34 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
         // A boost of a boost passes on what that one does. The post is found by
         // following them, no further than a few and never to one already seen.
         //
-        // Each boost names the version of what it passes on. Where what is
-        // found at any step is at another version, what is shown has changed
-        // since it was boosted: the post itself, or a boost on the way to it.
-        const find = async (): Promise<{ original: Publication | null; changed?: boolean }> => {
+        // Each boost names the version of what it passes on, and what is found
+        // at each step is held against it: the post itself, and every boost on
+        // the way to it.
+        const find = async (): Promise<{ original: Publication | null; cited?: Cited }> => {
             const seen = new Set<string>([publication.did ?? '']);
             let next = target;
-            let cited = version;
-            let changed = false;
+            let wanted = version;
+            let cited = 'shown' as Cited;
 
             for (let depth = 0; read && depth < BOOST_DEPTH && !seen.has(next); depth += 1) {
                 seen.add(next);
                 const found = await read(next);
                 const further = found?.state === 'published' && found.memeplex ? boosted(found.memeplex) : undefined;
 
-                changed ||= Boolean(found && cited && cited !== shownVersion(found));
+                const want = wanted;
+
+                if (found && want && want !== shownVersion(found)) {
+                    // A version that is in the history has been followed by
+                    // another. One that is not was put out of it.
+                    const kept = found.versions.some(each => each.opid === want);
+
+                    cited = !kept || cited === 'displaced' ? 'displaced' : 'edited';
+                }
                 if (!further) {
-                    return { original: found ?? null, changed };
+                    return { original: found ?? null, cited };
                 }
                 next = further;
-                cited = typeof found!.memeplex!.targetVersion === 'string' ? found!.memeplex!.targetVersion : undefined;
+                wanted = typeof found!.memeplex!.targetVersion === 'string' ? found!.memeplex!.targetVersion : undefined;
             }
 
             return { original: null };
@@ -420,7 +433,10 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     const original = held?.target === target ? held.original : undefined;
     const address = original?.did ?? target;
 
-    const shown = original && original.state !== 'withdrawn' && original.memeplex ? original : undefined;
+    const found = original && original.state !== 'withdrawn' && original.memeplex ? original : undefined;
+    // A version put out of a post's history is not stood in for by another.
+    const displaced = Boolean(found) && held?.cited === 'displaced';
+    const shown = displaced ? undefined : found;
 
     return (
         <article className="post boost">
@@ -430,7 +446,13 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 <time>{when(publication)}</time>
             </p>
             {original === undefined && <p className="muted">Reading the post.</p>}
-            {original !== undefined && !shown && (
+            {displaced && (
+                <p className="muted">
+                    The version boosted is no longer in the history of{' '}
+                    <span className="mono" title={address}>{short(address)}</span>
+                </p>
+            )}
+            {original !== undefined && !found && (
                 <p className="muted">
                     {original?.state === 'withdrawn' ? 'The post was withdrawn: ' : 'The post cannot be shown: '}
                     <span className="mono" title={address}>{short(address)}</span>
@@ -438,7 +460,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
             )}
             {/* A boost is of one version of a post. What is shown is the post as it
                 is, so a post that has changed since is said to have. */}
-            {shown && held?.changed && (
+            {shown && held?.cited === 'edited' && (
                 <p className="muted changed">The post has been edited since it was boosted. This is the post as it is.</p>
             )}
             {shown && (

@@ -1022,7 +1022,11 @@ describe('a boost', () => {
         const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, MIDDLE)] });
         // The boost in between names the version it passed on, which the post is no longer at.
         state.known[MIDDLE] = { ...boostOf(MIDDLE, BOB, ORIGINAL), memeplex: { ...boostOf(MIDDLE, BOB, ORIGINAL).memeplex!, targetVersion: 'op-earlier' } };
-        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        state.known[ORIGINAL] = {
+            ...post(ORIGINAL, BOB, 'What Bob wrote.'),
+            current: 1,
+            versions: [{ opid: 'op-earlier', type: 'create', outcome: 'attributed' }, { opid: 'op-later', type: 'update', outcome: 'attributed' }],
+        };
         const user = userEvent.setup();
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
@@ -1036,7 +1040,7 @@ describe('a boost', () => {
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith(ORIGINAL));
     });
 
-    it('says so when a boost on the way to the post has changed what it passes on', async () => {
+    it('says so when a boost on the way to the post has changed the version it passes on', async () => {
         const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';
         const outer = boostOf('did:cid:boost', ALICE, MIDDLE);
         const middle = boostOf(MIDDLE, BOB, ORIGINAL);
@@ -1050,19 +1054,34 @@ describe('a boost', () => {
         expect(screen.queryByText(/edited since it was boosted/)).toBeNull();
         view.unmount();
 
-        // It is edited to pass on another post, and what it cites is as that post is.
-        const OTHER = 'did:cid:bagaaieraotherotherotherotherotherotherotherotherotherot';
-        state.known[OTHER] = post(OTHER, BOB, 'Another post.');
+        // The post is edited, and the boost in between is edited to pass on the
+        // edit: what it cites is what is shown, and it is not what was boosted.
+        const edit = { opid: 'op-post-edit', type: 'update', outcome: 'attributed' };
+        state.known[ORIGINAL] = { ...post(ORIGINAL, BOB, 'What Bob wrote, corrected.'), current: 1, versions: [...post(ORIGINAL, BOB, '').versions, edit] };
         state.known[MIDDLE] = {
             ...middle,
             current: 1,
             versions: [...middle.versions, { opid: 'op-middle-edit', type: 'update', outcome: 'attributed' }],
-            memeplex: { ...middle.memeplex!, target: OTHER, targetVersion: `op-${OTHER}` },
+            memeplex: { ...middle.memeplex!, targetVersion: 'op-post-edit' },
         };
         render(<App api={api} />);
 
-        expect(await screen.findByText('Another post.')).toBeTruthy();
+        expect(await screen.findByText('What Bob wrote, corrected.')).toBeTruthy();
         expect(screen.getByText(/edited since it was boosted/)).toBeTruthy();
+    });
+
+    it('shows no other version in place of one that is no longer in the post\'s history', async () => {
+        const boost = boostOf('did:cid:boost', ALICE, ORIGINAL);
+        const { api, state } = services({ me: granted, timeline: [{ ...boost, memeplex: { ...boost.memeplex!, targetVersion: 'op-displaced' } }] });
+        // The history holds another version where the cited one was.
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What took its place.');
+        render(<App api={api} />);
+
+        expect(await screen.findByText(/The version boosted is no longer in the history of/)).toBeTruthy();
+        expect(screen.getByTitle(ORIGINAL)).toBeTruthy();
+        expect(screen.queryByText('What took its place.')).toBeNull();
+        expect(screen.queryByText(/edited since it was boosted/)).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
     });
 
     it('follows boosts of boosts only so far, and never round', async () => {
