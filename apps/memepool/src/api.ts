@@ -63,6 +63,10 @@ export interface Api {
     thread(did: string): Promise<Reply[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
+    // A publication as it was at one of its versions, which is what a response
+    // to it cites. 'no-revision' when that version is not in its history: no
+    // other version stands in for it.
+    revision(did: string, versionId: string): Promise<Publication | 'no-revision' | undefined>;
     // The body of an article the service published, or nothing when it holds
     // none for the object. `versionId` names the version whose body is wanted:
     // the one a reader is shown, where the latest may be an edit not anchored.
@@ -151,6 +155,17 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             const response = await call(bases.memeplex, `/publications/${encodeURIComponent(did)}`);
 
             return response.status === 404 ? undefined : json(response);
+        },
+        async revision(did, versionId) {
+            const response = await call(bases.memeplex, `/publications/${encodeURIComponent(did)}?versionId=${encodeURIComponent(versionId)}`);
+
+            if (response.status === 404) {
+                const reason = await response.json().then(body => (body as { reason?: unknown } | null)?.reason, () => undefined);
+
+                return reason === 'no-revision' ? 'no-revision' : undefined;
+            }
+
+            return json(response);
         },
         async content(did, versionId) {
             const version = versionId ? `?versionId=${encodeURIComponent(versionId)}` : '';

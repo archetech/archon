@@ -348,95 +348,101 @@ function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; 
     );
 }
 
-// Who is asked for a publication by its DID: the indexer.
-const Publications = createContext<((did: string) => Promise<Publication | undefined>) | undefined>(undefined);
+// Who is asked for publications: the indexer. `at` gives one as it was at a
+// version, and `now` as it is.
+interface Reading {
+    at: (did: string, versionId: string) => Promise<Publication | 'no-revision' | undefined>;
+    now: (did: string) => Promise<Publication | undefined>;
+}
+
+const Publications = createContext<Reading | undefined>(undefined);
 
 // Counts the reads of the list a publication is shown in. What a boost shows
-// is read apart from that list, and is read anew when the list is.
+// is read apart from that list, and is read anew when the list is: the indexer
+// may not have had it, and it may since have been withdrawn.
 const Reads = createContext(0);
-
-// How what is shown stands to the version a boost cites: it is that version,
-// it is a later one of a post whose history still holds the cited one, or the
-// cited one is not in the history, which a replay can bring about.
-type Cited = 'shown' | 'edited' | 'displaced';
 
 // How many boosts of boosts are followed to the post they pass on.
 const BOOST_DEPTH = 5;
 
-// The object a boost is of, or nothing for an object that is not a boost: a
-// post with no words of its own that names another.
-const boosted = (object: NonNullable<Publication['memeplex']>): string | undefined =>
-    (object.kind === 'post' && object.text === undefined && object.content === undefined && typeof object.target === 'string' ? object.target : undefined);
+// What a boost is of, or nothing for an object that is not a boost: a post
+// with no words of its own that names another, and the version of it.
+const boosted = (object: NonNullable<Publication['memeplex']>): { did: string; version?: string } | undefined =>
+    (object.kind === 'post' && object.text === undefined && object.content === undefined && typeof object.target === 'string'
+        ? { did: object.target, version: typeof object.targetVersion === 'string' ? object.targetVersion : undefined }
+        : undefined);
 
 // A boost, shown as what it passes on: the post it is of, as that post is
-// shown, under a line saying who boosted it. Opening it opens the post, which
-// is what there is to read and answer.
+// shown, under a line saying who boosted it.
+//
+// A boost is of one version of a post, and that version is what is shown,
+// whatever the post says since. A boost of a boost is of one version of that
+// boost, so the whole way to the post is fixed as well.
 function Boost({ publication, target, onOpen, onWithdraw }: {
-    publication: Publication; target: string; onOpen?: (publication: Publication) => void; onWithdraw?: () => void;
+    publication: Publication; target: { did: string; version?: string }; onOpen?: (publication: Publication) => void; onWithdraw?: () => void;
 }) {
     const read = useContext(Publications);
     const reads = useContext(Reads);
-    // The post boosted, with the target it was read for: not read yet, or one
-    // the indexer cannot show.
-    const [held, setHeld] = useState<{ target: string; original: Publication | null; cited?: Cited } | undefined>(undefined);
+    // What was found for the boost named: the post as it was, that its version
+    // is not in its history, or nothing the indexer can show.
+    const [held, setHeld] = useState<{ of: string; found: Publication | 'no-revision' | null; did: string } | undefined>(undefined);
+    const [opening, setOpening] = useState(false);
     const author = publication.memeplex!.author;
-    const version = typeof publication.memeplex!.targetVersion === 'string' ? publication.memeplex!.targetVersion : undefined;
+    const { did, version } = target;
+    const of = `${did} ${version ?? ''}`;
 
     useEffect(() => {
         let current = true;
-        // A boost of a boost passes on what that one does. The post is found by
-        // following them, no further than a few and never to one already seen.
-        //
-        // Each boost names the version of what it passes on, and what is found
-        // at each step is held against it: the post itself, and every boost on
-        // the way to it.
-        const find = async (): Promise<{ original: Publication | null; cited?: Cited }> => {
-            const seen = new Set<string>([publication.did ?? '']);
-            let next = target;
-            let wanted = version;
-            let cited = 'shown' as Cited;
+        // Follows boosts of boosts, each at the version the one before names,
+        // no further than a few and never to one already seen.
+        const find = async (): Promise<{ found: Publication | 'no-revision' | null; did: string }> => {
+            const seen = new Set<string>();
+            let next: { did: string; version?: string } = { did, version };
 
-            for (let depth = 0; read && depth < BOOST_DEPTH && !seen.has(next); depth += 1) {
-                seen.add(next);
-                const found = await read(next);
-                const further = found?.state === 'published' && found.memeplex ? boosted(found.memeplex) : undefined;
+            for (let depth = 0; read && next.version && depth < BOOST_DEPTH && !seen.has(`${next.did} ${next.version}`); depth += 1) {
+                seen.add(`${next.did} ${next.version}`);
+                const found = await read.at(next.did, next.version);
 
-                const want = wanted;
-
-                if (found && want && want !== shownVersion(found)) {
-                    // A version that is in the history has been followed by
-                    // another. One that is not was put out of it.
-                    const kept = found.versions.some(each => each.opid === want);
-
-                    cited = !kept || cited === 'displaced' ? 'displaced' : 'edited';
+                if (found === 'no-revision' || !found) {
+                    return { found: found ?? null, did: next.did };
                 }
+
+                const further = found.memeplex ? boosted(found.memeplex) : undefined;
+
                 if (!further) {
-                    return { original: found ?? null, cited };
+                    return { found, did: next.did };
                 }
                 next = further;
-                wanted = typeof found!.memeplex!.targetVersion === 'string' ? found!.memeplex!.targetVersion : undefined;
             }
 
-            return { original: null };
+            return { found: null, did: next.did };
         };
 
         find().then(
-            found => { if (current) setHeld({ target, ...found }); },
-            () => { if (current) setHeld({ target, original: null }); },
+            answer => { if (current) setHeld({ of, ...answer }); },
+            () => { if (current) setHeld({ of, found: null, did }); },
         );
 
         return () => { current = false; };
-    }, [read, target, version, reads, publication.did]);
+    }, [read, did, version, of, reads]);
 
-    // What was read for another target is not this one's. What was read for
+    // What was read for another boost is not this one's. What was read for
     // this one stays while it is read anew.
-    const original = held?.target === target ? held.original : undefined;
-    const address = original?.did ?? target;
+    const answer = held?.of === of ? held : undefined;
+    const shown = answer && answer.found && answer.found !== 'no-revision' && answer.found.memeplex ? answer.found : undefined;
+    const address = answer?.did ?? did;
+    const withdrawn = shown?.state === 'withdrawn';
 
-    const found = original && original.state !== 'withdrawn' && original.memeplex ? original : undefined;
-    // A version put out of a post's history is not stood in for by another.
-    const displaced = Boolean(found) && held?.cited === 'displaced';
-    const shown = displaced ? undefined : found;
+    // The post is opened as it is, which is what there is to read and answer.
+    const open = async () => {
+        setOpening(true);
+        try {
+            onOpen?.(await read?.now(shown!.did!).catch(() => undefined) ?? shown!);
+        }
+        finally {
+            setOpening(false);
+        }
+    };
 
     return (
         <article className="post boost">
@@ -445,23 +451,12 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 <span>boosted</span>
                 <time>{when(publication)}</time>
             </p>
-            {original === undefined && <p className="muted">Reading the post.</p>}
-            {displaced && (
+            {answer === undefined && <p className="muted">Reading the post.</p>}
+            {answer && !shown && (
                 <p className="muted">
-                    The version boosted is no longer in the history of{' '}
+                    {answer.found === 'no-revision' ? 'The version boosted is no longer in the history of ' : 'The post cannot be shown: '}
                     <span className="mono" title={address}>{short(address)}</span>
                 </p>
-            )}
-            {original !== undefined && !found && (
-                <p className="muted">
-                    {original?.state === 'withdrawn' ? 'The post was withdrawn: ' : 'The post cannot be shown: '}
-                    <span className="mono" title={address}>{short(address)}</span>
-                </p>
-            )}
-            {/* A boost is of one version of a post. What is shown is the post as it
-                is, so a post that has changed since is said to have. */}
-            {shown && held?.cited === 'edited' && (
-                <p className="muted changed">The post has been edited since it was boosted. This is the post as it is.</p>
             )}
             {shown && (
                 <div className="original">
@@ -471,10 +466,11 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                     </header>
                     {shown.memeplex!.title && <h3>{shown.memeplex!.title}</h3>}
                     <Body object={shown.memeplex!} />
+                    {withdrawn && <p className="muted note">Its author has since withdrawn this post.</p>}
                 </div>
             )}
             <footer>
-                {onOpen && shown && <button className="quiet" onClick={() => onOpen(shown)}>Open</button>}
+                {onOpen && shown && !withdrawn && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
                 <Copy text={address} label="Copy DID" unable={`Could not copy. The DID is ${address}`} />
             </footer>
@@ -1272,6 +1268,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 }
 
 export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number }) {
+    const reading = useMemo(() => ({ at: api.revision, now: api.publication }), [api]);
     // Each identity is asked about once, however many of its posts are shown.
     const people = useMemo(() => {
         const asked = new Map<string, Promise<Person>>();
@@ -1343,7 +1340,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     return (
         <Avatars.Provider value={api.avatar}>
             <People.Provider value={people}>
-                <Publications.Provider value={api.publication}>
+                <Publications.Provider value={reading}>
                     {error && <p role="alert" className="error">{error}</p>}
                     <Reader
                         key={session}

@@ -45,7 +45,7 @@ All routes are `GET` and return JSON. A publication is the result of attribution
 | `/api/v1/ready` | `true` once the index has read every DID the node has. |
 | `/api/v1/version` | `{ version, commit }`. |
 | `/api/v1/status` | `{ ready, dids, publications, lastPoll, lastRebuild }`. |
-| `/api/v1/publications/:did` | The publication of an object. 404 when it has no attributed version. |
+| `/api/v1/publications/:did` | The publication of an object. 404 when it has no attributed version. With `?versionId=`, the object as it was at that version, which is what a response to it cites: `current` is that version and `memeplex` what it said, with the object's own `state`. A version that is not in the history, is not attributed, or is the deletion answers 404 with `reason: "no-revision"`, and never with another version. |
 | `/api/v1/timeline?author=<did>&author=…&limit=&offset=` | `{ total, publications }`: the posts, papers and replies of up to 1000 authors that are published, newest first. `limit` is 1 to 500, default 50. |
 | `/api/v1/threads/:did` | The replies to an object and the replies to those, as a flat list in reading order, each with its `depth`. A withdrawn reply stays as a tombstone. |
 | `/api/v1/boosts/:did` | The posts that name the object as their target. |

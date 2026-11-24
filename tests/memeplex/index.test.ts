@@ -100,6 +100,47 @@ beforeAll(async () => {
     dids.removedTag = await record(await (await respond(carol, carolGrant, web, post, { kind: 'tag', tag: 'spam' }, 304)).delete(web, 306));
 }, 240_000);
 
+describe('an object as it was at a version', () => {
+    it('is what that version said, whatever the object says since', () => {
+        const index = filled();
+        const { versions } = index.publication(edited)!;
+        const first = index.revision(edited, versions[0].opid!) as Exclude<ReturnType<typeof index.revision>, string | undefined>;
+
+        expect(versions.length).toBeGreaterThan(1);
+        expect(first.memeplex!.text).not.toBe('Final.');
+        expect(first).toMatchObject({ state: 'published', did: edited, current: 0 });
+        expect(first.versions).toStrictEqual(versions);
+        // The latest version is the publication as it is.
+        expect(index.revision(edited, versions.at(-1)!.opid!)).toStrictEqual(index.publication(edited));
+    });
+
+    it('is still there for an object since withdrawn, which says it is', () => {
+        const index = filled();
+        const { versions } = index.publication(withdrawn)!;
+        const first = index.revision(withdrawn, versions[0].opid!);
+
+        expect(first).toMatchObject({ state: 'withdrawn', current: 0 });
+        expect((first as { memeplex: Record<string, unknown> }).memeplex).toMatchObject({ kind: 'post' });
+        // The deletion is no version of what was published.
+        expect(versions.at(-1)!.type).toBe('delete');
+        expect(index.revision(withdrawn, versions.at(-1)!.opid!)).toBe('no-revision');
+    });
+
+    it('is no other version when the one named is not in the history, or is not attributed', () => {
+        const index = filled();
+
+        expect(index.revision(post, 'bafyreinotinthehistory')).toBe('no-revision');
+        expect(index.revision(forged, 'bafyreianything')).toBeUndefined();
+        expect(index.revision('did:cid:nothing', 'bafyreianything')).toBeUndefined();
+
+        const unattributed = index.publication(late)!.versions.find(each => each.outcome !== 'attributed');
+
+        if (unattributed?.opid) {
+            expect(index.revision(late, unattributed.opid)).toBe('no-revision');
+        }
+    });
+});
+
 describe('publications', () => {
     it('holds what is attributed and nothing that is only claimed', () => {
         const index = filled();
