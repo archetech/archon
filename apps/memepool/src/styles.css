@@ -68,6 +68,8 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 }
 
 .identity { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+button.identity.visit { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.identity.visit:hover strong, button.identity.visit:hover .mono, button.identity.visit:focus-visible strong { text-decoration: underline; }
 .who { display: inline-flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .called { display: inline-flex; flex-wrap: wrap; gap: 0 0.4rem; overflow-wrap: anywhere; }
 .called strong { color: var(--ink, inherit); }

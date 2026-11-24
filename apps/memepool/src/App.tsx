@@ -64,14 +64,17 @@ function usePerson(did: string): Person {
     return person.did === did ? person.found : {};
 }
 
+// How a reader goes to an author's own posts.
+const Visits = createContext<((did: string) => void) | undefined>(undefined);
+
 // An identity as the pages name one: its avatar, the name it gives itself and
 // its address, where it has them, and its DID, shortened. A name is a claim
 // anyone can make, so the DID is always beside it: the DID is who wrote.
 function Identity({ did }: { did: string }) {
     const { name, address } = usePerson(did);
-
-    return (
-        <span className="identity">
+    const visit = useContext(Visits);
+    const shown = (
+        <>
             <Picture key={did} did={did} />
             <span className="who">
                 {(name || address) && (
@@ -82,8 +85,13 @@ function Identity({ did }: { did: string }) {
                 )}
                 <span className="mono" title={did}>{short(did)}</span>
             </span>
-        </span>
+        </>
     );
+
+    // Where there is somewhere to go, an identity is the way to its posts.
+    return visit
+        ? <button type="button" className="identity visit" title="Posts by this author" onClick={() => visit(did)}>{shown}</button>
+        : <span className="identity">{shown}</span>;
 }
 
 export const short = (did: string) => (did.length > 24 ? `${did.slice(0, 14)}…${did.slice(-6)}` : did);
@@ -1086,6 +1094,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // Whether the reader is writing an article, which has a form of its own.
     const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
+    // The author whose posts alone are shown, where the reader went to one.
+    const [author, setAuthor] = useState<string | null>(null);
     // How many times the timeline has been read from its start.
     const [refreshes, setRefreshes] = useState(0);
     const [following, setFollowing] = useState('');
@@ -1098,7 +1108,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         const mine = reads.current += 1;
 
         try {
-            const page = await api.timeline([me.did, ...follows.filter(did => did !== me.did)], older?.from ?? 0);
+            const page = await api.timeline(author ? [author] : [me.did, ...follows.filter(did => did !== me.did)], older?.from ?? 0);
 
             if (mine !== reads.current) {
                 return;
@@ -1123,7 +1133,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 setError(message(failure));
             }
         }
-    }, [api, me.did, follows]);
+    }, [api, me.did, follows, author]);
 
     useEffect(() => {
         loadTimeline();
@@ -1131,9 +1141,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         return () => { reads.current += 1; };
     }, [loadTimeline]);
 
-    const follow = () => {
-        const did = following.trim();
-
+    const follow = (did: string) => {
         if (!did.startsWith('did:') || follows.includes(did)) {
             return;
         }
@@ -1143,6 +1151,26 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         localStorage.setItem(FOLLOWS, JSON.stringify(next));
         setFollows(next);
         setFollowing('');
+    };
+
+    // Goes to one author's posts, or back to the reader's timeline. What was
+    // shown is another's list, so it is put away until the new one is read.
+    const visit = (did: string | null) => {
+        // The list shown is already this one's: an open post is closed on it,
+        // and it is read anew as it is when a post is closed any other way.
+        if (did === author) {
+            if (open) {
+                setOpen(null);
+                loadTimeline();
+            }
+            return;
+        }
+        setOpen(null);
+        setWriting(false);
+        setTimeline(null);
+        setFetched(0);
+        setTotal(0);
+        setAuthor(did);
     };
 
     const unfollow = (did: string) => {
@@ -1160,6 +1188,10 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     const changeable = (each: Publication) =>
         each.memeplex?.author === me.did && each.state === 'published' && grants.has(String(each.memeplex.grant));
 
+    // What the reader has published that waits to be anchored, where the list
+    // shown is one it belongs in: the reader's timeline, or the reader's posts.
+    const pending = author && author !== me.did ? [] : waiting.filter(each => !each.target);
+
     // Signed out only when the service says so: the session is a cookie the
     // page cannot remove, and a reader who is told they are signed out must be.
     const signOut = async () => {
@@ -1174,109 +1206,123 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     };
 
     return (
-        <main>
-            <header className="top">
-                <h1>Memepool</h1>
-                <Identity did={me.did} />
-                <button className="quiet" onClick={signOut}>Sign out</button>
-            </header>
+        <Visits.Provider value={visit}>
+            <main>
+                <header className="top">
+                    <h1>Memepool</h1>
+                    <Identity did={me.did} />
+                    <button className="quiet" onClick={signOut}>Sign out</button>
+                </header>
 
-            {!me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
-            {error && <p role="alert" className="error">{error}</p>}
+                {!me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
+                {error && <p role="alert" className="error">{error}</p>}
 
-            {open ? (
-                <Thread
-                    api={api}
-                    me={me}
-                    grants={grants}
-                    root={open}
-                    mine={changeable(open)}
-                    waiting={waiting}
-                    onPublished={published => setWaiting(current => [...current, published])}
-                    onBack={() => { setOpen(null); loadTimeline(); }}
-                />
-            ) : (
-                <>
-                    {may(me, 'memeplex:post') && !writing && (
-                        <>
-                            <Composer
-                                label="Post"
-                                onPublish={async text => {
-                                    const did = await api.publish({ kind: 'post', text });
+                {open ? (
+                    <Thread
+                        api={api}
+                        me={me}
+                        grants={grants}
+                        root={open}
+                        mine={changeable(open)}
+                        waiting={waiting}
+                        onPublished={published => setWaiting(current => [...current, published])}
+                        onBack={() => { setOpen(null); loadTimeline(); }}
+                    />
+                ) : (
+                    <>
+                        {author && (
+                            <section className="card author">
+                                <p><button className="quiet" onClick={() => visit(null)}>Back to your timeline</button></p>
+                                <Identity did={author} />
+                                <p>
+                                    {author !== me.did && (follows.includes(author)
+                                        ? <button className="quiet" onClick={() => unfollow(author)}>Unfollow</button>
+                                        : <button className="quiet" onClick={() => follow(author)}>Follow</button>)}
+                                    <Copy text={author} label="Copy DID" unable={`Could not copy. The DID is ${author}`} />
+                                </p>
+                            </section>
+                        )}
+                        {!author && may(me, 'memeplex:post') && !writing && (
+                            <>
+                                <Composer
+                                    label="Post"
+                                    onPublish={async text => {
+                                        const did = await api.publish({ kind: 'post', text });
 
-                                    setWaiting(current => [...current, { did, text }]);
+                                        setWaiting(current => [...current, { did, text }]);
+                                    }}
+                                />
+                                <p><button className="quiet" onClick={() => setWriting(true)}>Write an article</button></p>
+                            </>
+                        )}
+                        {!author && may(me, 'memeplex:post') && writing && (
+                            <ArticleComposer
+                                onCancel={() => setWriting(false)}
+                                onPublish={async article => {
+                                    const did = await api.publish({ kind: 'post', ...article });
+
+                                    setWaiting(current => [...current, { did, title: article.title }]);
+                                    setWriting(false);
                                 }}
                             />
-                            <p><button className="quiet" onClick={() => setWriting(true)}>Write an article</button></p>
-                        </>
-                    )}
-                    {may(me, 'memeplex:post') && writing && (
-                        <ArticleComposer
-                            onCancel={() => setWriting(false)}
-                            onPublish={async article => {
-                                const did = await api.publish({ kind: 'post', ...article });
-
-                                setWaiting(current => [...current, { did, title: article.title }]);
-                                setWriting(false);
-                            }}
-                        />
-                    )}
-
-                    <section>
-                        <h2>Timeline <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
-                        {waiting.filter(each => !each.target).map(each => (
-                            <article key={each.did} className="post waiting">
-                                {each.title !== undefined && <h3>{each.title}</h3>}
-                                {each.text !== undefined && <Markdown text={each.text} />}
-                                <footer className="muted">Waiting to be anchored</footer>
-                            </article>
-                        ))}
-                        {timeline === null && <p className="muted">Loading…</p>}
-                        {timeline?.length === 0 && waiting.length === 0 && <p className="muted">Nothing here yet.</p>}
-                        <Reads.Provider value={refreshes}>{timeline?.map(each => (
-                            <Post
-                                key={each.did}
-                                publication={each}
-                                onOpen={setOpen}
-                                onWithdraw={changeable(each)
-                                    ? async () => {
-                                        try {
-                                            await api.withdraw(each.did!);
-                                            await loadTimeline();
-                                        }
-                                        catch (failure) {
-                                            setError(message(failure));
-                                        }
-                                    }
-                                    : undefined}
-                            />
-                        ))}</Reads.Provider>
-                        {timeline && fetched < total && (
-                            <button className="quiet" onClick={() => loadTimeline({ shown: timeline, from: fetched })}>Older</button>
                         )}
-                    </section>
 
-                    <section className="card">
-                        <h2>Following</h2>
-                        <p className="muted">
+                        <section>
+                            <h2>{author ? 'Posts' : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
+                            {pending.map(each => (
+                                <article key={each.did} className="post waiting">
+                                    {each.title !== undefined && <h3>{each.title}</h3>}
+                                    {each.text !== undefined && <Markdown text={each.text} />}
+                                    <footer className="muted">Waiting to be anchored</footer>
+                                </article>
+                            ))}
+                            {timeline === null && <p className="muted">Loading…</p>}
+                            {timeline?.length === 0 && pending.length === 0 && <p className="muted">Nothing here yet.</p>}
+                            <Reads.Provider value={refreshes}>{timeline?.map(each => (
+                                <Post
+                                    key={each.did}
+                                    publication={each}
+                                    onOpen={setOpen}
+                                    onWithdraw={changeable(each)
+                                        ? async () => {
+                                            try {
+                                                await api.withdraw(each.did!);
+                                                await loadTimeline();
+                                            }
+                                            catch (failure) {
+                                                setError(message(failure));
+                                            }
+                                        }
+                                        : undefined}
+                                />
+                            ))}</Reads.Provider>
+                            {timeline && fetched < total && (
+                                <button className="quiet" onClick={() => loadTimeline({ shown: timeline, from: fetched })}>Older</button>
+                            )}
+                        </section>
+
+                        {!author && <section className="card">
+                            <h2>Following</h2>
+                            <p className="muted">
                             Kept in this browser and published nowhere. The node that serves your timeline
                             does see which authors you ask it for.
-                        </p>
-                        {follows.map(did => (
-                            <p key={did}>
-                                <Identity did={did} />{' '}
-                                <button className="quiet" onClick={() => unfollow(did)}>Unfollow</button>
                             </p>
-                        ))}
-                        <label>
+                            {follows.map(did => (
+                                <p key={did}>
+                                    <Identity did={did} />{' '}
+                                    <button className="quiet" onClick={() => unfollow(did)}>Unfollow</button>
+                                </p>
+                            ))}
+                            <label>
                             Follow an author
-                            <input value={following} onChange={event => setFollowing(event.target.value)} placeholder="did:cid:…" />
-                        </label>
-                        <button disabled={!following.trim().startsWith('did:')} onClick={follow}>Follow</button>
-                    </section>
-                </>
-            )}
-        </main>
+                                <input value={following} onChange={event => setFollowing(event.target.value)} placeholder="did:cid:…" />
+                            </label>
+                            <button disabled={!following.trim().startsWith('did:')} onClick={() => follow(following.trim())}>Follow</button>
+                        </section>}
+                    </>
+                )}
+            </main>
+        </Visits.Provider>
     );
 }
 
