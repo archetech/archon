@@ -42,6 +42,9 @@ function newestFirst(a: Publication, b: Publication): number {
     return createdAt(b) - createdAt(a) || (a.did! < b.did! ? -1 : 1);
 }
 
+// The kinds of object a timeline holds.
+export const TIMELINE_KINDS = ['post', 'paper', 'reply'] as const;
+
 export class MemeplexIndex {
     private histories = new Map<string, ResolvedVersion[]>();
     private publications = new Map<string, Publication>();
@@ -192,11 +195,14 @@ export class MemeplexIndex {
     }
 
     // What the authors have published and not withdrawn, newest first: posts,
-    // papers and replies.
-    timeline(authors: string[]): Publication[] {
+    // papers and replies, or those of them that `kinds` names. A reply is part
+    // of a conversation, and a reader may want an author's posts without them.
+    timeline(authors: string[], kinds: readonly string[] = TIMELINE_KINDS): Publication[] {
+        const wanted = TIMELINE_KINDS.filter(kind => kinds.includes(kind));
+
         return [...new Set(authors)]
             .flatMap(author => this.under(this.byAuthor, author))
-            .filter(each => each.state === 'published' && ['post', 'paper', 'reply'].includes(kindOf(each)!))
+            .filter(each => each.state === 'published' && wanted.includes(kindOf(each) as typeof wanted[number]))
             .sort(newestFirst);
     }
 

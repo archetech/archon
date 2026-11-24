@@ -19,6 +19,9 @@ const post = (did: string, author: string, text: string, more: Partial<Publicati
 
 // How many publications the indexer gives at once.
 const PAGE = 50;
+// The kinds a reader's timeline and an author's posts are, and an author's replies.
+const POSTS = ['post', 'paper'];
+const REPLIES = ['reply'];
 
 // The services, as far as the pages can tell.
 function services(start: { me?: Me; timeline?: Publication[] } = {}) {
@@ -45,8 +48,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         publish: vi.fn(async object => { state.published.push(object); return `did:cid:new${state.published.length}`; }),
         edit: vi.fn(async (did: string, object: Record<string, unknown>) => { state.edited.push({ did, object }); }),
         withdraw: vi.fn(async did => { state.timeline = state.timeline.map(each => (each.did === did ? { ...each, state: 'withdrawn' as const } : each)); }),
-        timeline: vi.fn(async (authors, offset = 0) => {
-            const all = state.timeline.filter(each => authors.includes(each.memeplex!.author));
+        timeline: vi.fn(async (authors, offset = 0, kinds) => {
+            const all = state.timeline.filter(each => authors.includes(each.memeplex!.author) && (!kinds || kinds.includes(String(each.memeplex!.kind))));
 
             return { total: all.length, publications: all.slice(offset, offset + PAGE) };
         }),
@@ -248,7 +251,7 @@ describe('reading and publishing', () => {
         expect(await screen.findByText('Mine.')).toBeTruthy();
         expect(screen.getByText('Bob\'s.')).toBeTruthy();
         expect(screen.queryByText('Carol\'s.')).toBeNull();
-        expect(api.timeline).toHaveBeenCalledWith([ALICE, BOB], 0);
+        expect(api.timeline).toHaveBeenCalledWith([ALICE, BOB], 0, POSTS);
     });
 
     it('publishes a post, and shows it as waiting until the indexer has it', async () => {
@@ -365,7 +368,7 @@ describe('reading and publishing', () => {
 
         expect(await screen.findByText('Post 59.')).toBeTruthy();
         expect(screen.getByText('Post 0.')).toBeTruthy();
-        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 50);
+        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 50, POSTS);
         expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
     });
 
@@ -380,7 +383,7 @@ describe('reading and publishing', () => {
         const user = userEvent.setup();
 
         await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
-        await waitFor(() => expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 0));
+        await waitFor(() => expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 0, POSTS));
         late({ total: 1, publications: [post('did:cid:2', BOB, 'Bob\'s.')] });
 
         expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
@@ -488,7 +491,7 @@ describe('reading and publishing', () => {
 
         await user.click(screen.getByRole('button', { name: 'Older' }));
         expect(await screen.findByText('Post 119.')).toBeTruthy();
-        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 100);
+        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 100, POSTS);
         expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
     });
 
@@ -932,7 +935,7 @@ describe('an author\'s own posts', () => {
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
         expect(screen.getByText('From Bob.')).toBeTruthy();
         expect(screen.getByText('Bob once more.')).toBeTruthy();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
         // Who it is, and nowhere to write: these are another's posts.
         expect(within(document.querySelector('.author') as HTMLElement).getByText('Bob B.')).toBeTruthy();
         expect(screen.queryByLabelText('Post')).toBeNull();
@@ -941,7 +944,7 @@ describe('an author\'s own posts', () => {
         await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
         expect(await screen.findByText('From Alice.')).toBeTruthy();
         expect(screen.getByLabelText('Post')).toBeTruthy();
-        expect(lastRead(api)).toStrictEqual([[ALICE, BOB], 0]);
+        expect(lastRead(api)).toStrictEqual([[ALICE, BOB], 0, POSTS]);
     });
 
     it('can be followed and unfollowed from there, which is kept as any follow is', async () => {
@@ -961,7 +964,7 @@ describe('an author\'s own posts', () => {
 
         expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([BOB]);
         // Still Bob's posts: following changes the reader's timeline, not this list.
-        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
 
         await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
         expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([]);
@@ -1016,7 +1019,7 @@ describe('an author\'s own posts', () => {
         expect(await screen.findByText('Bob once more.')).toBeTruthy();
         expect(screen.queryByLabelText('Reply')).toBeNull();
         expect(screen.queryByText('Loading…')).toBeNull();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
 
         // And the reader's timeline likewise, from a post opened on it.
         await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
@@ -1047,6 +1050,69 @@ describe('an author\'s own posts', () => {
         expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
     });
 
+    it('are listed apart from the author\'s replies, each shown with what it answers', async () => {
+        const PARENT = 'did:cid:bagaaieraparentparentparentparentparentparentparentparentpar';
+        const parent: Publication = { ...post(PARENT, ALICE, 'What Alice asked.'), versions: [{ opid: 'bafyparent', type: 'create', outcome: 'attributed' }] };
+        const answer: Publication = { ...post('did:cid:answer', BOB, 'What Bob answered.'), memeplex: { kind: 'reply', author: BOB, text: 'What Bob answered.', target: PARENT, targetVersion: 'bafyparent' } };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:2', BOB, 'From Bob.'), answer] });
+        state.known[PARENT] = parent;
+        state.revisions[`${PARENT} bafyparent`] = parent;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The reader's timeline holds no reply.
+        await screen.findByText('From Bob.');
+        expect(screen.queryByText('What Bob answered.')).toBeNull();
+        expect(lastRead(api)).toStrictEqual([[ALICE, BOB], 0, POSTS]);
+
+        // Nor does the author's posts.
+        await user.click(authorOf('From Bob.'));
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
+        expect(screen.queryByText('What Bob answered.')).toBeNull();
+        expect(screen.getByRole('tab', { name: 'Posts' }).getAttribute('aria-selected')).toBe('true');
+
+        // The author's replies are their own list.
+        await user.click(screen.getByRole('tab', { name: 'Replies' }));
+        const reply = (await screen.findByText('What Bob answered.')).closest('article')!;
+
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]);
+        expect(screen.getByRole('heading', { name: /Replies/ })).toBeTruthy();
+        expect(screen.queryByText('From Bob.')).toBeNull();
+        // What it answers is above it, as that was at the version answered.
+        const answered = reply.querySelector('.answered') as HTMLElement;
+        expect(within(answered).getByText('Replying to')).toBeTruthy();
+        expect(await within(answered).findByText('What Alice asked.')).toBeTruthy();
+        expect(api.revision).toHaveBeenCalledWith(PARENT, 'bafyparent');
+
+        // And the posts are a tab back, by the keyboard as well.
+        screen.getByRole('tab', { name: 'Replies' }).focus();
+        await user.keyboard('{ArrowLeft}');
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Posts' }));
+        expect(screen.getByRole('tab', { name: 'Replies' }).tabIndex).toBe(-1);
+    });
+
+    it('show an author\'s posts first whichever list was left, and say when a reply\'s post cannot be shown', async () => {
+        const answer: Publication = { ...post('did:cid:answer', BOB, 'What Bob answered.'), memeplex: { kind: 'reply', author: BOB, text: 'What Bob answered.', target: 'did:cid:bagaaieranowhere', targetVersion: 'bafynowhere' } };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.'), answer] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(authorOf('From Bob.'));
+        await user.click(await screen.findByRole('tab', { name: 'Replies' }));
+        const reply = (await screen.findByText('What Bob answered.')).closest('article')!;
+        expect(await within(reply).findByText(/which cannot be shown/)).toBeTruthy();
+
+        // Another author's view starts at their posts.
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByRole('tab', { name: 'Posts' }).getAttribute('aria-selected')).toBe('true');
+        expect(lastRead(api)).toStrictEqual([[ALICE], 0, POSTS]);
+    });
+
     it('show older posts a page at a time, of that author', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const many = Array.from({ length: PAGE + 2 }, (_, index) => post(`did:cid:b${index}`, BOB, `Bob ${index}.`));
@@ -1059,7 +1125,7 @@ describe('an author\'s own posts', () => {
         await user.click(await screen.findByRole('button', { name: 'Older' }));
 
         expect(await screen.findByText(`Bob ${PAGE + 1}.`)).toBeTruthy();
-        expect(lastRead(api)).toStrictEqual([[BOB], PAGE]);
+        expect(lastRead(api)).toStrictEqual([[BOB], PAGE, POSTS]);
     });
 });
 
@@ -1789,7 +1855,11 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        // A reply is found among the reader's own replies, and not in the timeline.
+        await screen.findByRole('button', { name: 'Sign out' });
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        await user.click(await screen.findByRole('tab', { name: 'Replies' }));
+        await user.click(within((await screen.findByText('A reply.')).closest('article')!.querySelector(':scope > footer') as HTMLElement).getByRole('button', { name: 'Open' }));
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await user.clear(screen.getByLabelText('Edit'));
         await user.type(screen.getByLabelText('Edit'), 'A better reply.');
@@ -1897,6 +1967,16 @@ describe('the services\' client', () => {
         expect(await api.revision('did:cid:1', 'gone')).toBe('no-revision');
         expect(await api.revision('did:cid:1', 'none')).toBeUndefined();
         expect(await api.revision('did:cid:1', 'unrouted')).toBeUndefined();
+    });
+
+    it('asks the indexer for the kinds wanted, and keeps no other kind an indexer gives', async () => {
+        const mixed = [post('did:cid:1', ALICE, 'A post.'), { ...post('did:cid:2', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.' } }];
+        const { api, asked } = answering({
+            'GET /memeplex/api/v1/timeline?author=did%3Acid%3Aa&kind=post&kind=paper': { status: 200, body: { total: 2, publications: mixed } },
+        });
+
+        expect((await api.timeline(['did:cid:a'], 0, ['post', 'paper'])).publications.map(each => each.did)).toStrictEqual(['did:cid:1']);
+        expect(asked[0].url).toBe('/memeplex/api/v1/timeline?author=did%3Acid%3Aa&kind=post&kind=paper');
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

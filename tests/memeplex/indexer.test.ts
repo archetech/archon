@@ -381,6 +381,12 @@ describe('the HTTP views', () => {
 
         const page = await request(app).get('/api/v1/timeline').query({ author: [userDid, clientDid], limit: 1, offset: 1 });
         expect(page.body).toMatchObject({ total: 2, publications: [{ did: first }] });
+
+        // By kind: an author's posts without the replies, and the replies alone.
+        const posts = await request(app).get('/api/v1/timeline').query({ author: userDid, kind: ['post', 'paper'] });
+        expect(posts.body).toMatchObject({ total: 1, publications: [{ did: first }] });
+        const replies = await request(app).get('/api/v1/timeline').query({ author: userDid, kind: 'reply' });
+        expect(replies.body).toMatchObject({ total: 1, publications: [{ did: reply }] });
     }, 60_000);
 
     it.each([
@@ -389,6 +395,8 @@ describe('the HTTP views', () => {
         ['a limit too large', { author: 'did:cid:a', limit: 501 }],
         ['a limit that is not a number', { author: 'did:cid:a', limit: 'ten' }],
         ['a negative offset', { author: 'did:cid:a', offset: -1 }],
+        ['a kind a timeline does not hold', { author: 'did:cid:a', kind: ['post', 'rating'] }],
+        ['a kind that is empty', { author: 'did:cid:a', kind: '' }],
     ])('refuses a timeline with %s', async (_name, query) => {
         const { app } = await serving();
 

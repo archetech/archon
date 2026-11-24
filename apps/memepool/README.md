@@ -34,10 +34,17 @@ boosted is no longer in the post's history, which a replay can bring about, no o
 version is shown in its place. Opening a boost opens the post as it is, and the
 reader who made a boost can undo it, which withdraws the boost and leaves the post.
 
+A reader's timeline is the posts, articles and boosts of the reader and of those
+they follow. It holds no replies: a reply is part of a conversation, and is read in
+the thread of what it answers.
+
 An author, wherever one is shown, is the way to that author's own posts: a list of
 what the author published and nothing else, read from the indexer a page at a time,
 with the way to follow or unfollow the author and a step back to the reader's
-timeline.
+timeline. The author's view has two lists, **Posts** and **Replies**. A reply there
+is shown with what it answers above it, as that was at the version answered, since
+it is read apart from its thread. A reader's own replies are found the same way, by
+going to themselves.
 
 An author is shown by the name the identity gives itself and by its address, where
 it has them, with the DID always beside them: a name is a claim anyone can make, and
@@ -69,8 +76,8 @@ An embed is an image whose address is a DID and a version of it,
   post quotes another. A card's own embeds are shown by their words, so that no card
   is inside another.
 - **An image asset** is shown as the image, which the Memepool service serves.
-- **Anything else**, a DID with no version, and an embed in a heading, a table or the
-  words of a link, is shown by its words. So is every embed past the twentieth in
+- **Anything else**, a DID with no version, and an embed in a heading, a table, the
+  words of a link or inside emphasis, is shown by its words. So is every embed past the twentieth in
   one text.
 
 A version that is no longer in an object's history is said to be, and no other is

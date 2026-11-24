@@ -580,8 +580,81 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     );
 }
 
-function Post({ publication, onOpen, onWithdraw, full }: {
-    publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api;
+// A row of tabs, of which one is chosen: it is the one in the order the Tab
+// key follows, and the arrow keys move between them. `panel` is the id of what
+// the tabs choose between.
+function Tabs<T extends string>({ label, tabs, selected, onSelect, panel }: {
+    label: string; tabs: [T, string][]; selected: T; onSelect: (tab: T) => void; panel: string;
+}) {
+    const buttons = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
+
+    return (
+        <div role="tablist" aria-label={label} className="tabs">
+            {tabs.map(([tab, name], index) => (
+                <button
+                    key={tab}
+                    role="tab"
+                    className="quiet"
+                    aria-selected={selected === tab}
+                    aria-controls={panel}
+                    tabIndex={selected === tab ? 0 : -1}
+                    ref={element => { buttons.current[tab] = element; }}
+                    onClick={() => onSelect(tab)}
+                    onKeyDown={event => {
+                        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+
+                        if (step) {
+                            const [next] = tabs[(index + step + tabs.length) % tabs.length];
+
+                            event.preventDefault();
+                            onSelect(next);
+                            buttons.current[next]?.focus();
+                        }
+                    }}
+                >
+                    {name}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+// What a reply answers, shown above the reply where it is read apart from its
+// thread: the post or reply it is to, as that was at the version answered.
+function Answered({ did, version }: { did: string; version?: string }) {
+    const read = useContext(Publications);
+    const reads = useContext(Reads);
+    const [held, setHeld] = useState<{ of: string; found: Publication | 'no-revision' | null } | undefined>(undefined);
+    const of = `${did} ${version ?? ''}`;
+
+    useEffect(() => {
+        let current = true;
+
+        (read && version ? read.at(did, version) : Promise.resolve(undefined)).then(
+            found => { if (current) setHeld({ of, found: found ?? null }); },
+            () => { if (current) setHeld({ of, found: null }); },
+        );
+
+        return () => { current = false; };
+    }, [read, reads, did, version, of]);
+
+    const found = held?.of === of ? held.found : undefined;
+
+    return (
+        <div className="answered">
+            <p className="muted">Replying to</p>
+            {found === undefined && <p className="muted">Reading what it answers.</p>}
+            {found === 'no-revision' && <p className="muted">A version that is no longer in the history of <span className="mono" title={did}>{short(did)}</span></p>}
+            {found === null && <p className="muted"><span className="mono" title={did}>{short(did)}</span>, which cannot be shown</p>}
+            {found && found !== 'no-revision' && found.memeplex && <div className="embed card"><Quoted publication={found} /></div>}
+        </div>
+    );
+}
+
+// `answers` says whether a reply is shown with what it answers: it is where a
+// reply is read apart from its thread, and not in the thread itself.
+function Post({ publication, onOpen, onWithdraw, full, answers }: {
+    publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api; answers?: boolean;
 }) {
     const object = publication.memeplex;
 
@@ -601,6 +674,9 @@ function Post({ publication, onOpen, onWithdraw, full }: {
                 <Identity did={object.author} />
                 <time>{when(publication)}</time>
             </header>
+            {answers && object.kind === 'reply' && typeof object.target === 'string' && (
+                <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
+            )}
             {object.title && <h3>{object.title}</h3>}
             <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
             <footer>
@@ -1186,8 +1262,12 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // Whether the reader is writing an article, which has a form of its own.
     const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
-    // The author whose posts alone are shown, where the reader went to one.
+    // The author whose posts alone are shown, where the reader went to one,
+    // and whether it is the author's replies that are shown in their place. A
+    // reply is part of a conversation: the reader's timeline has none, and an
+    // author's are listed apart from the author's posts.
     const [author, setAuthor] = useState<string | null>(null);
+    const [replies, setReplies] = useState(false);
     // How many times the timeline has been read from its start.
     const [refreshes, setRefreshes] = useState(0);
     const [following, setFollowing] = useState('');
@@ -1200,7 +1280,11 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         const mine = reads.current += 1;
 
         try {
-            const page = await api.timeline(author ? [author] : [me.did, ...follows.filter(did => did !== me.did)], older?.from ?? 0);
+            const page = await api.timeline(
+                author ? [author] : [me.did, ...follows.filter(did => did !== me.did)],
+                older?.from ?? 0,
+                author && replies ? ['reply'] : ['post', 'paper'],
+            );
 
             if (mine !== reads.current) {
                 return;
@@ -1225,7 +1309,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 setError(message(failure));
             }
         }
-    }, [api, me.did, follows, author]);
+    }, [api, me.did, follows, author, replies]);
 
     useEffect(() => {
         loadTimeline();
@@ -1262,7 +1346,20 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         setTimeline(null);
         setFetched(0);
         setTotal(0);
+        setReplies(false);
         setAuthor(did);
+    };
+
+    // Shows an author's posts, or the author's replies. What was shown is the
+    // other list, so it is put away until this one is read.
+    const list = (which: 'posts' | 'replies') => {
+        if ((which === 'replies') === replies) {
+            return;
+        }
+        setTimeline(null);
+        setFetched(0);
+        setTotal(0);
+        setReplies(which === 'replies');
     };
 
     const unfollow = (did: string) => {
@@ -1282,7 +1379,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
     // What the reader has published that waits to be anchored, where the list
     // shown is one it belongs in: the reader's timeline, or the reader's posts.
-    const pending = author && author !== me.did ? [] : waiting.filter(each => !each.target);
+    const pending = (author && author !== me.did) || replies ? [] : waiting.filter(each => !each.target);
 
     // How an embed in a text is shown: an object at its version from the
     // indexer, as a card, and an image from the service.
@@ -1348,6 +1445,13 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                         : <button className="quiet" onClick={() => follow(author)}>Follow</button>)}
                                     <Copy text={author} label="Copy DID" unable={`Could not copy. The DID is ${author}`} />
                                 </p>
+                                <Tabs
+                                    label="What of this author's is listed"
+                                    tabs={[['posts', 'Posts'], ['replies', 'Replies']]}
+                                    selected={replies ? 'replies' : 'posts'}
+                                    onSelect={list}
+                                    panel="author-list"
+                                />
                             </section>
                         )}
                         {!author && may(me, 'memeplex:post') && !writing && (
@@ -1375,8 +1479,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                             />
                         )}
 
-                        <section>
-                            <h2>{author ? 'Posts' : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
+                        <section id={author ? 'author-list' : undefined} role={author ? 'tabpanel' : undefined} aria-label={author ? (replies ? 'Replies' : 'Posts') : undefined}>
+                            <h2>{author ? (replies ? 'Replies' : 'Posts') : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
                             {pending.map(each => (
                                 <article key={each.did} className="post waiting">
                                     {each.title !== undefined && <h3>{each.title}</h3>}
@@ -1390,6 +1494,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                 <Post
                                     key={each.did}
                                     publication={each}
+                                    answers
                                     onOpen={setOpen}
                                     onWithdraw={changeable(each)
                                         ? async () => {
