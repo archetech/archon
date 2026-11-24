@@ -1086,6 +1086,10 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
 }) {
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
+
+    // A post opened anew is given as it is at that moment, which may be a later
+    // version than the one shown here.
+    useEffect(() => { setRoot(opened); }, [opened]);
     const [editing, setEditing] = useState(false);
     // The version an edit was made of, while its chain has not anchored the
     // edit: the edit is anchored once another version is the one shown.

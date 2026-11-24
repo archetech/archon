@@ -830,6 +830,13 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.get('/avatars/:did', async (req, res) => {
         const none = () => { res.status(404).json({ error: 'no avatar' }); };
 
+        // Only a DID is resolved: a name would have the wallet look it up, and
+        // an address would have it ask the address's domain.
+        if (!images || !String(req.params.did).startsWith('did:')) {
+            none();
+            return;
+        }
+
         try {
             const identity = await keymaster.resolveDID(String(req.params.did));
             const named = (identity.didDocumentData as { avatar?: unknown } | undefined)?.avatar;
@@ -837,7 +844,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 ? null
                 : await imageOf(named.trim(), { types: AVATAR_TYPES, limit: AVATAR_LIMIT });
 
-            if (!image || !String(req.params.did).startsWith('did:')) {
+            if (!image) {
                 none();
                 return;
             }
@@ -859,7 +866,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
 
         try {
-            const image = versionId
+            const image = versionId && String(req.params.did).startsWith('did:')
                 ? await imageOf(String(req.params.did), { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS, versionId })
                 : null;
 

@@ -988,6 +988,14 @@ describe('an author\'s avatar', () => {
         expect((await avatarOf(aliceDid)).status).toBe(404);
         expect((await avatarOf('did:cid:bagaaieranosuchidentityaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).status).toBe(404);
         expect((await avatarOf('alice')).status).toBe(404);
+
+        // What is no DID is resolved by nobody: a name would be looked up in the
+        // service's wallet, and an address asked of its domain.
+        const resolved = jest.spyOn(service, 'resolveDID');
+        expect((await avatarOf('memepool')).status).toBe(404);
+        expect((await avatarOf('reader@example.org')).status).toBe(404);
+        expect(resolved).not.toHaveBeenCalled();
+        resolved.mockRestore();
         expect(limits).toStrictEqual([]);
     }, 120_000);
 
@@ -1097,7 +1105,12 @@ describe('an embedded image', () => {
 
         expect((await imageAt(did)).status).toBe(404);
         expect((await imageAt(did, 'bafyreinotaversionofthisasset')).status).toBe(404);
-        expect((await imageAt('alice', await versionOf(did))).status).toBe(404);
+        const version = await versionOf(did);
+        const resolved = jest.spyOn(service, 'resolveDID');
+        expect((await imageAt('alice', version)).status).toBe(404);
+        expect((await imageAt('reader@example.org', version)).status).toBe(404);
+        expect(resolved).not.toHaveBeenCalled();
+        resolved.mockRestore();
         expect(limits).toStrictEqual([]);
     }, 120_000);
 

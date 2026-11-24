@@ -1332,6 +1332,26 @@ describe('a post embedded in another', () => {
         expect(screen.queryByText('What Bob wrote.')).toBeNull();
     });
 
+    it('shows the post as it is when it is opened from a card inside its own thread', async () => {
+        // A reply to the post quotes the post, at the version it answered.
+        const first = at(QUOTED, BOB, 'What Bob wrote.');
+        const { api, state } = services({ me: granted, timeline: [first] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        has(state, first);
+        vi.mocked(api.thread).mockResolvedValue([{ depth: 0, publication: post('did:cid:reply', ALICE, `On this: ${embed()}`) }]);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('What Bob wrote.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        const card = await waitFor(() => { const found = document.querySelector('.embed.card'); expect(found).not.toBeNull(); return found as HTMLElement; });
+
+        // Bob edits the post, and the thread still shows it as it was read.
+        state.known[QUOTED] = { ...at(QUOTED, BOB, 'What Bob wrote, corrected.'), current: 1, versions: [first.versions[0], { opid: 'bafyv2', type: 'update', outcome: 'attributed' }] };
+        await user.click(within(card).getByRole('button', { name: 'Open' }));
+
+        expect(await screen.findAllByText('What Bob wrote, corrected.')).not.toHaveLength(0);
+    });
+
     it('shows a card\'s own embeds by their words, so that no card is inside another', async () => {
         const INNER = 'did:cid:bagaaierainnerinnerinnerinnerinnerinnerinnerinnerinnerinn';
         const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, embed())] });
