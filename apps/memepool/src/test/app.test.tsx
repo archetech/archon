@@ -986,6 +986,33 @@ describe('a boost', () => {
         expect(screen.queryByText('boosted')).toBeNull();
     });
 
+    it('opens nothing when the post cannot be read as it is, or has just been withdrawn', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('What Bob wrote.');
+        vi.mocked(api.publication).mockRejectedValueOnce(new Error('the indexer is away'));
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+
+        // The version boosted is not opened in its place.
+        expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // Withdrawn since the boost was read.
+        state.known[ORIGINAL] = { ...state.known[ORIGINAL], state: 'withdrawn' };
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // And opened once it can be.
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+    });
+
     it('is undone by the reader who made it, which withdraws the boost and not the post', async () => {
         const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
         has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
@@ -1562,6 +1589,24 @@ describe('the services\' client', () => {
         expect(await api.content('did:cid:2')).toBeUndefined();
         expect(await api.content('did:cid:1', 'bafy version')).toBeUndefined();
         expect(asked[2]).toBe('/memepool/api/v1/objects/did%3Acid%3A1/content?versionId=bafy%20version');
+    });
+
+    it('reads a publication at a version, and takes no other version for it', async () => {
+        const at = (opid: string) => ({ ...post('did:cid:1', ALICE, 'First.'), current: 0, versions: [{ opid, type: 'create', outcome: 'attributed' }] });
+        const path = (version: string) => `GET /memeplex/api/v1/publications/did%3Acid%3A1?versionId=${version}`;
+        const { api } = answering({
+            [path('v1')]: { status: 200, body: at('v1') },
+            // An indexer that does not know the question answers with the publication as it is.
+            [path('v0')]: { status: 200, body: at('v1') },
+            [path('gone')]: { status: 404, body: { error: 'no such attributed version in the history', reason: 'no-revision' } },
+            [path('none')]: { status: 404, body: { error: 'no attributed publication', reason: 'no-publication' } },
+        });
+
+        expect(await api.revision('did:cid:1', 'v1')).toMatchObject({ did: 'did:cid:1', current: 0 });
+        expect(await api.revision('did:cid:1', 'v0')).toBeUndefined();
+        expect(await api.revision('did:cid:1', 'gone')).toBe('no-revision');
+        expect(await api.revision('did:cid:1', 'none')).toBeUndefined();
+        expect(await api.revision('did:cid:1', 'unrouted')).toBeUndefined();
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

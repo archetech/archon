@@ -165,7 +165,11 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
                 return reason === 'no-revision' ? 'no-revision' : undefined;
             }
 
-            return json(response);
+            const publication = await json(response) as Publication;
+
+            // An answer has to be the version asked for: an indexer that does
+            // not know the question answers with the publication as it is.
+            return publication.versions?.[publication.current ?? -1]?.opid === versionId ? publication : undefined;
         },
         async content(did, versionId) {
             const version = versionId ? `?versionId=${encodeURIComponent(versionId)}` : '';

@@ -387,6 +387,8 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     // is not in its history, or nothing the indexer can show.
     const [held, setHeld] = useState<{ of: string; found: Publication | 'no-revision' | null; did: string } | undefined>(undefined);
     const [opening, setOpening] = useState(false);
+    // Whether the post could not be opened as it is when that was asked.
+    const [unopened, setUnopened] = useState(false);
     const author = publication.memeplex!.author;
     const { did, version } = target;
     const of = `${did} ${version ?? ''}`;
@@ -434,10 +436,20 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     const withdrawn = shown?.state === 'withdrawn';
 
     // The post is opened as it is, which is what there is to read and answer.
+    // The version boosted is not opened in its place: an answer would be to a
+    // version the post may have left behind, or to a post since withdrawn.
     const open = async () => {
         setOpening(true);
+        setUnopened(false);
         try {
-            onOpen?.(await read?.now(shown!.did!).catch(() => undefined) ?? shown!);
+            const now = await read?.now(shown!.did!).catch(() => undefined);
+
+            if (now?.state === 'published' && now.memeplex) {
+                onOpen?.(now);
+            }
+            else {
+                setUnopened(true);
+            }
         }
         finally {
             setOpening(false);
@@ -469,6 +481,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                     {withdrawn && <p className="muted note">Its author has since withdrawn this post.</p>}
                 </div>
             )}
+            {unopened && <p role="alert" className="error">The post cannot be opened as it is. Refresh, and try once more.</p>}
             <footer>
                 {onOpen && shown && !withdrawn && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
