@@ -1378,8 +1378,9 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         each.memeplex?.author === me.did && each.state === 'published' && grants.has(String(each.memeplex.grant));
 
     // What the reader has published that waits to be anchored, where the list
-    // shown is one it belongs in: the reader's timeline, or the reader's posts.
-    const pending = (author && author !== me.did) || replies ? [] : waiting.filter(each => !each.target);
+    // shown is one it belongs in: the reader's posts in the reader's timeline
+    // and among the reader's posts, and the reader's replies among those.
+    const pending = author && author !== me.did ? [] : waiting.filter(each => Boolean(each.target) === replies);
 
     // How an embed in a text is shown: an object at its version from the
     // indexer, as a card, and an image from the service.

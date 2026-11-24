@@ -1135,6 +1135,30 @@ describe('an author\'s own posts', () => {
         expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
     });
 
+    it('hold a reply of the reader\'s that waits to be anchored, among the reader\'s replies and nowhere else', async () => {
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'Not anchored yet.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await screen.findByText('Waiting to be anchored');
+
+        // Not in the timeline, nor among the reader's posts.
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await screen.findByText('From Alice.');
+        expect(screen.queryByText('Not anchored yet.')).toBeNull();
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        await screen.findByRole('tab', { name: 'Posts' });
+        expect(screen.queryByText('Not anchored yet.')).toBeNull();
+
+        await user.click(screen.getByRole('tab', { name: 'Replies' }));
+        expect(await screen.findByText('Not anchored yet.')).toBeTruthy();
+        expect(screen.getByText('Waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('Nothing here yet.')).toBeNull();
+    });
+
     it('show older posts a page at a time, of that author', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const many = Array.from({ length: PAGE + 2 }, (_, index) => post(`did:cid:b${index}`, BOB, `Bob ${index}.`));
