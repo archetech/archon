@@ -147,115 +147,157 @@ export const MATH_LIMIT = 4000;
 
 const DOLLAR = String.fromCharCode(36);
 
-// Keeps as math only what Text formatting says is math, and reads the rest as
-// the Markdown it otherwise is.
+// Says which dollars are math, before the text is read as Markdown.
 //
 // The parser takes any two dollars in a line for math, so a sentence naming
-// two prices would be. The rule shared with Pandoc is narrower: an opening
-// dollar has something other than a space straight after it, and a closing
-// dollar has something other than a space straight before it and no digit
-// after it.
+// two prices would be. The rule shared with Pandoc is narrower, and it is a
+// rule about the dollars themselves, whatever Markdown is around them: a
+// dollar opens math when something other than a space comes straight after
+// it, and the next dollar closes that math when something other than a space
+// comes straight before it and no digit after it. Math holds no dollar of its
+// own, so a dollar is math only with the very next one, and only where both
+// are as the rule says.
 //
-// Where a pair fails the rule, its opening dollar is the text it is, and what
-// comes after it is read anew: it is Markdown, with its own emphasis and links,
-// and may hold math that the failed pair had taken a dollar from.
+// Every other dollar is written with a backslash before it, which Markdown
+// reads as the dollar alone. The parser is then left with the pairs that are
+// math, and the text around them is Markdown as it would be anyway.
 //
-// Math between two dollars each side is set apart, wherever it is written.
-const inline = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+// Dollars in code, in math set apart on lines of its own, in HTML and in an
+// address given apart from its link are left as they are: a backslash there
+// would be shown.
+//
+// What is code is found by reading the text with no math in it, since a
+// dollar before a span of code would otherwise be taken to open math that
+// closes inside the span. Math set apart is found by reading it with math.
+const plain = unified().use(remarkParse).use(remarkGfm);
+const withMath = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const BACKSLASH = String.fromCharCode(92);
 
-// How many times one text is read anew. Each is a parse of what is left of a
-// run of text, so a text of nothing but dollars is not read without end.
-const REREADS = 20;
+export function settleDollars(text: string): string {
+    if (!text.includes(DOLLAR)) {
+        return text;
+    }
 
-function settleMath(tree: Node, source: string, rereads: { left: number }, defined: string): void {
+    const left: [number, number][] = [];
+    const leave = (kinds: string[]) => function each(node: Node): void {
+        const from = node.position?.start.offset;
+        const to = node.position?.end.offset;
+
+        if (from !== undefined && to !== undefined && kinds.includes(node.type)) {
+            left.push([from, to]);
+            return;
+        }
+        node.children?.forEach(each);
+    };
+
+    const read = plain.parse(text) as unknown as Node;
+
+    leave(['code', 'inlineCode', 'html', 'definition'])(read);
+    leave(['math'])(withMath.parse(text) as unknown as Node);
+
+    // An address written bare, with no brackets, is a link as it stands. A
+    // dollar in one may be math, where it is one of a pair. Where it is not,
+    // it is left without a backslash, which would become part of the address.
+    const bare: [number, number][] = [];
+    const addresses = (node: Node) => {
+        const from = node.position?.start.offset;
+        const to = node.position?.end.offset;
+
+        if (node.type === 'link' && from !== undefined && to !== undefined && text.charAt(from) !== '[') {
+            bare.push([from, to]);
+        }
+        node.children?.forEach(addresses);
+    };
+
+    addresses(read);
+
+    const within = (at: number) => left.some(([from, to]) => at >= from && at < to);
+    // The runs of dollars that may be math: outside what is left alone, and
+    // with no backslash already before them.
+    const runs: { at: number; length: number }[] = [];
+
+    for (let at = 0; at < text.length; at += 1) {
+        if (text.charAt(at) !== DOLLAR || within(at)) {
+            continue;
+        }
+
+        let slashes = 0;
+
+        while (text.charAt(at - 1 - slashes) === BACKSLASH) {
+            slashes += 1;
+        }
+
+        let length = 1;
+
+        while (text.charAt(at + length) === DOLLAR && !within(at + length)) {
+            length += 1;
+        }
+        if (slashes % 2 === 0) {
+            runs.push({ at, length });
+        }
+        at += length - 1;
+    }
+
+    const opens = ({ at, length }: { at: number; length: number }) => /\S/.test(text.charAt(at + length));
+    const closes = ({ at, length }: { at: number; length: number }) => /\S/.test(text.charAt(at - 1)) && !/\d/.test(text.charAt(at + length));
+    const math = new Set<number>();
+
+    for (let index = 0; index < runs.length; index += 1) {
+        const open = runs[index];
+        const close = runs[index + 1];
+
+        // Math is one or two dollars each side, the same number, with
+        // something between them and no line left empty.
+        if (close && open.length <= 2 && open.length === close.length && opens(open) && closes(close)
+            && !/\n[ \t]*\n/.test(text.slice(open.at, close.at))) {
+            math.add(open.at).add(close.at);
+            index += 1;
+        }
+    }
+
+    let settled = '';
+    let from = 0;
+
+    for (const { at, length } of runs) {
+        if (!math.has(at) && !bare.some(([start, end]) => at >= start && at < end)) {
+            settled += text.slice(from, at) + (BACKSLASH + DOLLAR).repeat(length);
+            from = at + length;
+        }
+    }
+
+    return settled + text.slice(from);
+}
+
+// Math between two dollars each side is set apart, wherever it is written,
+// and math too long to render is shown as it was written.
+const markMath = () => (tree: Node, file: unknown) => {
+    const source = String(file);
     const walk = (parent: Node) => {
         if (!parent.children) {
             return;
         }
-
-        const settled: Node[] = [];
-        const end = parent.children[parent.children.length - 1]?.position?.end.offset;
-
-        for (const child of parent.children) {
+        parent.children = parent.children.map(child => {
             const from = child.position?.start.offset;
-            const to = child.position?.end.offset;
+            const long = (child.value ?? '').length > MATH_LIMIT;
 
             if (child.type === 'math' || (child.type === 'code' && child.lang === 'math')) {
-                // Too long to render: a block of the LaTeX as it was written.
-                settled.push((child.value ?? '').length > MATH_LIMIT ? { type: 'code', value: child.value } : child);
-                continue;
+                return long ? { type: 'code', value: child.value } : child;
             }
-            if (child.type !== 'inlineMath' || from === undefined || to === undefined) {
+            if (child.type !== 'inlineMath' || from === undefined) {
                 walk(child);
-                settled.push(child);
-                continue;
+                return child;
+            }
+            if (long) {
+                return { type: 'inlineCode', value: child.value };
             }
 
-            const written = source.slice(from, to);
-            let dollars = 0;
-
-            while (written.charAt(dollars) === DOLLAR) {
-                dollars += 1;
-            }
-
-            const inside = written.slice(dollars, written.length - dollars);
-            const long = inside.length > MATH_LIMIT;
-
-            if (inside && !long && !/^\s|\s$/.test(inside) && !/\d/.test(source.charAt(to))) {
-                settled.push(dollars > 1
-                    ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
-                    : child);
-                continue;
-            }
-
-            // Not math. What follows the opening dollars, to the end of what
-            // this node holds, is read anew, where there are reads left and it
-            // is one run of text: the parser drops the white space around a
-            // paragraph, which is kept here beside it.
-            if (!long && rereads.left > 0 && end !== undefined) {
-                const rest = source.slice(from + dollars, end);
-                const lead = /^\s*/.exec(rest)?.[0] ?? '';
-                const tail = /\s*$/.exec(rest.slice(lead.length))?.[0] ?? '';
-                // A link or an image may give its address apart from itself,
-                // anywhere in the text. Those addresses are read with the run,
-                // so that it names them as the whole text does, and are then
-                // left out: the text has them already.
-                const read = inline.parse(defined ? [rest, '', defined].join(String.fromCharCode(10)) : rest) as unknown as Node;
-                const [first, ...others] = read.children ?? [];
-                const run = first?.type === 'paragraph' && others.every(each => each.type === 'definition') ? { ...read, children: [first] } : undefined;
-
-                rereads.left -= 1;
-                if (run) {
-                    settleMath(run, rest, rereads, defined);
-                    settled.push({ type: 'text', value: written.slice(0, dollars) + lead }, ...run.children![0].children ?? [], { type: 'text', value: tail });
-                    break;
-                }
-            }
-
-            settled.push({ type: 'text', value: written });
-        }
-
-        parent.children = settled;
+            return source.charAt(from + 1) === DOLLAR
+                ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
+                : child;
+        });
     };
 
     walk(tree);
-}
-
-const keepMath = () => (tree: Node, file: unknown) => {
-    const source = String(file);
-    const definitions: string[] = [];
-    const gather = (node: Node) => {
-        const from = node.position?.start.offset;
-        const to = node.position?.end.offset;
-
-        if (node.type === 'definition' && from !== undefined && to !== undefined) {
-            definitions.push(source.slice(from, to));
-        }
-        node.children?.forEach(gather);
-    };
-
-    gather(tree);
-    settleMath(tree, source, { left: REREADS }, definitions.join(String.fromCharCode(10)));
 };
 
 // How KaTeX is asked to render: what is written is a stranger's, so no command
@@ -359,12 +401,13 @@ const components: Components = {
 // shown inside a card has its own embeds shown by their words, so that an embed
 // is never inside another.
 export default function Markdown({ text, className = 'text', embeds = true }: { text: string; className?: string; embeds?: boolean }) {
-    const plugins = useMemo(() => [remarkGfm, remarkMath, keepMath, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
+    const plugins = useMemo(() => [remarkGfm, remarkMath, markMath, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
+    const settled = useMemo(() => settleDollars(text), [text]);
 
     return (
         <div className={`${className} markdown`}>
             <ReactMarkdown remarkPlugins={plugins as never} rehypePlugins={MATH as never} urlTransform={safeUrl} components={components}>
-                {text}
+                {settled}
             </ReactMarkdown>
         </div>
     );

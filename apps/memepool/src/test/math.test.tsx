@@ -127,7 +127,37 @@ describe('math', () => {
         expect(asked).toStrictEqual(['did:cid:bagaaieraquoted bafyv1', 'did:cid:bagaaieraquoted bafyv1']);
     });
 
-    it('reads a text of nothing but dollars only so many times, and loses none of it', () => {
+    it('leaves the Markdown around a dollar that is not math as it is', () => {
+        const page = shown('**costs $5** and $x$\n\n> Costs $5 and $y$\n> today\n\n| price | math |\n|---|---|\n| $5 | $z$ |');
+
+        expect(math(page).map(latex)).toStrictEqual(['x', 'y', 'z']);
+        expect(page.querySelector('strong')?.textContent).toBe('costs $5');
+        expect(page.querySelector('blockquote')?.textContent).toContain('Costs $5 and ');
+        expect(page.querySelector('blockquote')?.textContent).toContain('today');
+        expect(page.querySelectorAll('blockquote p')).toHaveLength(1);
+        expect(screen.getAllByRole('cell')[0].textContent).toBe('$5');
+    });
+
+    it('takes a dollar for math only with the very next one, and never across a line left empty', () => {
+        // The first dollar would close on the third, were math to hold a dollar of its own.
+        expect(math(shown('$a and $b$')).map(latex)).toStrictEqual(['b']);
+        expect(math(shown('$a\n\nb$'))).toHaveLength(0);
+        expect(math(shown('$a\nb$')).map(latex)).toStrictEqual(['a\nb']);
+        // One dollar does not close two.
+        expect(math(shown('$$a$ and $b$$'))).toHaveLength(0);
+    });
+
+    it('leaves a dollar alone in a bare address, in HTML and in code, where a backslash would be shown', () => {
+        const page = shown('See https://example.org/?a=$1&b=$2 and <b title="$3">$4</b> and `$5` and\n\n    $6 indented');
+
+        expect(math(page)).toHaveLength(0);
+        expect(page.querySelector('a')?.getAttribute('href')).toBe('https://example.org/?a=$1&b=$2');
+        expect(page.textContent).not.toContain(String.fromCharCode(92));
+        expect(page.textContent).toContain('<b title="$3">$4</b>');
+        expect(page.querySelector('pre code')?.textContent).toContain('$6 indented');
+    });
+
+    it('shows a text of nothing but dollars as it was written', () => {
         const text = Array.from({ length: 200 }, (_, index) => `$ ${index} $`).join(' ');
         const page = shown(text);
 
