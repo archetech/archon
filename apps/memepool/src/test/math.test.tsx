@@ -60,6 +60,42 @@ describe('math', () => {
         expect(page.textContent).toBe(read);
     });
 
+    it('reads what is between dollars that are not math as the Markdown it is', () => {
+        const page = shown('a $ **bold** $ and $ [a link](https://example.org/) $ and $ <b>not bold</b> $ end');
+
+        expect(math(page)).toHaveLength(0);
+        expect(page.querySelector('strong')?.textContent).toBe('bold');
+        expect(page.querySelector('a')?.getAttribute('href')).toBe('https://example.org/');
+        // And under the same rules as any text: HTML is shown as the text it is.
+        expect(page.querySelector('b')).toBeNull();
+        expect(page.textContent).toBe('a $ bold $ and $ a link $ and $ <b>not bold</b> $ end');
+    });
+
+    it('renders math that comes after a dollar that is not math', () => {
+        const page = shown('It costs $5, and $x^2$ is math, as is $y$; so $6 is not.');
+
+        expect(math(page).map(latex)).toStrictEqual(['x^2', 'y']);
+        expect(page.textContent?.startsWith('It costs $5, and ')).toBe(true);
+        expect(page.textContent?.endsWith('; so $6 is not.')).toBe(true);
+    });
+
+    it('does so inside emphasis, a list and a heading', () => {
+        const page = shown('**costs $5 and $a$**\n\n- costs $5 and $b$\n\n# Costs $5 and $c$');
+
+        expect(math(page).map(latex)).toStrictEqual(['a', 'b', 'c']);
+        expect(page.querySelector('strong')?.textContent?.startsWith('costs $5 and ')).toBe(true);
+        expect(page.querySelectorAll('li')).toHaveLength(1);
+        expect(page.querySelector('h1')?.textContent?.startsWith('Costs $5 and ')).toBe(true);
+    });
+
+    it('reads a text of nothing but dollars only so many times, and loses none of it', () => {
+        const text = Array.from({ length: 200 }, (_, index) => `$ ${index} $`).join(' ');
+        const page = shown(text);
+
+        expect(math(page)).toHaveLength(0);
+        expect(page.textContent).toBe(text);
+    });
+
     it('runs no command that reaches outside the math', () => {
         const page = shown([
             String.raw`$\href{javascript:alert(1)}{x}$`,

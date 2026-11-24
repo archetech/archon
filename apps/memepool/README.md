@@ -91,9 +91,9 @@ the pages carry themselves.
   longer than 4,000 characters is not rendered.
 - **Math that cannot be rendered is shown as it was written.**
 
-A dollar that is not math and comes before one that is can take that one's opening
-dollar for its own closing one, and both are then shown as text. Writing the first
-as `\$` keeps the math.
+What is between two dollars that are not math is the Markdown it otherwise is, with
+its own emphasis and links, and math that comes after a dollar that is not math is
+still math.
 
 An embed is an image whose address is a DID and a version of it,
 `![words](did:cid:…?versionId=…)`, and what it shows depends on what the DID is:

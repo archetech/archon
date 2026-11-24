@@ -5,6 +5,8 @@ import type { Components } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 
 // Text as Memeplex says a client shows it: docs/plans/memeplex-reference-1436.md,
 // "Text formatting". It is GitHub Flavored Markdown, and it is written by
@@ -145,8 +147,8 @@ export const MATH_LIMIT = 4000;
 
 const DOLLAR = String.fromCharCode(36);
 
-// Keeps as math only what Text formatting says is math, and leaves the rest
-// the text it was written as.
+// Keeps as math only what Text formatting says is math, and reads the rest as
+// the Markdown it otherwise is.
 //
 // The parser takes any two dollars in a line for math, so a sentence naming
 // two prices would be. The rule shared with Pandoc is narrower: an opening
@@ -154,24 +156,39 @@ const DOLLAR = String.fromCharCode(36);
 // dollar has something other than a space straight before it and no digit
 // after it.
 //
+// Where a pair fails the rule, its opening dollar is the text it is, and what
+// comes after it is read anew: it is Markdown, with its own emphasis and links,
+// and may hold math that the failed pair had taken a dollar from.
+//
 // Math between two dollars each side is set apart, wherever it is written.
-const keepMath = () => (tree: Node, file: unknown) => {
-    const source = String(file);
+const inline = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+
+// How many times one text is read anew. Each is a parse of what is left of a
+// run of text, so a text of nothing but dollars is not read without end.
+const REREADS = 20;
+
+function settleMath(tree: Node, source: string, rereads: { left: number }): void {
     const walk = (parent: Node) => {
         if (!parent.children) {
             return;
         }
-        parent.children = parent.children.map(child => {
+
+        const settled: Node[] = [];
+        const end = parent.children[parent.children.length - 1]?.position?.end.offset;
+
+        for (const child of parent.children) {
             const from = child.position?.start.offset;
             const to = child.position?.end.offset;
 
             if (child.type === 'math' || (child.type === 'code' && child.lang === 'math')) {
                 // Too long to render: a block of the LaTeX as it was written.
-                return (child.value ?? '').length > MATH_LIMIT ? { type: 'code', value: child.value } : child;
+                settled.push((child.value ?? '').length > MATH_LIMIT ? { type: 'code', value: child.value } : child);
+                continue;
             }
             if (child.type !== 'inlineMath' || from === undefined || to === undefined) {
                 walk(child);
-                return child;
+                settled.push(child);
+                continue;
             }
 
             const written = source.slice(from, to);
@@ -182,19 +199,44 @@ const keepMath = () => (tree: Node, file: unknown) => {
             }
 
             const inside = written.slice(dollars, written.length - dollars);
+            const long = inside.length > MATH_LIMIT;
 
-            if (!inside || /^\s|\s$/.test(inside) || /\d/.test(source.charAt(to)) || inside.length > MATH_LIMIT) {
-                return { type: 'text', value: written };
+            if (inside && !long && !/^\s|\s$/.test(inside) && !/\d/.test(source.charAt(to))) {
+                settled.push(dollars > 1
+                    ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
+                    : child);
+                continue;
             }
 
-            return dollars > 1
-                ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
-                : child;
-        });
+            // Not math. What follows the opening dollars, to the end of what
+            // this node holds, is read anew, where there are reads left and it
+            // is one run of text: the parser drops the white space around a
+            // paragraph, which is kept here beside it.
+            if (!long && rereads.left > 0 && end !== undefined) {
+                const rest = source.slice(from + dollars, end);
+                const lead = /^\s*/.exec(rest)?.[0] ?? '';
+                const tail = /\s*$/.exec(rest.slice(lead.length))?.[0] ?? '';
+                const read = inline.parse(rest) as unknown as Node;
+                const run = read.children?.length === 1 && read.children[0].type === 'paragraph' ? read : undefined;
+
+                rereads.left -= 1;
+                if (run) {
+                    settleMath(run, rest, rereads);
+                    settled.push({ type: 'text', value: written.slice(0, dollars) + lead }, ...run.children![0].children ?? [], { type: 'text', value: tail });
+                    break;
+                }
+            }
+
+            settled.push({ type: 'text', value: written });
+        }
+
+        parent.children = settled;
     };
 
     walk(tree);
-};
+}
+
+const keepMath = () => (tree: Node, file: unknown) => settleMath(tree, String(file), { left: REREADS });
 
 // How KaTeX is asked to render: what is written is a stranger's, so no command
 // that makes a link, loads an image or sets a class or an attribute is run, and
