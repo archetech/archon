@@ -1159,6 +1159,30 @@ describe('an author\'s own posts', () => {
         expect(screen.queryByText('Nothing here yet.')).toBeNull();
     });
 
+    it('hold no reply as waiting that its thread has shown, though the list of replies does not', async () => {
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
+        vi.mocked(api.publish).mockResolvedValue('did:cid:reply');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'Soon anchored.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await screen.findByText('Waiting to be anchored');
+
+        // The thread shows it once it is anchored, here as withdrawn since: no list of replies ever holds it.
+        vi.mocked(api.thread).mockResolvedValue([{ depth: 0, publication: { ...post('did:cid:reply', ALICE, 'Soon anchored.'), state: 'withdrawn' } }]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(screen.queryByText('Waiting to be anchored')).toBeNull());
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        await user.click(await screen.findByRole('tab', { name: 'Replies' }));
+
+        expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
+        expect(screen.queryByText('Waiting to be anchored')).toBeNull();
+    });
+
     it('show older posts a page at a time, of that author', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const many = Array.from({ length: PAGE + 2 }, (_, index) => post(`did:cid:b${index}`, BOB, `Bob ${index}.`));

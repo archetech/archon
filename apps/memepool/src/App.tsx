@@ -1157,8 +1157,9 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack, onRead }: {
     api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
     onPublished: (waiting: Waiting) => void; onBack: () => void;
-    // Told each time the thread has been read, so that what its texts embed is read anew.
-    onRead?: () => void;
+    // Told each time the thread has been read, with the replies it shows: what its
+    // texts embed is read anew, and a reply of the reader's that is shown waits no more.
+    onRead?: (shown: string[]) => void;
 }) {
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
@@ -1181,7 +1182,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onB
             const [thread, latest] = await Promise.all([api.thread(opened.did!), api.publication(opened.did!)]);
 
             if (mine === reads.current) {
-                onRead?.();
+                onRead?.(thread.flatMap(each => each.publication.did ?? []));
                 setReplies(thread);
                 if (latest) {
                     setRoot(latest);
@@ -1388,7 +1389,13 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // What an embed shows is read apart from the list or thread it is in, and
     // is read anew when that is: the indexer may not have had it, and a replay
     // may have put its version out of the history.
-    const read = useCallback(() => setRefreshes(count => count + 1), []);
+    //
+    // A thread that has been read shows its replies, the withdrawn among them:
+    // one of the reader's that it shows waits no more.
+    const read = useCallback((shown: string[]) => {
+        setRefreshes(count => count + 1);
+        setWaiting(current => (current.some(each => shown.includes(each.did)) ? current.filter(each => !shown.includes(each.did)) : current));
+    }, []);
     const embedding = useMemo<Embedding>(() => ({
         object: api.revision,
         image: api.image,
