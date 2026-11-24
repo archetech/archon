@@ -1318,6 +1318,41 @@ describe('what the reader published that waits to be anchored', () => {
         await waitFor(() => expect(JSON.parse(localStorage.getItem(KEY)!)).toStrictEqual([{ did: 'did:cid:there', text: 'Published in another page.' }]));
     });
 
+    it('takes up what another page of the reader writes, and does not bring back what that page put away', async () => {
+        const KEY = `memepool.waiting.${ALICE}`;
+        // Both pages hold an entry that will never be published.
+        localStorage.setItem(KEY, JSON.stringify([{ did: 'did:cid:failed', text: 'Never published.', failed: true }]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'Anchored.')] });
+        vi.mocked(api.publish).mockResolvedValue('did:cid:new');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const another = (entries: unknown[]) => {
+            localStorage.setItem(KEY, JSON.stringify(entries));
+            fireEvent(window, new StorageEvent('storage', { key: KEY, newValue: JSON.stringify(entries) }));
+        };
+
+        await waitingCard('Never published.');
+
+        // The other page dismisses it.
+        another([]);
+        await waitFor(() => expect(screen.queryByText('Never published.')).toBeNull());
+
+        // This page then publishes something else, and writes no dismissed entry back.
+        await user.type(screen.getByLabelText('Post'), 'Something else.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitingCard('Something else.');
+        await waitFor(() => expect(JSON.parse(localStorage.getItem(KEY)!)).toStrictEqual([{ did: 'did:cid:new', text: 'Something else.' }]));
+
+        // What the other page publishes is shown here as waiting too.
+        another([{ did: 'did:cid:new', text: 'Something else.' }, { did: 'did:cid:there', text: 'From the other page.' }]);
+        expect(await waitingCard('From the other page.')).not.toBeNull();
+
+        // A write to another reader's list, or to something else, is not this page's.
+        fireEvent(window, new StorageEvent('storage', { key: `memepool.waiting.${BOB}`, newValue: '[]' }));
+        fireEvent(window, new StorageEvent('storage', { key: 'memepool.follows', newValue: '[]' }));
+        expect(screen.getByText('From the other page.')).toBeTruthy();
+    });
+
     it('is the list of whoever is signed in, when that changes under the page', async () => {
         localStorage.setItem(`memepool.waiting.${ALICE}`, JSON.stringify([{ did: 'did:cid:hers', text: 'Alice wrote this.' }]));
         localStorage.setItem(`memepool.waiting.${BOB}`, JSON.stringify([{ did: 'did:cid:his', text: 'Bob wrote this.' }]));

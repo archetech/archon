@@ -1468,6 +1468,24 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         }
     }, [me.did, waiting]);
 
+    // What another page of this reader writes is what is so: it added what it
+    // published and removed what it put away. This page takes it up, so that it
+    // shows the same and does not write back what the other removed.
+    useEffect(() => {
+        const taken = (event: StorageEvent) => {
+            if (event.key === WAITING + me.did) {
+                const stored = readWaiting(me.did);
+
+                kept.current = stored;
+                setWaiting(stored);
+            }
+        };
+
+        window.addEventListener('storage', taken);
+
+        return () => window.removeEventListener('storage', taken);
+    }, [me.did]);
+
     // Asks the service where each thing that waits stands, when the list or a
     // thread is read and when there is something new to ask about. The indexer
     // shows only what is published, so it cannot say that something never will be.
