@@ -147,6 +147,16 @@ describe('math', () => {
         expect(math(shown('$$a$ and $b$$'))).toHaveLength(0);
     });
 
+    it('takes a backslash to be before one dollar, and the next as free to open math', () => {
+        const page = shown(String.raw`\$$x$ and \\$y$ and \$\$z`);
+
+        expect(math(page).map(latex)).toStrictEqual(['x', 'y']);
+        // A dollar, the math, a backslash that was itself escaped, the math, and two dollars.
+        expect(page.textContent?.startsWith('$')).toBe(true);
+        expect(page.textContent).toContain(' and \\');
+        expect(page.textContent?.endsWith(' and $$z')).toBe(true);
+    });
+
     it('leaves a dollar alone in a bare address, in HTML and in code, where a backslash would be shown', () => {
         const page = shown('See https://example.org/?a=$1&b=$2 and <b title="$3">$4</b> and `$5` and\n\n    $6 indented');
 

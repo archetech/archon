@@ -227,14 +227,17 @@ export function settleDollars(text: string): string {
             slashes += 1;
         }
 
+        // A backslash is before this dollar alone: the next may open math.
+        if (slashes % 2 === 1) {
+            continue;
+        }
+
         let length = 1;
 
         while (text.charAt(at + length) === DOLLAR && !within(at + length)) {
             length += 1;
         }
-        if (slashes % 2 === 0) {
-            runs.push({ at, length });
-        }
+        runs.push({ at, length });
         at += length - 1;
     }
 
