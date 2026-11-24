@@ -351,6 +351,13 @@ function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; 
 // Who is asked for a publication by its DID: the indexer.
 const Publications = createContext<((did: string) => Promise<Publication | undefined>) | undefined>(undefined);
 
+// Counts the reads of the list a publication is shown in. What a boost shows
+// is read apart from that list, and is read anew when the list is.
+const Reads = createContext(0);
+
+// How many boosts of boosts are followed to the post they pass on.
+const BOOST_DEPTH = 5;
+
 // The object a boost is of, or nothing for an object that is not a boost: a
 // post with no words of its own that names another.
 const boosted = (object: NonNullable<Publication['memeplex']>): string | undefined =>
@@ -363,21 +370,46 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     publication: Publication; target: string; onOpen?: (publication: Publication) => void; onWithdraw?: () => void;
 }) {
     const read = useContext(Publications);
-    // The post boosted: not read yet, or one the indexer cannot show.
-    const [original, setOriginal] = useState<Publication | null | undefined>(undefined);
+    const reads = useContext(Reads);
+    // The post boosted, with the target it was read for: not read yet, or one
+    // the indexer cannot show.
+    const [held, setHeld] = useState<{ target: string; original: Publication | null } | undefined>(undefined);
     const author = publication.memeplex!.author;
 
     useEffect(() => {
         let current = true;
+        // A boost of a boost passes on what that one does. The post is found by
+        // following them, no further than a few and never to one already seen.
+        const find = async (): Promise<Publication | null> => {
+            const seen = new Set<string>([publication.did ?? '']);
+            let next = target;
 
-        setOriginal(undefined);
-        (read ? read(target) : Promise.resolve(undefined)).then(
-            found => { if (current) setOriginal(found ?? null); },
-            () => { if (current) setOriginal(null); },
+            for (let depth = 0; read && depth < BOOST_DEPTH && !seen.has(next); depth += 1) {
+                seen.add(next);
+                const found = await read(next);
+                const further = found?.state === 'published' && found.memeplex ? boosted(found.memeplex) : undefined;
+
+                if (!further) {
+                    return found ?? null;
+                }
+                next = further;
+            }
+
+            return null;
+        };
+
+        find().then(
+            original => { if (current) setHeld({ target, original }); },
+            () => { if (current) setHeld({ target, original: null }); },
         );
 
         return () => { current = false; };
-    }, [read, target]);
+    }, [read, target, reads, publication.did]);
+
+    // What was read for another target is not this one's. What was read for
+    // this one stays while it is read anew.
+    const original = held?.target === target ? held.original : undefined;
+    const address = original?.did ?? target;
 
     const shown = original && original.state !== 'withdrawn' && original.memeplex ? original : undefined;
 
@@ -392,7 +424,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
             {original !== undefined && !shown && (
                 <p className="muted">
                     {original?.state === 'withdrawn' ? 'The post was withdrawn: ' : 'The post cannot be shown: '}
-                    <span className="mono" title={target}>{short(target)}</span>
+                    <span className="mono" title={address}>{short(address)}</span>
                 </p>
             )}
             {shown && (
@@ -408,7 +440,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
             <footer>
                 {onOpen && shown && <button className="quiet" onClick={() => onOpen(shown)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
-                <Copy text={target} label="Copy DID" unable={`Could not copy. The DID is ${target}`} />
+                <Copy text={address} label="Copy DID" unable={`Could not copy. The DID is ${address}`} />
             </footer>
         </article>
     );
@@ -1009,6 +1041,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // Whether the reader is writing an article, which has a form of its own.
     const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
+    // How many times the timeline has been read from its start.
+    const [refreshes, setRefreshes] = useState(0);
     const [following, setFollowing] = useState('');
     const [error, setError] = useState('');
 
@@ -1030,6 +1064,9 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
             const shown = new Set(read.map(each => each.did));
 
             setTimeline(read);
+            if (!older) {
+                setRefreshes(count => count + 1);
+            }
             setFetched((older?.from ?? 0) + page.publications.length);
             setTotal(page.total);
             // Once the indexer shows an object, it is a publication.
@@ -1151,7 +1188,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         ))}
                         {timeline === null && <p className="muted">Loading…</p>}
                         {timeline?.length === 0 && waiting.length === 0 && <p className="muted">Nothing here yet.</p>}
-                        {timeline?.map(each => (
+                        <Reads.Provider value={refreshes}>{timeline?.map(each => (
                             <Post
                                 key={each.did}
                                 publication={each}
@@ -1168,7 +1205,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                     }
                                     : undefined}
                             />
-                        ))}
+                        ))}</Reads.Provider>
                         {timeline && fetched < total && (
                             <button className="quiet" onClick={() => loadTimeline({ shown: timeline, from: fetched })}>Older</button>
                         )}

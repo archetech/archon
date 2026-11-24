@@ -961,6 +961,70 @@ describe('a boost', () => {
         await waitFor(() => expect(api.withdraw).toHaveBeenCalledWith('did:cid:boost'));
     });
 
+    it('reads the post anew when the timeline is refreshed, and keeps what it showed meanwhile', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The indexer did not have the post yet.
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+
+        // An edit is shown after the next refresh, with no gap where the post is not.
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote, corrected.');
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(screen.queryByText('Reading the post.')).toBeNull();
+        expect(await screen.findByText('What Bob wrote, corrected.')).toBeTruthy();
+
+        state.known[ORIGINAL] = { ...post(ORIGINAL, BOB, 'Gone.'), state: 'withdrawn' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByText(/The post was withdrawn/)).toBeTruthy();
+    });
+
+    it('shows the post a boost of a boost passes on, and opens and copies that post', async () => {
+        const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, MIDDLE)] });
+        state.known[MIDDLE] = boostOf(MIDDLE, BOB, ORIGINAL);
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        expect(screen.queryByText(/A boost of/)).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith(ORIGINAL));
+    });
+
+    it('follows boosts of boosts only so far, and never round', async () => {
+        const A = 'did:cid:bagaaieraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        const B = 'did:cid:bagaaierabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, A)] });
+        state.known[A] = boostOf(A, BOB, B);
+        state.known[B] = boostOf(B, BOB, A);
+        const view = render(<App api={api} />);
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(vi.mocked(api.publication).mock.calls.length).toBeLessThanOrEqual(2);
+        view.unmount();
+
+        // A chain longer than is followed.
+        const chain = Array.from({ length: 8 }, (_, index) => `did:cid:bagaaierachain${index}`);
+        chain.forEach((did, index) => { state.known[did] = index === 7 ? post(did, BOB, 'At the end.') : boostOf(did, BOB, chain[index + 1]); });
+        state.timeline = [boostOf('did:cid:boost', ALICE, chain[0])];
+        vi.mocked(api.publication).mockClear();
+        render(<App api={api} />);
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(screen.queryByText('At the end.')).toBeNull();
+        expect(vi.mocked(api.publication).mock.calls.length).toBe(5);
+    });
+
     it('says so when the post cannot be shown, was withdrawn, or cannot be read', async () => {
         const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
         const view = render(<App api={api} />);
