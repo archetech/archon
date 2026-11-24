@@ -32,6 +32,10 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         bodies: {} as Record<string, string>,
         // What the service says of each identity, by its DID.
         people: {} as Record<string, { name?: string; address?: string }>,
+        // The publications the indexer has, by DID, beside those of a timeline.
+        known: {} as Record<string, Publication>,
+        // Publications as they were at a version, by DID and version.
+        revisions: {} as Record<string, Publication>,
     };
     const api: Api = {
         me: vi.fn(async () => state.me),
@@ -48,7 +52,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         }),
         thread: vi.fn(async () => []),
         responses: vi.fn(async () => state.responses),
-        publication: vi.fn(async () => undefined),
+        publication: vi.fn(async (did: string) => state.known[did]),
+        revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
@@ -546,7 +551,6 @@ describe('reading and publishing', () => {
             timeline: [
                 { ...post('did:cid:1', ALICE, ''), memeplex: { kind: 'post', author: ALICE, content: { cid: 'bafy' } } },
                 { ...post('did:cid:2', ALICE, ''), memeplex: { kind: 'paper', author: ALICE, title: 'On DIDs', summary: 'A summary.', content: { cid: 'bafy' } } },
-                { ...post('did:cid:3', ALICE, ''), memeplex: { kind: 'post', author: ALICE, target: 'did:cid:bagaaieraboostedboostedboostedboostedboostedboosted' } },
             ],
         });
         render(<App api={api} />);
@@ -556,7 +560,6 @@ describe('reading and publishing', () => {
         // A list shows what an article says of itself, and reads no body.
         expect(screen.getAllByText('Open it to read the full text.')).toHaveLength(2);
         expect(api.content).not.toHaveBeenCalled();
-        expect(screen.getByText(/A boost of/)).toBeTruthy();
     });
 
     it('shows a reader as signed in, with the way to sign out, when the read after signing in fails', async () => {
@@ -904,6 +907,209 @@ describe('an author\'s avatar', () => {
 
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(ALICE)}`);
         expect(asked).toContain(`/memepool/api/v1/avatars/${encodeURIComponent(BOB)}`);
+    });
+});
+
+describe('a boost', () => {
+    const ORIGINAL = 'did:cid:bagaaieraoriginaloriginaloriginaloriginaloriginalorigina';
+    const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';
+    // A boost names what it is of and the version of it.
+    const boostOf = (did: string, author: string, target: string, targetVersion = `op-${target}`): Publication =>
+        ({ ...post(did, author, ''), memeplex: { kind: 'post', author, target, targetVersion, grant: 'did:cid:grant' } });
+    // The indexer has a publication as it is, and as it was at its first version.
+    const has = (state: ReturnType<typeof services>['state'], publication: Publication) => {
+        state.known[publication.did!] = publication;
+        state.revisions[`${publication.did} ${publication.versions[0].opid}`] = publication;
+    };
+
+    it('is shown as the post it is of, under who boosted it', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        has(state, post(ORIGINAL, BOB, 'What **Bob** wrote.'));
+        state.people[ALICE] = { name: 'Alice' };
+        state.people[BOB] = { name: 'Bob B.' };
+        render(<App api={api} />);
+
+        const entry = (await screen.findByText('boosted')).closest('article')!;
+
+        // Who boosted, and then the post as it is shown anywhere: its author and its text.
+        expect(await within(entry.querySelector('.boosted') as HTMLElement).findByText('Alice')).toBeTruthy();
+        const original = await waitFor(() => entry.querySelector('.original') as HTMLElement);
+        expect(await within(original).findByText('Bob B.')).toBeTruthy();
+        expect(within(original).getByText('Bob').tagName).toBe('STRONG');
+        // It is asked for at the version the boost names.
+        expect(api.revision).toHaveBeenCalledWith(ORIGINAL, `op-${ORIGINAL}`);
+        expect(screen.queryByText(/A boost of/)).toBeNull();
+    });
+
+    it('shows the version boosted, whatever the post says since', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        const first = post(ORIGINAL, BOB, 'What Bob wrote.');
+        has(state, first);
+        // Bob has edited the post since, and the indexer shows the edit as the post.
+        state.known[ORIGINAL] = {
+            ...post(ORIGINAL, BOB, 'Something else entirely.'),
+            current: 1,
+            versions: [first.versions[0], { opid: 'op-edit', type: 'update', outcome: 'attributed' }],
+        };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        expect(screen.queryByText('Something else entirely.')).toBeNull();
+
+        // Reading the timeline anew changes nothing: the boost is of that version.
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(vi.mocked(api.revision).mock.calls.length).toBeGreaterThan(1));
+        expect(screen.getByText('What Bob wrote.')).toBeTruthy();
+        expect(screen.queryByText('Something else entirely.')).toBeNull();
+    });
+
+    it('opens the post as it is, and copies its DID', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        const first = post(ORIGINAL, BOB, 'What Bob wrote.');
+        has(state, first);
+        state.known[ORIGINAL] = { ...post(ORIGINAL, BOB, 'What Bob wrote, corrected.'), current: 1, versions: [first.versions[0], { opid: 'op-edit', type: 'update', outcome: 'attributed' }] };
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        await screen.findByText('What Bob wrote.');
+        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
+
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        // The thread is the post's own, as it is: that is what there is to answer.
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+        expect(api.thread).toHaveBeenCalledWith(ORIGINAL);
+        expect(screen.getByText('What Bob wrote, corrected.')).toBeTruthy();
+        expect(screen.queryByText('boosted')).toBeNull();
+    });
+
+    it('opens nothing when the post cannot be read as it is, or has just been withdrawn', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('What Bob wrote.');
+        vi.mocked(api.publication).mockRejectedValueOnce(new Error('the indexer is away'));
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+
+        // The version boosted is not opened in its place.
+        expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // Withdrawn since the boost was read.
+        state.known[ORIGINAL] = { ...state.known[ORIGINAL], state: 'withdrawn' };
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // And opened once it can be.
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+    });
+
+    it('is undone by the reader who made it, which withdraws the boost and not the post', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('What Bob wrote.');
+        expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'Undo boost' }));
+
+        await waitFor(() => expect(api.withdraw).toHaveBeenCalledWith('did:cid:boost'));
+    });
+
+    it('still shows a post its author has since withdrawn, says so, and offers nothing to open', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        const gone = { ...post(ORIGINAL, BOB, 'What Bob wrote.'), state: 'withdrawn' as const };
+        has(state, gone);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        expect(screen.getByText('Its author has since withdrawn this post.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    });
+
+    it('shows no other version in place of one that is not in the post\'s history', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL, 'op-displaced')] });
+        // The history holds another version where the one boosted was.
+        has(state, post(ORIGINAL, BOB, 'What took its place.'));
+        render(<App api={api} />);
+
+        expect(await screen.findByText(/The version boosted is no longer in the history of/)).toBeTruthy();
+        expect(screen.getByTitle(ORIGINAL)).toBeTruthy();
+        expect(screen.queryByText('What took its place.')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    });
+
+    it('says so when the indexer has no such post or cannot be read, and shows it once it can', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, ORIGINAL)] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(screen.getByTitle(ORIGINAL)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+
+        vi.mocked(api.revision).mockRejectedValueOnce(new Error('the indexer is away'));
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(vi.mocked(api.revision).mock.calls.length).toBeGreaterThan(1));
+        expect(screen.getByText(/The post cannot be shown/)).toBeTruthy();
+
+        // The indexer has read the post since.
+        has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+    });
+
+    it('shows the post a boost of a boost passes on, each at the version the one before names', async () => {
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, MIDDLE)] });
+        const middle = boostOf(MIDDLE, BOB, ORIGINAL);
+        has(state, middle);
+        has(state, post(ORIGINAL, BOB, 'What Bob wrote.'));
+        // The boost in between has since been edited to name another version, which changes nothing here.
+        state.known[MIDDLE] = { ...middle, current: 1, memeplex: { ...middle.memeplex!, targetVersion: 'op-later' } };
+        const user = userEvent.setup();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        expect(vi.mocked(api.revision).mock.calls).toStrictEqual([[MIDDLE, `op-${MIDDLE}`], [ORIGINAL, `op-${ORIGINAL}`]]);
+        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith(ORIGINAL));
+    });
+
+    it('follows boosts of boosts only so far, and never round', async () => {
+        const A = 'did:cid:bagaaieraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        const B = 'did:cid:bagaaierabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+        const { api, state } = services({ me: granted, timeline: [boostOf('did:cid:boost', ALICE, A)] });
+        has(state, boostOf(A, BOB, B));
+        has(state, boostOf(B, BOB, A));
+        const view = render(<App api={api} />);
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(vi.mocked(api.revision).mock.calls.length).toBe(2);
+        view.unmount();
+
+        // A chain longer than is followed.
+        const chain = Array.from({ length: 8 }, (_, index) => `did:cid:bagaaierachain${index}`);
+        chain.forEach((did, index) => has(state, index === 7 ? post(did, BOB, 'At the end.') : boostOf(did, BOB, chain[index + 1])));
+        state.timeline = [boostOf('did:cid:boost', ALICE, chain[0])];
+        vi.mocked(api.revision).mockClear();
+        render(<App api={api} />);
+
+        expect(await screen.findByText(/The post cannot be shown/)).toBeTruthy();
+        expect(screen.queryByText('At the end.')).toBeNull();
+        expect(vi.mocked(api.revision).mock.calls.length).toBe(5);
     });
 });
 
@@ -1383,6 +1589,24 @@ describe('the services\' client', () => {
         expect(await api.content('did:cid:2')).toBeUndefined();
         expect(await api.content('did:cid:1', 'bafy version')).toBeUndefined();
         expect(asked[2]).toBe('/memepool/api/v1/objects/did%3Acid%3A1/content?versionId=bafy%20version');
+    });
+
+    it('reads a publication at a version, and takes no other version for it', async () => {
+        const at = (opid: string) => ({ ...post('did:cid:1', ALICE, 'First.'), current: 0, versions: [{ opid, type: 'create', outcome: 'attributed' }] });
+        const path = (version: string) => `GET /memeplex/api/v1/publications/did%3Acid%3A1?versionId=${version}`;
+        const { api } = answering({
+            [path('v1')]: { status: 200, body: at('v1') },
+            // An indexer that does not know the question answers with the publication as it is.
+            [path('v0')]: { status: 200, body: at('v1') },
+            [path('gone')]: { status: 404, body: { error: 'no such attributed version in the history', reason: 'no-revision' } },
+            [path('none')]: { status: 404, body: { error: 'no attributed publication', reason: 'no-publication' } },
+        });
+
+        expect(await api.revision('did:cid:1', 'v1')).toMatchObject({ did: 'did:cid:1', current: 0 });
+        expect(await api.revision('did:cid:1', 'v0')).toBeUndefined();
+        expect(await api.revision('did:cid:1', 'gone')).toBe('no-revision');
+        expect(await api.revision('did:cid:1', 'none')).toBeUndefined();
+        expect(await api.revision('did:cid:1', 'unrouted')).toBeUndefined();
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

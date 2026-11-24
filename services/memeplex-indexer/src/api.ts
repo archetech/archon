@@ -70,11 +70,18 @@ export function createIndexerRouter({ index, status, version }: ApiOptions): exp
         next();
     });
 
+    // With `versionId`, the object as it was at that version, which is what a
+    // response to it cites.
     router.get('/publications/:did', (req, res) => {
-        const publication = index.publication(req.params.did);
+        const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
+        const publication = versionId === undefined ? index.publication(req.params.did) : index.revision(req.params.did, versionId);
 
         if (!publication) {
-            res.status(404).json({ error: 'no attributed publication' });
+            res.status(404).json({ error: 'no attributed publication', reason: 'no-publication' });
+            return;
+        }
+        if (publication === 'no-revision') {
+            res.status(404).json({ error: 'no such attributed version in the history', reason: 'no-revision' });
             return;
         }
         res.json(publication);

@@ -25,6 +25,15 @@ publishes for the user under their grant. Everything they read comes from the
    the service, which stores it; a timeline shows the title and summary, and the
    body is read when the article is opened.
 
+A boost is shown as what it passes on: the post it is of, as that post is shown
+anywhere, under a line saying who boosted it and when. A boost is of one version of
+a post, and that version is what is shown, read from the indexer by the version the
+boost names: an edit to the post changes nothing in the boost. A post its author has
+since withdrawn is still shown, and said to have been withdrawn. Where the version
+boosted is no longer in the post's history, which a replay can bring about, no other
+version is shown in its place. Opening a boost opens the post as it is, and the
+reader who made a boost can undo it, which withdraws the boost and leaves the post.
+
 An author is shown by the name the identity gives itself and by its address, where
 it has them, with the DID always beside them: a name is a claim anyone can make, and
 the service passes on an address only when the address's domain confirms it.

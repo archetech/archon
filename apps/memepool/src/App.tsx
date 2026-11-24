@@ -348,11 +348,162 @@ function Body({ object, full }: { object: NonNullable<Publication['memeplex']>; 
     );
 }
 
-function Post({ publication, onOpen, onWithdraw, full }: { publication: Publication; onOpen?: () => void; onWithdraw?: () => void; full?: Api }) {
+// Who is asked for publications: the indexer. `at` gives one as it was at a
+// version, and `now` as it is.
+interface Reading {
+    at: (did: string, versionId: string) => Promise<Publication | 'no-revision' | undefined>;
+    now: (did: string) => Promise<Publication | undefined>;
+}
+
+const Publications = createContext<Reading | undefined>(undefined);
+
+// Counts the reads of the list a publication is shown in. What a boost shows
+// is read apart from that list, and is read anew when the list is: the indexer
+// may not have had it, and it may since have been withdrawn.
+const Reads = createContext(0);
+
+// How many boosts of boosts are followed to the post they pass on.
+const BOOST_DEPTH = 5;
+
+// What a boost is of, or nothing for an object that is not a boost: a post
+// with no words of its own that names another, and the version of it.
+const boosted = (object: NonNullable<Publication['memeplex']>): { did: string; version?: string } | undefined =>
+    (object.kind === 'post' && object.text === undefined && object.content === undefined && typeof object.target === 'string'
+        ? { did: object.target, version: typeof object.targetVersion === 'string' ? object.targetVersion : undefined }
+        : undefined);
+
+// A boost, shown as what it passes on: the post it is of, as that post is
+// shown, under a line saying who boosted it.
+//
+// A boost is of one version of a post, and that version is what is shown,
+// whatever the post says since. A boost of a boost is of one version of that
+// boost, so the whole way to the post is fixed as well.
+function Boost({ publication, target, onOpen, onWithdraw }: {
+    publication: Publication; target: { did: string; version?: string }; onOpen?: (publication: Publication) => void; onWithdraw?: () => void;
+}) {
+    const read = useContext(Publications);
+    const reads = useContext(Reads);
+    // What was found for the boost named: the post as it was, that its version
+    // is not in its history, or nothing the indexer can show.
+    const [held, setHeld] = useState<{ of: string; found: Publication | 'no-revision' | null; did: string } | undefined>(undefined);
+    const [opening, setOpening] = useState(false);
+    // Whether the post could not be opened as it is when that was asked.
+    const [unopened, setUnopened] = useState(false);
+    const author = publication.memeplex!.author;
+    const { did, version } = target;
+    const of = `${did} ${version ?? ''}`;
+
+    useEffect(() => {
+        let current = true;
+        // Follows boosts of boosts, each at the version the one before names,
+        // no further than a few and never to one already seen.
+        const find = async (): Promise<{ found: Publication | 'no-revision' | null; did: string }> => {
+            const seen = new Set<string>();
+            let next: { did: string; version?: string } = { did, version };
+
+            for (let depth = 0; read && next.version && depth < BOOST_DEPTH && !seen.has(`${next.did} ${next.version}`); depth += 1) {
+                seen.add(`${next.did} ${next.version}`);
+                const found = await read.at(next.did, next.version);
+
+                if (found === 'no-revision' || !found) {
+                    return { found: found ?? null, did: next.did };
+                }
+
+                const further = found.memeplex ? boosted(found.memeplex) : undefined;
+
+                if (!further) {
+                    return { found, did: next.did };
+                }
+                next = further;
+            }
+
+            return { found: null, did: next.did };
+        };
+
+        find().then(
+            answer => { if (current) setHeld({ of, ...answer }); },
+            () => { if (current) setHeld({ of, found: null, did }); },
+        );
+
+        return () => { current = false; };
+    }, [read, did, version, of, reads]);
+
+    // What was read for another boost is not this one's. What was read for
+    // this one stays while it is read anew.
+    const answer = held?.of === of ? held : undefined;
+    const shown = answer && answer.found && answer.found !== 'no-revision' && answer.found.memeplex ? answer.found : undefined;
+    const address = answer?.did ?? did;
+    const withdrawn = shown?.state === 'withdrawn';
+
+    // The post is opened as it is, which is what there is to read and answer.
+    // The version boosted is not opened in its place: an answer would be to a
+    // version the post may have left behind, or to a post since withdrawn.
+    const open = async () => {
+        setOpening(true);
+        setUnopened(false);
+        try {
+            const now = await read?.now(shown!.did!).catch(() => undefined);
+
+            if (now?.state === 'published' && now.memeplex) {
+                onOpen?.(now);
+            }
+            else {
+                setUnopened(true);
+            }
+        }
+        finally {
+            setOpening(false);
+        }
+    };
+
+    return (
+        <article className="post boost">
+            <p className="boosted">
+                <Identity did={author} />
+                <span>boosted</span>
+                <time>{when(publication)}</time>
+            </p>
+            {answer === undefined && <p className="muted">Reading the post.</p>}
+            {answer && !shown && (
+                <p className="muted">
+                    {answer.found === 'no-revision' ? 'The version boosted is no longer in the history of ' : 'The post cannot be shown: '}
+                    <span className="mono" title={address}>{short(address)}</span>
+                </p>
+            )}
+            {shown && (
+                <div className="original">
+                    <header>
+                        <Identity did={shown.memeplex!.author} />
+                        <time>{when(shown)}</time>
+                    </header>
+                    {shown.memeplex!.title && <h3>{shown.memeplex!.title}</h3>}
+                    <Body object={shown.memeplex!} />
+                    {withdrawn && <p className="muted note">Its author has since withdrawn this post.</p>}
+                </div>
+            )}
+            {unopened && <p role="alert" className="error">The post cannot be opened as it is. Refresh, and try once more.</p>}
+            <footer>
+                {onOpen && shown && !withdrawn && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
+                {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
+                <Copy text={address} label="Copy DID" unable={`Could not copy. The DID is ${address}`} />
+            </footer>
+        </article>
+    );
+}
+
+function Post({ publication, onOpen, onWithdraw, full }: {
+    publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api;
+}) {
     const object = publication.memeplex;
 
     if (publication.state === 'withdrawn' || !object) {
         return <article className="post muted">Withdrawn</article>;
+    }
+
+    const target = boosted(object);
+
+    if (target) {
+        return <Boost publication={publication} target={target} onOpen={onOpen} onWithdraw={onWithdraw} />;
     }
 
     return (
@@ -364,7 +515,7 @@ function Post({ publication, onOpen, onWithdraw, full }: { publication: Publicat
             {object.title && <h3>{object.title}</h3>}
             <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
             <footer>
-                {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
+                {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
                 {/* A post's DID is its address: what another wallet or node resolves it by. */}
                 {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
@@ -935,6 +1086,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // Whether the reader is writing an article, which has a form of its own.
     const [writing, setWriting] = useState(false);
     const [open, setOpen] = useState<Publication | null>(null);
+    // How many times the timeline has been read from its start.
+    const [refreshes, setRefreshes] = useState(0);
     const [following, setFollowing] = useState('');
     const [error, setError] = useState('');
 
@@ -956,6 +1109,9 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
             const shown = new Set(read.map(each => each.did));
 
             setTimeline(read);
+            if (!older) {
+                setRefreshes(count => count + 1);
+            }
             setFetched((older?.from ?? 0) + page.publications.length);
             setTotal(page.total);
             // Once the indexer shows an object, it is a publication.
@@ -1077,11 +1233,11 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                         ))}
                         {timeline === null && <p className="muted">Loading…</p>}
                         {timeline?.length === 0 && waiting.length === 0 && <p className="muted">Nothing here yet.</p>}
-                        {timeline?.map(each => (
+                        <Reads.Provider value={refreshes}>{timeline?.map(each => (
                             <Post
                                 key={each.did}
                                 publication={each}
-                                onOpen={() => setOpen(each)}
+                                onOpen={setOpen}
                                 onWithdraw={changeable(each)
                                     ? async () => {
                                         try {
@@ -1094,7 +1250,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                     }
                                     : undefined}
                             />
-                        ))}
+                        ))}</Reads.Provider>
                         {timeline && fetched < total && (
                             <button className="quiet" onClick={() => loadTimeline({ shown: timeline, from: fetched })}>Older</button>
                         )}
@@ -1125,6 +1281,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 }
 
 export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number }) {
+    const reading = useMemo(() => ({ at: api.revision, now: api.publication }), [api]);
     // Each identity is asked about once, however many of its posts are shown.
     const people = useMemo(() => {
         const asked = new Map<string, Promise<Person>>();
@@ -1196,19 +1353,21 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     return (
         <Avatars.Provider value={api.avatar}>
             <People.Provider value={people}>
-                {error && <p role="alert" className="error">{error}</p>}
-                <Reader
-                    key={session}
-                    api={api}
-                    me={me}
-                    onCheck={loadMe}
-                    onSignedOut={() => {
-                        sessions.current += 1;
-                        setSession(sessions.current);
-                        setMe(null);
-                        setError('');
-                    }}
-                />
+                <Publications.Provider value={reading}>
+                    {error && <p role="alert" className="error">{error}</p>}
+                    <Reader
+                        key={session}
+                        api={api}
+                        me={me}
+                        onCheck={loadMe}
+                        onSignedOut={() => {
+                            sessions.current += 1;
+                            setSession(sessions.current);
+                            setMe(null);
+                            setError('');
+                        }}
+                    />
+                </Publications.Provider>
             </People.Provider>
         </Avatars.Provider>
     );

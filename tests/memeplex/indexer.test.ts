@@ -358,6 +358,17 @@ describe('the HTTP views', () => {
         expect(found.status).toBe(200);
         expect(found.body).toMatchObject({ state: 'published', did: first, memeplex: { text: 'First.' } });
         expect((await request(app).get(`/api/v1/publications/${grant}`)).status).toBe(404);
+
+        // The object as it was at a version, and no other in place of one that is not there.
+        const version = found.body.versions[0].opid;
+        const at = await request(app).get(`/api/v1/publications/${first}`).query({ versionId: version });
+
+        expect(at.status).toBe(200);
+        expect(at.body).toMatchObject({ did: first, current: 0 });
+        const gone = await request(app).get(`/api/v1/publications/${first}`).query({ versionId: 'bafyreinotinthehistory' });
+        expect(gone.status).toBe(404);
+        expect(gone.body.reason).toBe('no-revision');
+        expect((await request(app).get('/api/v1/publications/did:cid:nothing').query({ versionId: version })).body.reason).toBe('no-publication');
         expect((await request(app).get('/api/v1/publications/did:cid:nothing')).status).toBe(404);
     }, 60_000);
 

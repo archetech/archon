@@ -162,6 +162,35 @@ export class MemeplexIndex {
         return this.publications.get(did);
     }
 
+    // An object as it was at one of its versions, which is what a response to
+    // it cites: the publication with `current` at that version and `memeplex`
+    // as the version had it. Its `state` is the object's own, so one since
+    // withdrawn says so.
+    //
+    // A version that is not in the object's history is 'no-revision': a
+    // response continues to mean the version it cited, and no other stands in
+    // for one that is gone. So is a version that is in the history and is not
+    // attributed, or is the object's deletion, since neither is something the
+    // author published.
+    revision(did: string, versionId: string): Publication | 'no-revision' | undefined {
+        const publication = this.publications.get(did);
+
+        if (!publication) {
+            return undefined;
+        }
+
+        const at = publication.versions.findIndex(each => each.opid === versionId);
+        const version = publication.versions[at];
+        const data = this.histories.get(did)?.[at]?.didDocumentData;
+        const memeplex = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, any>).memeplex : undefined;
+
+        if (!version || version.outcome !== 'attributed' || version.type === 'delete' || memeplex === undefined) {
+            return 'no-revision';
+        }
+
+        return { ...publication, current: at, memeplex };
+    }
+
     // What the authors have published and not withdrawn, newest first: posts,
     // papers and replies.
     timeline(authors: string[]): Publication[] {
