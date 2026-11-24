@@ -29,7 +29,9 @@ A boost is shown as what it passes on: the post it is of, as that post is shown
 anywhere, under a line saying who boosted it and when. Opening it opens the post,
 and the reader who made a boost can undo it, which withdraws the boost and leaves
 the post. Where the indexer cannot show the post, or it was withdrawn, the entry
-says so.
+says so. A boost is of one version of a post, and the indexer gives a post as it
+is: where the post has been edited since, the entry says that as well, since what
+is shown is not what was boosted.
 
 An author is shown by the name the identity gives itself and by its address, where
 it has them, with the DID always beside them: a name is a claim anyone can make, and

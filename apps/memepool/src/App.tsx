@@ -373,16 +373,22 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     const reads = useContext(Reads);
     // The post boosted, with the target it was read for: not read yet, or one
     // the indexer cannot show.
-    const [held, setHeld] = useState<{ target: string; original: Publication | null } | undefined>(undefined);
+    const [held, setHeld] = useState<{ target: string; original: Publication | null; cited?: string } | undefined>(undefined);
     const author = publication.memeplex!.author;
+    const version = typeof publication.memeplex!.targetVersion === 'string' ? publication.memeplex!.targetVersion : undefined;
 
     useEffect(() => {
         let current = true;
         // A boost of a boost passes on what that one does. The post is found by
         // following them, no further than a few and never to one already seen.
-        const find = async (): Promise<Publication | null> => {
+        //
+        // A boost names the version of what it passes on. The version the
+        // post was at when the last boost before it was made is kept, to tell a
+        // post that has changed since.
+        const find = async (): Promise<{ original: Publication | null; cited?: string }> => {
             const seen = new Set<string>([publication.did ?? '']);
             let next = target;
+            let cited = version;
 
             for (let depth = 0; read && depth < BOOST_DEPTH && !seen.has(next); depth += 1) {
                 seen.add(next);
@@ -390,21 +396,22 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 const further = found?.state === 'published' && found.memeplex ? boosted(found.memeplex) : undefined;
 
                 if (!further) {
-                    return found ?? null;
+                    return { original: found ?? null, cited };
                 }
                 next = further;
+                cited = typeof found!.memeplex!.targetVersion === 'string' ? found!.memeplex!.targetVersion : undefined;
             }
 
-            return null;
+            return { original: null };
         };
 
         find().then(
-            original => { if (current) setHeld({ target, original }); },
+            found => { if (current) setHeld({ target, ...found }); },
             () => { if (current) setHeld({ target, original: null }); },
         );
 
         return () => { current = false; };
-    }, [read, target, reads, publication.did]);
+    }, [read, target, version, reads, publication.did]);
 
     // What was read for another target is not this one's. What was read for
     // this one stays while it is read anew.
@@ -426,6 +433,11 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                     {original?.state === 'withdrawn' ? 'The post was withdrawn: ' : 'The post cannot be shown: '}
                     <span className="mono" title={address}>{short(address)}</span>
                 </p>
+            )}
+            {/* A boost is of one version of a post. What is shown is the post as it
+                is, so a post that has changed since is said to have. */}
+            {shown && held?.cited && held.cited !== shownVersion(shown) && (
+                <p className="muted changed">The post has been edited since it was boosted. This is the post as it is.</p>
             )}
             {shown && (
                 <div className="original">
