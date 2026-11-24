@@ -113,6 +113,12 @@ button.identity.visit:hover strong, button.identity.visit:hover .mono, button.id
 .markdown input[type="checkbox"] { display: inline; width: auto; margin: 0 0.35rem 0 0; }
 .post .article { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .post.waiting { border-style: dashed; }
+.post .answered { margin: 0 0 0.6rem; }
+.post .answered > p { font-size: 0.85rem; margin: 0 0 0.25rem; }
+.post .answered .embed.card { border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.75rem; }
+.post .answered .embed.card header { display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; color: var(--soft); font-size: 0.85rem; }
+.tabs { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
+.tabs [role="tab"][aria-selected="true"] { font-weight: 600; text-decoration: underline; }
 .markdown .embed { margin: 0.5rem 0; }
 .markdown .embed.card { border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.75rem; }
 .markdown .embed.card header { display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; color: var(--soft); font-size: 0.85rem; }

@@ -59,7 +59,12 @@ export interface Api {
     edit(did: string, object: Record<string, unknown>): Promise<void>;
     withdraw(did: string): Promise<void>;
     // One page of a timeline, newest first, and how many publications it has in all.
-    timeline(authors: string[], offset?: number): Promise<{ total: number; publications: Publication[] }>;
+    // `kinds` names the kinds wanted among posts, papers and replies: a
+    // reader's timeline is posts and papers, and replies are an author's to list.
+    //
+    // `read` is how many publications the indexer gave, where that is more
+    // than are returned: the next page starts after them.
+    timeline(authors: string[], offset?: number, kinds?: string[]): Promise<{ total: number; publications: Publication[]; read?: number }>;
     thread(did: string): Promise<Reply[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
@@ -133,18 +138,27 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
         async withdraw(did) {
             await json(await post(`/objects/${encodeURIComponent(did)}`, undefined, 'DELETE'));
         },
-        async timeline(authors, offset = 0) {
+        async timeline(authors, offset = 0, kinds) {
             if (authors.length === 0) {
                 return { total: 0, publications: [] };
             }
 
             const query = new URLSearchParams(authors.map(author => ['author', author]));
 
+            for (const kind of kinds ?? []) {
+                query.append('kind', kind);
+            }
             if (offset > 0) {
                 query.set('offset', String(offset));
             }
 
-            return json(await call(bases.memeplex, `/timeline?${query}`));
+            const page = await json(await call(bases.memeplex, `/timeline?${query}`)) as { total: number; publications: Publication[] };
+
+            // An indexer that does not know the question gives every kind. What
+            // it gave is still what the next page comes after.
+            return kinds
+                ? { ...page, publications: page.publications.filter(each => kinds.includes(String(each.memeplex?.kind))), read: page.publications.length }
+                : page;
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),
         async responses(did) {

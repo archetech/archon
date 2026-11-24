@@ -7,7 +7,7 @@ export { attribute } from './attribution.js';
 export type { Publication, Unattributed, Version, VersionOutcome } from './attribution.js';
 export { coauthors, currentRatings, ratingValue } from './views.js';
 export type { Coauthor } from './views.js';
-export { MemeplexIndex } from './index-core.js';
+export { MemeplexIndex, TIMELINE_KINDS } from './index-core.js';
 export type { RatingSummary, Reply } from './index-core.js';
 export { GRANT_LINK_PREFIX, grantLink, parseGrantLink, readGrantRequest } from './grant-link.js';
 export type { GrantRequestError, ReadGrantRequest } from './grant-link.js';

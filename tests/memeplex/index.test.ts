@@ -198,6 +198,19 @@ describe('views', () => {
         expect(index.timeline([])).toStrictEqual([]);
     });
 
+    it('lists the kinds asked for: posts and papers without the replies, or the replies alone', () => {
+        const index = filled();
+        const everyone = [alice.did, bob.did];
+
+        // A boost is a post.
+        expect(index.timeline(everyone, ['post', 'paper']).map(each => each.did)).toStrictEqual([boost, late, edited, post, paper]);
+        expect(index.timeline(everyone, ['reply']).map(each => each.did)).toStrictEqual([underGone, reply]);
+        expect(index.timeline(everyone, ['paper']).map(each => each.did)).toStrictEqual([paper]);
+        // No kind a timeline does not hold is given for the asking.
+        expect(index.timeline(everyone, ['rating', 'tag', 'grant'])).toStrictEqual([]);
+        expect(index.timeline(everyone, [])).toStrictEqual([]);
+    });
+
     it('builds a thread, oldest first, keeping a withdrawn reply as a tombstone', () => {
         const thread = filled().thread(post);
 
