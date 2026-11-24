@@ -58,6 +58,10 @@ export interface Api {
     // Replaces one of the reader's objects with another version of it.
     edit(did: string, object: Record<string, unknown>): Promise<void>;
     withdraw(did: string): Promise<void>;
+    // Where an object the reader published through the service stands, and the
+    // chain it is on: 'pending' while it waits to be anchored, 'none' when it
+    // never will be. Nothing when the service cannot say.
+    state(did: string): Promise<{ state: Publication['state']; registry?: string } | undefined>;
     // One page of a timeline, newest first, and how many publications it has in all.
     // `kinds` names the kinds wanted among posts, papers and replies: a
     // reader's timeline is posts and papers, and replies are an author's to list.
@@ -137,6 +141,11 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
         },
         async withdraw(did) {
             await json(await post(`/objects/${encodeURIComponent(did)}`, undefined, 'DELETE'));
+        },
+        async state(did) {
+            const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/state`).catch(() => undefined);
+
+            return response?.ok ? response.json() : undefined;
         },
         async timeline(authors, offset = 0, kinds) {
             if (authors.length === 0) {

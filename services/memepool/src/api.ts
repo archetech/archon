@@ -19,6 +19,7 @@ export interface LoginKeymaster {
     resolveDID(did: string, options?: { versionSequence?: number; versionId?: string }): Promise<{
         didDocument?: { controller?: string };
         didDocumentData?: unknown;
+        didDocumentRegistration?: { registry?: string };
         didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean };
     }>;
 }
@@ -697,6 +698,43 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // stored. It reads no other: a reference in an object someone else made
     // can be to anything, of any size. `versionId` names the version whose body
     // is wanted, which is how a reader gets the body of the version it shows.
+    // Where an object the user published through this service stands: whether
+    // it is anchored and attributed, still waits, or never will be. The pages
+    // hold what a user published until the indexer shows it, and ask this to
+    // know which of those is so.
+    //
+    // It is for the object's author, and of an object the service created: the
+    // author is the one its creation names, since nothing later can change it.
+    router.get('/objects/:did/state', async (req: Request, res: Response) => {
+        const { user } = req as Signed;
+        const none = () => { res.status(404).json({ error: 'no object of yours that this service published' }); };
+        const did = String(req.params.did);
+
+        if (!did.startsWith('did:')) {
+            none();
+            return;
+        }
+
+        try {
+            const first = await keymaster.resolveDID(did, { versionSequence: 1 });
+            const claimed = memeplexOf(first);
+
+            if (first.didDocument?.controller !== await client.did() || claimed?.author !== user || typeof claimed.grant !== 'string') {
+                none();
+                return;
+            }
+
+            const { state } = await client.publication(did, claimed.grant);
+            // The chain it waits on is the one it was created on, which is its grant's.
+            const registry = first.didDocumentRegistration?.registry;
+
+            res.json({ state, ...(typeof registry === 'string' ? { registry } : {}) });
+        }
+        catch {
+            none();
+        }
+    });
+
     router.get('/objects/:did/content', async (req, res) => {
         const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
         const object = content ? await publishedHere(String(req.params.did), versionId).catch(() => undefined) : undefined;
