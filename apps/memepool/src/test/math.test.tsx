@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { render } from '@testing-library/react';
-import Markdown, { MATH_LIMIT } from '../Markdown';
+import { render, screen, waitFor } from '@testing-library/react';
+import Markdown, { Embeds, MATH_LIMIT } from '../Markdown';
+import type { Embedding } from '../Markdown';
 
 // Math as Memeplex says a client shows it: docs/plans/memeplex-reference-1436.md,
 // "Text formatting". It is written between dollars, as in Pandoc, Jupyter and
@@ -86,6 +87,44 @@ describe('math', () => {
         expect(page.querySelector('strong')?.textContent?.startsWith('costs $5 and ')).toBe(true);
         expect(page.querySelectorAll('li')).toHaveLength(1);
         expect(page.querySelector('h1')?.textContent?.startsWith('Costs $5 and ')).toBe(true);
+    });
+
+    it('still names a link and an image by an address given elsewhere in the text', () => {
+        const page = shown([
+            'Costs $5 and $x$, see [the site][ref] and ![a chart][pic].',
+            '',
+            '[ref]: https://example.org/',
+            '[pic]: https://example.org/chart.png',
+        ].join('\n'));
+
+        expect(math(page).map(latex)).toStrictEqual(['x']);
+        expect([...page.querySelectorAll('a')].map(each => [each.textContent, each.getAttribute('href')])).toStrictEqual([
+            ['the site', 'https://example.org/'],
+            // An image elsewhere is a link the reader may follow, and is not loaded.
+            ['a chart', 'https://example.org/chart.png'],
+        ]);
+        expect(page.querySelector('img')).toBeNull();
+        // The addresses are given once, and are no part of what is shown.
+        expect(page.textContent).not.toContain('[ref]');
+        expect(page.textContent?.startsWith('Costs $5 and ')).toBe(true);
+    });
+
+    it('still shows an embed whose address is given elsewhere, after a dollar that is not math', async () => {
+        const asked: string[] = [];
+        const embedding: Embedding = {
+            object: async (did, version) => { asked.push(`${did} ${version}`); return { text: 'Quoted.' }; },
+            image: () => '',
+            card: object => <blockquote>{String((object as { text: string }).text)}</blockquote>,
+        };
+
+        render(
+            <Embeds.Provider value={embedding}>
+                <Markdown text={'Costs $5, and see:\n\n![a post][quoted]\n\nIt costs $6 too: ![again][quoted]\n\n[quoted]: did:cid:bagaaieraquoted?versionId=bafyv1'} />
+            </Embeds.Provider>,
+        );
+
+        await waitFor(() => expect(screen.getAllByText('Quoted.')).toHaveLength(2));
+        expect(asked).toStrictEqual(['did:cid:bagaaieraquoted bafyv1', 'did:cid:bagaaieraquoted bafyv1']);
     });
 
     it('reads a text of nothing but dollars only so many times, and loses none of it', () => {

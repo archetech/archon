@@ -167,7 +167,7 @@ const inline = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 // run of text, so a text of nothing but dollars is not read without end.
 const REREADS = 20;
 
-function settleMath(tree: Node, source: string, rereads: { left: number }): void {
+function settleMath(tree: Node, source: string, rereads: { left: number }, defined: string): void {
     const walk = (parent: Node) => {
         if (!parent.children) {
             return;
@@ -216,12 +216,17 @@ function settleMath(tree: Node, source: string, rereads: { left: number }): void
                 const rest = source.slice(from + dollars, end);
                 const lead = /^\s*/.exec(rest)?.[0] ?? '';
                 const tail = /\s*$/.exec(rest.slice(lead.length))?.[0] ?? '';
-                const read = inline.parse(rest) as unknown as Node;
-                const run = read.children?.length === 1 && read.children[0].type === 'paragraph' ? read : undefined;
+                // A link or an image may give its address apart from itself,
+                // anywhere in the text. Those addresses are read with the run,
+                // so that it names them as the whole text does, and are then
+                // left out: the text has them already.
+                const read = inline.parse(defined ? [rest, '', defined].join(String.fromCharCode(10)) : rest) as unknown as Node;
+                const [first, ...others] = read.children ?? [];
+                const run = first?.type === 'paragraph' && others.every(each => each.type === 'definition') ? { ...read, children: [first] } : undefined;
 
                 rereads.left -= 1;
                 if (run) {
-                    settleMath(run, rest, rereads);
+                    settleMath(run, rest, rereads, defined);
                     settled.push({ type: 'text', value: written.slice(0, dollars) + lead }, ...run.children![0].children ?? [], { type: 'text', value: tail });
                     break;
                 }
@@ -236,7 +241,22 @@ function settleMath(tree: Node, source: string, rereads: { left: number }): void
     walk(tree);
 }
 
-const keepMath = () => (tree: Node, file: unknown) => settleMath(tree, String(file), { left: REREADS });
+const keepMath = () => (tree: Node, file: unknown) => {
+    const source = String(file);
+    const definitions: string[] = [];
+    const gather = (node: Node) => {
+        const from = node.position?.start.offset;
+        const to = node.position?.end.offset;
+
+        if (node.type === 'definition' && from !== undefined && to !== undefined) {
+            definitions.push(source.slice(from, to));
+        }
+        node.children?.forEach(gather);
+    };
+
+    gather(tree);
+    settleMath(tree, source, { left: REREADS }, definitions.join(String.fromCharCode(10)));
+};
 
 // How KaTeX is asked to render: what is written is a stranger's, so no command
 // that makes a link, loads an image or sets a class or an attribute is run, and
