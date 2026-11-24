@@ -749,7 +749,13 @@ describe('publishing', () => {
         const late = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Too late.' })).body.did;
         await alice.revokeDID(grantDid);
         await anchor();
-        expect(await stateOf(late)).toStrictEqual({ state: 'none' });
+        expect(await stateOf(late)).toStrictEqual({ state: 'none', registry: REGISTRY });
+
+        // Saying so reads the object and its grant, and no other user's grants.
+        const every = jest.spyOn(client, 'grantsFrom');
+        await stateOf(late);
+        expect(every).not.toHaveBeenCalled();
+        every.mockRestore();
     }, 120_000);
 
     it('says nothing of an object that is another user\'s, that it did not publish, or to nobody signed in', async () => {

@@ -19,6 +19,7 @@ export interface LoginKeymaster {
     resolveDID(did: string, options?: { versionSequence?: number; versionId?: string }): Promise<{
         didDocument?: { controller?: string };
         didDocumentData?: unknown;
+        didDocumentRegistration?: { registry?: string };
         didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean };
     }>;
 }
@@ -723,9 +724,9 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 return;
             }
 
-            const [{ state }, grants] = await Promise.all([client.publication(did, claimed.grant), client.grantsFrom(user)]);
-            // The chain it waits on is its grant's, where that grant is still in force.
-            const registry = liveGrants(grants, new Date(now())).find(each => each.did === claimed.grant)?.registry;
+            const { state } = await client.publication(did, claimed.grant);
+            // The chain it waits on is the one it was created on, which is its grant's.
+            const registry = first.didDocumentRegistration?.registry;
 
             res.json({ state, ...(typeof registry === 'string' ? { registry } : {}) });
         }
