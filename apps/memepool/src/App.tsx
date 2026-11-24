@@ -1298,7 +1298,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
             if (!older) {
                 setRefreshes(count => count + 1);
             }
-            setFetched((older?.from ?? 0) + page.publications.length);
+            setFetched((older?.from ?? 0) + (page.read ?? page.publications.length));
             setTotal(page.total);
             // Once the indexer shows an object, it is a publication.
             setWaiting(current => current.filter(each => !shown.has(each.did)));

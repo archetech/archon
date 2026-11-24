@@ -61,7 +61,10 @@ export interface Api {
     // One page of a timeline, newest first, and how many publications it has in all.
     // `kinds` names the kinds wanted among posts, papers and replies: a
     // reader's timeline is posts and papers, and replies are an author's to list.
-    timeline(authors: string[], offset?: number, kinds?: string[]): Promise<{ total: number; publications: Publication[] }>;
+    //
+    // `read` is how many publications the indexer gave, where that is more
+    // than are returned: the next page starts after them.
+    timeline(authors: string[], offset?: number, kinds?: string[]): Promise<{ total: number; publications: Publication[]; read?: number }>;
     thread(did: string): Promise<Reply[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
@@ -151,8 +154,11 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
 
             const page = await json(await call(bases.memeplex, `/timeline?${query}`)) as { total: number; publications: Publication[] };
 
-            // An indexer that does not know the question gives every kind.
-            return kinds ? { ...page, publications: page.publications.filter(each => kinds.includes(String(each.memeplex?.kind))) } : page;
+            // An indexer that does not know the question gives every kind. What
+            // it gave is still what the next page comes after.
+            return kinds
+                ? { ...page, publications: page.publications.filter(each => kinds.includes(String(each.memeplex?.kind))), read: page.publications.length }
+                : page;
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),
         async responses(did) {

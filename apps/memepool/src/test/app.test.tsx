@@ -1113,6 +1113,28 @@ describe('an author\'s own posts', () => {
         expect(lastRead(api)).toStrictEqual([[ALICE], 0, POSTS]);
     });
 
+    it('reach older posts past a page of replies, from an indexer that gives every kind', async () => {
+        const replies = Array.from({ length: PAGE }, (_, index): Publication =>
+            ({ ...post(`did:cid:r${index}`, ALICE, `Reply ${index}.`), memeplex: { kind: 'reply', author: ALICE, text: `Reply ${index}.` } }));
+        const { api } = services({ me: granted });
+        const all = [...replies, post('did:cid:old', ALICE, 'An older post.')];
+        // The indexer pages what it has and does not know of kinds; the client keeps the kinds asked for.
+        vi.mocked(api.timeline).mockImplementation(async (_authors, offset = 0, kinds) => {
+            const given = all.slice(offset, offset + PAGE);
+
+            return { total: all.length, publications: given.filter(each => !kinds || kinds.includes(String(each.memeplex!.kind))), read: given.length };
+        });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // A whole page of replies shows nothing, and there is more to read.
+        await user.click(await screen.findByRole('button', { name: 'Older' }));
+
+        expect(await screen.findByText('An older post.')).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[ALICE], PAGE, POSTS]);
+        expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
+    });
+
     it('show older posts a page at a time, of that author', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const many = Array.from({ length: PAGE + 2 }, (_, index) => post(`did:cid:b${index}`, BOB, `Bob ${index}.`));
@@ -1975,7 +1997,11 @@ describe('the services\' client', () => {
             'GET /memeplex/api/v1/timeline?author=did%3Acid%3Aa&kind=post&kind=paper': { status: 200, body: { total: 2, publications: mixed } },
         });
 
-        expect((await api.timeline(['did:cid:a'], 0, ['post', 'paper'])).publications.map(each => each.did)).toStrictEqual(['did:cid:1']);
+        const page = await api.timeline(['did:cid:a'], 0, ['post', 'paper']);
+
+        expect(page.publications.map(each => each.did)).toStrictEqual(['did:cid:1']);
+        // What the indexer gave is what the next page comes after.
+        expect(page.read).toBe(2);
         expect(asked[0].url).toBe('/memeplex/api/v1/timeline?author=did%3Acid%3Aa&kind=post&kind=paper');
     });
 
