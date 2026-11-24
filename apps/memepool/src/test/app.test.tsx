@@ -1297,6 +1297,47 @@ describe('what the reader published that waits to be anchored', () => {
         expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
     });
 
+    it('is not lost to another page of the same reader, which writes what it changed and leaves the rest', async () => {
+        const KEY = `memepool.waiting.${ALICE}`;
+        const { state, user } = await publishing('Published in this page.', 'did:cid:here');
+        await waitingCard('Published in this page.');
+
+        // Another page of this reader publishes, and this one knows nothing of it.
+        localStorage.setItem(KEY, JSON.stringify([...JSON.parse(localStorage.getItem(KEY)!), { did: 'did:cid:there', text: 'Published in another page.' }]));
+
+        // This page changes its own entry, and then puts it away.
+        state.states['did:cid:here'] = { state: 'pending', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(JSON.parse(localStorage.getItem(KEY)!)).toStrictEqual([
+            { did: 'did:cid:there', text: 'Published in another page.' },
+            { did: 'did:cid:here', text: 'Published in this page.', registry: 'BTC:mainnet' },
+        ]));
+
+        state.states['did:cid:here'] = { state: 'published' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(JSON.parse(localStorage.getItem(KEY)!)).toStrictEqual([{ did: 'did:cid:there', text: 'Published in another page.' }]));
+    });
+
+    it('is the list of whoever is signed in, when that changes under the page', async () => {
+        localStorage.setItem(`memepool.waiting.${ALICE}`, JSON.stringify([{ did: 'did:cid:hers', text: 'Alice wrote this.' }]));
+        localStorage.setItem(`memepool.waiting.${BOB}`, JSON.stringify([{ did: 'did:cid:his', text: 'Bob wrote this.' }]));
+        const { api, state } = services({ me: { did: ALICE, link: 'archon://auth?grant=x' } });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await waitingCard('Alice wrote this.');
+
+        // Another page signs in as Bob, and this one learns of it when it asks who is signed in.
+        state.me = { did: BOB, link: 'archon://auth?grant=y' };
+        await user.click(screen.getByRole('button', { name: 'I have approved it' }));
+
+        expect(await waitingCard('Bob wrote this.')).not.toBeNull();
+        expect(screen.queryByText('Alice wrote this.')).toBeNull();
+        // Neither reader's list is written over with the other's.
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)).toStrictEqual([{ did: 'did:cid:hers', text: 'Alice wrote this.' }]);
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${BOB}`)!)).toStrictEqual([{ did: 'did:cid:his', text: 'Bob wrote this.' }]);
+    });
+
     it('is a reply in its thread, kept and marked in the same way', async () => {
         const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
         vi.mocked(api.publish).mockResolvedValue('did:cid:reply');

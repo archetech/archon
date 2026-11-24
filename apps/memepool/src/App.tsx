@@ -1447,9 +1447,21 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         setRefreshes(count => count + 1);
         setWaiting(current => (current.some(each => shown.includes(each.did)) ? current.filter(each => !shown.includes(each.did)) : current));
     }, []);
+    // What is kept is every page's of this reader in this browser, and another
+    // page may have added to it. So this page writes what it changed, the
+    // entries it holds and the removal of those it has put away, onto what is
+    // there, and leaves the rest.
+    const kept = useRef(waiting);
+
     useEffect(() => {
+        const mine = new Map(waiting.map(each => [each.did, each]));
+        const gone = new Set(kept.current.filter(each => !mine.has(each.did)).map(each => each.did));
+
+        kept.current = waiting;
         try {
-            localStorage.setItem(WAITING + me.did, JSON.stringify(waiting));
+            const others = readWaiting(me.did).filter(each => !mine.has(each.did) && !gone.has(each.did));
+
+            localStorage.setItem(WAITING + me.did, JSON.stringify([...others, ...waiting]));
         }
         catch {
             // A browser that keeps nothing still shows what waits, until the page is left.
@@ -1720,7 +1732,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 <Publications.Provider value={reading}>
                     {error && <p role="alert" className="error">{error}</p>}
                     <Reader
-                        key={session}
+                        key={`${session} ${me.did}`}
                         api={api}
                         me={me}
                         onCheck={loadMe}
