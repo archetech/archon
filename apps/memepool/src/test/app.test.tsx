@@ -1036,6 +1036,35 @@ describe('a boost', () => {
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith(ORIGINAL));
     });
 
+    it('says so when a boost on the way to the post has changed what it passes on', async () => {
+        const MIDDLE = 'did:cid:bagaaieramiddlemiddlemiddlemiddlemiddlemiddlemiddlemiddl';
+        const outer = boostOf('did:cid:boost', ALICE, MIDDLE);
+        const middle = boostOf(MIDDLE, BOB, ORIGINAL);
+        const { api, state } = services({ me: granted, timeline: [{ ...outer, memeplex: { ...outer.memeplex!, targetVersion: `op-${MIDDLE}` } }] });
+        state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
+        // The boost in between is at the version cited, and names the version the post is at.
+        state.known[MIDDLE] = { ...middle, memeplex: { ...middle.memeplex!, targetVersion: `op-${ORIGINAL}` } };
+        const view = render(<App api={api} />);
+
+        expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
+        expect(screen.queryByText(/edited since it was boosted/)).toBeNull();
+        view.unmount();
+
+        // It is edited to pass on another post, and what it cites is as that post is.
+        const OTHER = 'did:cid:bagaaieraotherotherotherotherotherotherotherotherotherot';
+        state.known[OTHER] = post(OTHER, BOB, 'Another post.');
+        state.known[MIDDLE] = {
+            ...middle,
+            current: 1,
+            versions: [...middle.versions, { opid: 'op-middle-edit', type: 'update', outcome: 'attributed' }],
+            memeplex: { ...middle.memeplex!, target: OTHER, targetVersion: `op-${OTHER}` },
+        };
+        render(<App api={api} />);
+
+        expect(await screen.findByText('Another post.')).toBeTruthy();
+        expect(screen.getByText(/edited since it was boosted/)).toBeTruthy();
+    });
+
     it('follows boosts of boosts only so far, and never round', async () => {
         const A = 'did:cid:bagaaieraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
         const B = 'did:cid:bagaaierabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';

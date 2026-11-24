@@ -373,7 +373,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
     const reads = useContext(Reads);
     // The post boosted, with the target it was read for: not read yet, or one
     // the indexer cannot show.
-    const [held, setHeld] = useState<{ target: string; original: Publication | null; cited?: string } | undefined>(undefined);
+    const [held, setHeld] = useState<{ target: string; original: Publication | null; changed?: boolean } | undefined>(undefined);
     const author = publication.memeplex!.author;
     const version = typeof publication.memeplex!.targetVersion === 'string' ? publication.memeplex!.targetVersion : undefined;
 
@@ -382,21 +382,23 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
         // A boost of a boost passes on what that one does. The post is found by
         // following them, no further than a few and never to one already seen.
         //
-        // A boost names the version of what it passes on. The version the
-        // post was at when the last boost before it was made is kept, to tell a
-        // post that has changed since.
-        const find = async (): Promise<{ original: Publication | null; cited?: string }> => {
+        // Each boost names the version of what it passes on. Where what is
+        // found at any step is at another version, what is shown has changed
+        // since it was boosted: the post itself, or a boost on the way to it.
+        const find = async (): Promise<{ original: Publication | null; changed?: boolean }> => {
             const seen = new Set<string>([publication.did ?? '']);
             let next = target;
             let cited = version;
+            let changed = false;
 
             for (let depth = 0; read && depth < BOOST_DEPTH && !seen.has(next); depth += 1) {
                 seen.add(next);
                 const found = await read(next);
                 const further = found?.state === 'published' && found.memeplex ? boosted(found.memeplex) : undefined;
 
+                changed ||= Boolean(found && cited && cited !== shownVersion(found));
                 if (!further) {
-                    return { original: found ?? null, cited };
+                    return { original: found ?? null, changed };
                 }
                 next = further;
                 cited = typeof found!.memeplex!.targetVersion === 'string' ? found!.memeplex!.targetVersion : undefined;
@@ -436,7 +438,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
             )}
             {/* A boost is of one version of a post. What is shown is the post as it
                 is, so a post that has changed since is said to have. */}
-            {shown && held?.cited && held.cited !== shownVersion(shown) && (
+            {shown && held?.changed && (
                 <p className="muted changed">The post has been edited since it was boosted. This is the post as it is.</p>
             )}
             {shown && (
