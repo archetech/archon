@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
+import { pageRoutes } from './pages.js';
+import type { Previews } from './pages.js';
 import { imageSize } from 'image-size';
 import type { Request, Response, NextFunction } from 'express';
 import { PERMITTED_REGISTRIES, actionFor } from '@didcid/memeplex';
@@ -88,6 +90,9 @@ export interface MemepoolOptions {
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
+    // What the page at the address of a publication or an author says of it,
+    // for whatever shows a link to it. Without it such a page says nothing.
+    previews?: Previews;
     // Milliseconds a challenge may wait for its answer, and a session lasts.
     challengeLifetime?: number;
     sessionLifetime?: number;
@@ -1016,6 +1021,9 @@ export function createMemepoolApp(options: MemepoolOptions): express.Express {
         res.status(404).json({ error: 'no such route' });
     });
     if (options.pagesDir) {
+        app.use(pageRoutes({
+            pagesDir: options.pagesDir, site: 'Memepool', publicURL: options.publicURL, previews: options.previews, isDid,
+        }));
         // The pages are files a browser may keep; the page that names them is
         // asked for each time, so that a new build is picked up.
         app.use(express.static(options.pagesDir, {

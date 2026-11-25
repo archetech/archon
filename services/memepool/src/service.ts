@@ -8,7 +8,7 @@ import { fetchPublicHttps } from '@didcid/common/net';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
-import { MemeplexClient } from '@didcid/memeplex/client';
+import { IndexerClient, MemeplexClient } from '@didcid/memeplex/client';
 import { createMemepoolApp } from './api.js';
 
 export interface MemepoolSettings {
@@ -17,6 +17,7 @@ export interface MemepoolSettings {
     bindAddress: string;
     name: string;
     publicURL: string;
+    indexerURL?: string;
     pagesDir: string;
     dataDir: string;
     passphrase: string;
@@ -167,6 +168,7 @@ export async function startMemepool(
         throw new Error(`Memepool's identity ${settings.name} is registered on local, so nothing it publishes can be on a grant's registry. Give the service a wallet whose identity is on another registry.`);
     }
 
+    const indexer = settings.indexerURL ? new IndexerClient(settings.indexerURL) : undefined;
     const app = createMemepoolApp({
         client,
         keymaster,
@@ -181,6 +183,16 @@ export async function startMemepool(
         // only where it has the shape of one.
         images: { get: (cid, limit) => (/^[A-Za-z0-9]{1,128}$/.test(cid) ? gatekeeper.getData(cid, limit).catch(() => null) : Promise.resolve(null)) },
         addresses: { owner: (address, signal) => addressOwner(address, signal) },
+        previews: indexer && {
+            publication: did => indexer.publication(did),
+            // No more of a body than a line about it and its first image need.
+            body: cid => gatekeeper.getText(cid, 1_000_000),
+            name: async did => {
+                const name = ((await keymaster.resolveDID(did)).didDocumentData as { name?: unknown } | undefined)?.name;
+
+                return typeof name === 'string' ? name : undefined;
+            },
+        },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

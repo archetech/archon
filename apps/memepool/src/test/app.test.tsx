@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
 import type { Api, Me, Publication, Responses } from '../api';
-import { hashOf, linkTo, routeOf } from '../route';
+import { linkTo, pathOf, routeOf, setRoot } from '../route';
 
 const ALICE = 'did:cid:bagaaieraalicealicealicealicealicealicealicealicealicealice';
 const BOB = 'did:cid:bagaaierabobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbo';
@@ -2760,26 +2760,62 @@ describe('the address of what is shown', () => {
     };
 
     it('names a publication or an author, and nothing else', () => {
-        expect(routeOf(`#/p/${BOB}`)).toStrictEqual({ publication: BOB });
-        expect(routeOf(`#/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
-        expect(routeOf(`#/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
-        for (const hash of ['', '#', '#/', '#/p/', '#/p/not-a-did', `#/x/${BOB}`, `#/p/${BOB}/replies`, `#/a/${BOB}/posts`, `#/a/${BOB}/replies/more`, '#/p/did:cid:a?b', '#/p/did:cid:<b>']) {
-            expect([hash, routeOf(hash)]).toStrictEqual([hash, null]);
+        const at = (pathname: string, hash = '') => routeOf({ pathname, hash });
+
+        expect(at(`/p/${BOB}`)).toStrictEqual({ publication: BOB });
+        expect(at(`/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
+        expect(at(`/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
+        // A DID's own part may be written encoded, as an address may be.
+        expect(at(`/p/${encodeURIComponent(BOB)}`)).toStrictEqual({ publication: BOB });
+        for (const path of ['/', '/p/', '/p/not-a-did', `/x/${BOB}`, `/p/${BOB}/replies`, `/a/${BOB}/posts`, `/a/${BOB}/replies/more`, '/p/did:cid:<b>', '/p/%E0%A4%A', '/assets/index.js']) {
+            expect([path, at(path)]).toStrictEqual([path, null]);
         }
 
         // An address is read back as the route it was made from.
         // A DID's own part may have colons in it.
         for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }, { publication: 'did:web:example.org:users:alice' }]) {
-            expect(routeOf(hashOf(route))).toStrictEqual(route);
+            expect(at(pathOf(route))).toStrictEqual(route);
         }
-        expect(hashOf(null)).toBe('');
-        expect(linkTo({ publication: BOB }, { origin: 'https://node.example', pathname: '/memepool/', search: '' })).toBe(`https://node.example/memepool/#/p/${BOB}`);
+        expect(pathOf(null)).toBe('/');
+        expect(linkTo({ publication: BOB }, { origin: 'https://node.example' })).toBe(`https://node.example/p/${BOB}`);
+
+        // A link made when the route was in the fragment is still read.
+        expect(at('/', `#/p/${BOB}`)).toStrictEqual({ publication: BOB });
+        expect(at('/', `#/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
+        expect(at('/', '#/p/not-a-did')).toBeNull();
+        expect(at('/', '#')).toBeNull();
+    });
+
+    it('is under the path the pages are served at, wherever that is', () => {
+        setRoot('/memepool/');
+        try {
+            expect(pathOf({ publication: BOB })).toBe(`/memepool/p/${BOB}`);
+            expect(pathOf(null)).toBe('/memepool/');
+            expect(routeOf({ pathname: `/memepool/a/${BOB}/replies`, hash: '' })).toStrictEqual({ author: BOB, replies: true });
+            // A path that is not under the pages' own names nothing.
+            expect(routeOf({ pathname: `/p/${BOB}`, hash: '' })).toBeNull();
+            expect(linkTo({ author: BOB }, { origin: 'https://node.example' })).toBe(`https://node.example/memepool/a/${BOB}`);
+        }
+        finally {
+            setRoot('/');
+        }
+    });
+
+    it('gives a link made when the route was in the fragment its address', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        window.history.replaceState(null, '', '/#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
+        expect(window.location.hash).toBe('');
     });
 
     it('opens the publication a link names, of whatever kind, for a reader who follows nobody', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
 
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
@@ -2787,12 +2823,12 @@ describe('the address of what is shown', () => {
         expect(screen.queryByText('From Alice.')).toBeNull();
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
         // The link is still the address of what is shown.
-        expect(window.location.hash).toBe('#/p/did:cid:2');
+        expect(window.location.pathname).toBe('/p/did:cid:2');
     });
 
     it('shows the author a link names, and the author\'s replies where it names them', async () => {
         const { api } = services({ me: granted, timeline: both() });
-        at(`#/a/${BOB}`);
+        at(`a/${BOB}`);
         render(<App api={api} />);
 
         expect(await screen.findByText('From Bob.')).toBeTruthy();
@@ -2800,7 +2836,7 @@ describe('the address of what is shown', () => {
         expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
 
         cleanup();
-        at(`#/a/${BOB}/replies`);
+        at(`a/${BOB}/replies`);
         render(<App api={api} />);
         expect(await screen.findByRole('heading', { name: /Replies/ })).toBeTruthy();
         await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
@@ -2814,28 +2850,28 @@ describe('the address of what is shown', () => {
         const user = userEvent.setup();
 
         await screen.findByText('From Alice.');
-        expect(window.location.hash).toBe('');
+        expect(window.location.pathname).toBe('/');
 
         // To an author, to the author's replies, and to a post.
         await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ }));
-        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await waitFor(() => expect(window.location.pathname).toBe(`/a/${BOB}`));
         await user.click(screen.getByRole('tab', { name: 'Replies' }));
-        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}/replies`));
+        await waitFor(() => expect(window.location.pathname).toBe(`/a/${BOB}/replies`));
         await user.click(screen.getByRole('tab', { name: 'Posts' }));
         await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
-        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
 
         // Back to the reader's own timeline, which has no name.
         await user.click(screen.getByRole('button', { name: 'Back' }));
         await user.click(await screen.findByRole('button', { name: 'Back to your timeline' }));
-        await waitFor(() => expect(window.location.hash).toBe(''));
+        await waitFor(() => expect(window.location.pathname).toBe('/'));
         expect(await screen.findByText('From Alice.')).toBeTruthy();
 
         // The browser's own back and forward show what each address names.
-        go(`#/a/${BOB}`);
+        go(`a/${BOB}`);
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
         expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
-        go('#/p/did:cid:2');
+        go('p/did:cid:2');
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
         go('');
         expect(await screen.findByText('From Alice.')).toBeTruthy();
@@ -2844,14 +2880,14 @@ describe('the address of what is shown', () => {
         // And the browser's history itself, a step back and a step forward.
         window.history.back();
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
-        expect(window.location.hash).toBe('#/p/did:cid:2');
+        expect(window.location.pathname).toBe('/p/did:cid:2');
         window.history.back();
-        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await waitFor(() => expect(window.location.pathname).toBe(`/a/${BOB}`));
         await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
         expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
         window.history.forward();
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
-        expect(window.location.hash).toBe('#/p/did:cid:2');
+        expect(window.location.pathname).toBe('/p/did:cid:2');
     });
 
     it('gives each post a link to itself, and an author one, to copy', async () => {
@@ -2863,18 +2899,18 @@ describe('the address of what is shown', () => {
         const article = (await screen.findByText('From Alice.')).closest('article')!;
 
         // The time is the link, as it is elsewhere.
-        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:1');
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('/p/did:cid:1');
         fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
-        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:1`]));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/p/did:cid:1`]));
 
         fireEvent.click(within(article).getByRole('button', { name: /Posts by this author|did:cid/ }));
         fireEvent.click(within(await waitFor(() => document.querySelector('.author') as HTMLElement)).getByRole('button', { name: 'Copy link' }));
-        await waitFor(() => expect(copied[1]).toBe(`${window.location.origin}/#/a/${ALICE}`));
+        await waitFor(() => expect(copied[1]).toBe(`${window.location.origin}/a/${ALICE}`));
     });
 
     it('says so when a link names nothing published, and shows the timeline', async () => {
         const { api } = services({ me: granted, timeline: both() });
-        at('#/p/did:cid:none');
+        at('p/did:cid:none');
         render(<App api={api} />);
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
@@ -2887,27 +2923,27 @@ describe('the address of what is shown', () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const { api, state } = services({ me: granted, timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
         const user = userEvent.setup();
 
         await screen.findByRole('button', { name: 'Back' });
-        go('#/p/did:cid:none');
+        go('p/did:cid:none');
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
         expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
         expect(await screen.findByText('From Alice.')).toBeTruthy();
-        expect(window.location.hash).toBe('#/p/did:cid:none');
+        expect(window.location.pathname).toBe('/p/did:cid:none');
 
         // From an author's list as well, and it is said no longer once the reader has gone on.
-        go(`#/a/${BOB}`);
+        go(`a/${BOB}`);
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
         expect(screen.queryByRole('alert')).toBeNull();
-        go('#/p/did:cid:none');
+        go('p/did:cid:none');
         expect(await screen.findByText('From Alice.')).toBeTruthy();
         expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published/);
         await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
-        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
         expect(screen.queryByRole('alert')).toBeNull();
     });
 
@@ -2925,19 +2961,19 @@ describe('the address of what is shown', () => {
 
         // Open is pressed, and the reader goes to an author before the post is read.
         await user.click(within(article).getByRole('button', { name: 'Open' }));
-        go(`#/a/${BOB}`);
+        go(`a/${BOB}`);
         await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
         answer(original);
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        expect(window.location.hash).toBe(`#/a/${BOB}`);
+        expect(window.location.pathname).toBe(`/a/${BOB}`);
         expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
     });
 
     it('opens nothing its author has withdrawn', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.', { state: 'withdrawn' });
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
@@ -2956,27 +2992,27 @@ describe('the address of what is shown', () => {
 
         const article = (await screen.findByText('From Bob.')).closest('article')!;
 
-        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:2');
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('/p/did:cid:2');
         fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
-        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:2`]));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/p/did:cid:2`]));
     });
 
     it('does not show a publication an address named once the reader has gone elsewhere', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         let answer!: (found: Publication) => void;
         vi.mocked(api.publication).mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
         const user = userEvent.setup();
 
         // The reader opens another post while the link's is still being read.
         state.known['did:cid:1'] = post('did:cid:1', ALICE, 'From Alice.');
         await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
-        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:1'));
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:1'));
         answer(post('did:cid:2', BOB, 'From Bob.'));
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        expect(window.location.hash).toBe('#/p/did:cid:1');
+        expect(window.location.pathname).toBe('/p/did:cid:1');
         expect(screen.getByText('From Alice.')).toBeTruthy();
         expect(screen.queryByText('From Bob.')).toBeNull();
     });
@@ -2992,7 +3028,7 @@ describe('a visitor, who has not signed in', () => {
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
         state.people[BOB] = { name: 'Bob B.' };
         state.responses = { boosts: [{ author: ALICE, did: 'did:cid:b' }], ratings: { ratings: [] }, tags: [] } as never;
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
 
         expect(await screen.findByText('From Bob.')).toBeTruthy();
@@ -3015,7 +3051,7 @@ describe('a visitor, who has not signed in', () => {
     it('reads an author a link names, and the author\'s replies, and goes from one thing to another', async () => {
         const { api, state } = services({ timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        at(`#/a/${BOB}`);
+        at(`a/${BOB}`);
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -3031,7 +3067,7 @@ describe('a visitor, who has not signed in', () => {
         await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
         await user.click(screen.getByRole('tab', { name: 'Posts' }));
         await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
-        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     });
 
@@ -3046,7 +3082,7 @@ describe('a visitor, who has not signed in', () => {
 
     it('is told when a link names nothing published, and asked to sign in', async () => {
         const { api } = services({ timeline: both() });
-        at('#/p/did:cid:none');
+        at('p/did:cid:none');
         render(<App api={api} />);
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
@@ -3063,7 +3099,7 @@ describe('a visitor, who has not signed in', () => {
             }
             return { answered: ALICE };
         });
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} pollMs={10} />);
         const user = userEvent.setup();
 
@@ -3074,7 +3110,7 @@ describe('a visitor, who has not signed in', () => {
 
         expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy();
         expect(await screen.findByText('From Bob.')).toBeTruthy();
-        expect(window.location.hash).toBe('#/p/did:cid:2');
+        expect(window.location.pathname).toBe('/p/did:cid:2');
         expect(await screen.findByLabelText('Reply')).toBeTruthy();
     });
 
@@ -3082,7 +3118,7 @@ describe('a visitor, who has not signed in', () => {
         const { api, state } = services({ timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
         vi.mocked(api.login).mockResolvedValue({ answered: ALICE });
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} pollMs={10} />);
         const user = userEvent.setup();
 
@@ -3097,7 +3133,7 @@ describe('a visitor, who has not signed in', () => {
         expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
         expect(api.challenge).toHaveBeenCalledTimes(1);
 
-        window.history.replaceState(null, '', '/#/p/did:cid:2');
+        window.history.replaceState(null, '', '/p/did:cid:2');
         fireEvent(window, new PopStateEvent('popstate'));
         expect(await screen.findByText('From Bob.')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
@@ -3114,7 +3150,7 @@ describe('a visitor, who has not signed in', () => {
         await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
         expect(await screen.findByRole('button', { name: 'This is me' })).toBeTruthy();
 
-        window.history.pushState(null, '', '/#/p/did:cid:2');
+        window.history.pushState(null, '', '/p/did:cid:2');
         fireEvent(window, new PopStateEvent('popstate'));
 
         expect(await screen.findByText('From Bob.')).toBeTruthy();
@@ -3125,14 +3161,14 @@ describe('a visitor, who has not signed in', () => {
     it('is not left waiting when they go back while a link within what they read is looked up', async () => {
         const { api, state } = services({ timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
         const user = userEvent.setup();
 
         await screen.findByText('From Bob.');
         // A link to another publication is followed, and its lookup does not answer.
         vi.mocked(api.publication).mockImplementation(() => new Promise(() => undefined));
-        window.history.pushState(null, '', '/#/p/did:cid:1');
+        window.history.pushState(null, '', '/p/did:cid:1');
         fireEvent(window, new PopStateEvent('popstate'));
         await user.click(screen.getByRole('button', { name: 'Back' }));
 
@@ -3143,7 +3179,7 @@ describe('a visitor, who has not signed in', () => {
     it('is a visitor once more after signing out, at what was being read', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        at('#/p/did:cid:2');
+        at('p/did:cid:2');
         render(<App api={api} />);
         const user = userEvent.setup();
 

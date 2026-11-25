@@ -24,6 +24,12 @@ services:
       # Where users reach the service, such as https://node.example/memepool.
       # With it, a wallet sends its answer to a challenge straight back.
       - ARCHON_MEMEPOOL_PUBLIC_URL=${ARCHON_MEMEPOOL_PUBLIC_URL:-}
+      # The node's Memeplex indexer, which says what a publication is for the
+      # page at its address. Unset, it is the indexer's container where the
+      # `memeplex` profile is in COMPOSE_PROFILES, and none otherwise: such a
+      # page then says nothing of itself.
+      - ARCHON_MEMEPLEX_INDEXER_URL=${ARCHON_MEMEPLEX_INDEXER_URL-}
+      - ARCHON_COMPOSE_PROFILES=${COMPOSE_PROFILES-}
       # Encrypts the wallet that holds the service's key. The service does not
       # start without it.
       - ARCHON_MEMEPOOL_WALLET_PASSPHRASE=${ARCHON_MEMEPOOL_WALLET_PASSPHRASE:-}
