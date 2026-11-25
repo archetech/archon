@@ -2607,6 +2607,9 @@ async fn proxy_ipfs_cat(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
+// The most that is passed on of what IPFS says when a read fails.
+const IPFS_ERROR_LIMIT: usize = 64 * 1024;
+
 // Reads what a CID names, and no more than `limit` bytes of it. The read is
 // taken a piece at a time, so that content past the limit is refused without
 // being held, and the request to IPFS is dropped, which ends it. That refusal
@@ -2628,7 +2631,12 @@ async fn proxy_ipfs_cat_raw(
             (StatusCode::BAD_GATEWAY, error_json("IPFS cat failed")).into_response()
         })?;
 
+    // What IPFS says of a read that failed is its own error, and is not the
+    // content: it is passed on as it was, up to a size of its own, whatever
+    // limit the caller asked for. Only content is refused for its size.
     let status = response.status();
+    let found = status.is_success();
+    let most = if found { limit } else { IPFS_ERROR_LIMIT };
     let mut body: Vec<u8> = Vec::new();
 
     loop {
@@ -2645,12 +2653,15 @@ async fn proxy_ipfs_cat_raw(
             break;
         };
 
-        if body.len().saturating_add(chunk.len()) > limit {
-            return Err((
-                StatusCode::PAYLOAD_TOO_LARGE,
-                Json(json!({ "error": "Content too large", "limit": limit })),
-            )
-                .into_response());
+        if body.len().saturating_add(chunk.len()) > most {
+            if found {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    Json(json!({ "error": "Content too large", "limit": limit })),
+                )
+                    .into_response());
+            }
+            break;
         }
         body.extend_from_slice(&chunk);
     }
