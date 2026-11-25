@@ -2790,6 +2790,24 @@ describe('a visitor, who has not signed in', () => {
         expect(api.challenge).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps a sign-in started where the address names nothing when they go on to something', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockResolvedValue({ answered: ALICE });
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        expect(await screen.findByRole('button', { name: 'This is me' })).toBeTruthy();
+
+        window.history.pushState(null, '', '/#/p/did:cid:2');
+        fireEvent(window, new PopStateEvent('popstate'));
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+    });
+
     it('is not left waiting when they go back while a link within what they read is looked up', async () => {
         const { api, state } = services({ timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');

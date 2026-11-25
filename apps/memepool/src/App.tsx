@@ -117,7 +117,11 @@ const when = (publication: Publication) => {
     return time ? new Date(time).toLocaleString() : '';
 };
 
-function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: string) => void; pollMs: number }) {
+function SignIn({ api, onSignedIn, onStarted, pollMs }: {
+    api: Api; onSignedIn: (did: string) => void; pollMs: number;
+    // Told when a challenge is asked for, before it is.
+    onStarted?: () => void;
+}) {
     const [asked, setAsked] = useState<{ challenge: string; link: string } | null>(null);
     const [answered, setAnswered] = useState<string | null>(null);
     const [response, setResponse] = useState('');
@@ -131,6 +135,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: strin
     const ask = useCallback(async () => {
         const mine = asking.current += 1;
 
+        onStarted?.();
         setError('');
         setAnswered(null);
         setAsked(null);
@@ -152,7 +157,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: strin
         finally {
             setAsking(false);
         }
-    }, [api]);
+    }, [api, onStarted]);
 
     // While a challenge is out and unanswered, ask whether a wallet has sent
     // its answer to the service.
@@ -1490,6 +1495,8 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     const visitor = me === VISITOR;
     // Whether a visitor has asked to sign in, from something they are reading.
     const [signing, setSigning] = useState(false);
+    // A sign-in that has been started is kept wherever the visitor goes.
+    const started = useCallback(() => setSigning(true), []);
     // Whether a publication an address names is being read, with nothing to show yet.
     const [arriving, setArriving] = useState(() => {
         const route = routeOf(window.location.hash);
@@ -1867,7 +1874,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                     {visitor && !nowhere && !signing && <button className="quiet" onClick={() => setSigning(true)}>Sign in</button>}
                 </header>
 
-                {visitor && onSignedIn && (signing || (nowhere && !arriving)) && <SignIn api={api} onSignedIn={onSignedIn} pollMs={pollMs ?? 3000} />}
+                {visitor && onSignedIn && (signing || (nowhere && !arriving)) && <SignIn api={api} onSignedIn={onSignedIn} onStarted={started} pollMs={pollMs ?? 3000} />}
                 {nowhere && arriving && <p className="muted">Loading…</p>}
                 {!visitor && !me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
                 {error && <p role="alert" className="error">{error}</p>}
