@@ -2526,6 +2526,18 @@ describe('the address of what is shown', () => {
         go('');
         expect(await screen.findByText('From Alice.')).toBeTruthy();
         expect(screen.getByLabelText('Post')).toBeTruthy();
+
+        // And the browser's history itself, a step back and a step forward.
+        window.history.back();
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
+        window.history.back();
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        window.history.forward();
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
     });
 
     it('gives each post a link to itself, and an author one, to copy', async () => {
