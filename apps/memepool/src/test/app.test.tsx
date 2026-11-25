@@ -2471,7 +2471,7 @@ describe('the address of what is shown', () => {
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
         expect(screen.getByText('From Bob.')).toBeTruthy();
         expect(screen.queryByText('From Alice.')).toBeNull();
-        expect(api.thread).toHaveBeenCalledWith('did:cid:2');
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
         // The link is still the address of what is shown.
         expect(window.location.hash).toBe('#/p/did:cid:2');
     });
@@ -2595,6 +2595,29 @@ describe('the address of what is shown', () => {
         await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
         await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
         expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('does not open a boosted post that was asked for before the reader went elsewhere', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted, timeline: [boost] });
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const article = (await screen.findByText('From Bob.')).closest('article')!;
+        let answer!: (found: Publication) => void;
+        vi.mocked(api.publication).mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+
+        // Open is pressed, and the reader goes to an author before the post is read.
+        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
+        answer(original);
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(window.location.hash).toBe(`#/a/${BOB}`);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
     });
 
     it('opens nothing its author has withdrawn', async () => {

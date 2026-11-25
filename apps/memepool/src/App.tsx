@@ -387,6 +387,9 @@ const BOOST_DEPTH = 5;
 
 // How a reader opens a publication from inside another's text.
 const Opens = createContext<((publication: Publication) => void) | undefined>(undefined);
+// How many times the reader has gone somewhere. A post that is read before it
+// is opened is opened only if the reader has gone nowhere since asking.
+const Goings = createContext<() => number>(() => 0);
 
 // A publication as it is, where it is one that can be opened: read at this
 // moment, and published. A version read earlier is not opened in its place,
@@ -406,15 +409,15 @@ const IMAGE_BYTES = 10_000_000;
 
 // What a reader's pages are given to go by: the way to an author's posts, the
 // way to open a publication, and how an embed is shown.
-function Ways({ visit, open, embedding, upload, children }: {
-    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding;
+function Ways({ visit, open, gone, embedding, upload, children }: {
+    visit: (did: string) => void; open: (publication: Publication) => void; gone: () => number; embedding: Embedding;
     upload?: (image: Blob) => Promise<{ did: string; versionId: string }>; children: ReactNode;
 }) {
     return (
         <Visits.Provider value={visit}>
             <Opens.Provider value={open}>
                 <Uploads.Provider value={upload}>
-                    <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+                    <Goings.Provider value={gone}><Embeds.Provider value={embedding}>{children}</Embeds.Provider></Goings.Provider>
                 </Uploads.Provider>
             </Opens.Provider>
         </Visits.Provider>
@@ -427,6 +430,7 @@ function Ways({ visit, open, embedding, upload, children }: {
 function Quoted({ publication }: { publication: Publication }) {
     const read = useContext(Publications);
     const onOpen = useContext(Opens);
+    const gone = useContext(Goings);
     const [opening, setOpening] = useState(false);
     const [unopened, setUnopened] = useState(false);
     const object = publication.memeplex!;
@@ -436,8 +440,12 @@ function Quoted({ publication }: { publication: Publication }) {
         setOpening(true);
         setUnopened(false);
         try {
+            const from = gone();
             const now = await asItIs(read, publication.did!);
 
+            if (gone() !== from) {
+                return;
+            }
             if (now) {
                 onOpen?.(now);
             }
@@ -483,6 +491,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
 }) {
     const read = useContext(Publications);
     const reads = useContext(Reads);
+    const gone = useContext(Goings);
     // What was found for the boost named: the post as it was, that its version
     // is not in its history, or nothing the indexer can show.
     const [held, setHeld] = useState<{ of: string; found: Publication | 'no-revision' | null; did: string } | undefined>(undefined);
@@ -542,8 +551,12 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
         setOpening(true);
         setUnopened(false);
         try {
+            const from = gone();
             const now = await asItIs(read, shown!.did!);
 
+            if (gone() !== from) {
+                return;
+            }
             if (now) {
                 onOpen?.(now);
             }
@@ -1546,6 +1559,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // Why an address the reader followed shows nothing. It is apart from a
     // failure to read the list, which a later read of the list clears.
     const [lost, setLost] = useState('');
+    const gone = useCallback(() => arrivals.current, []);
 
     useEffect(() => {
         if (address === addressed.current) {
@@ -1811,7 +1825,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     };
 
     return (
-        <Ways visit={visit} open={setOpen} embedding={embedding} upload={me.grant ? api.upload : undefined}>
+        <Ways visit={visit} open={setOpen} gone={gone} embedding={embedding} upload={me.grant ? api.upload : undefined}>
             <main>
                 <header className="top">
                     <h1>Memepool</h1>
