@@ -1722,6 +1722,45 @@ describe('adding an image to what is written', () => {
         await waitFor(() => expect(area.value).toBe('New Before.\n\n' + EMBED + '\n\n After.'));
     });
 
+    it('keeps the reader\'s place while the preview is shown, for the image and for the reader', async () => {
+        const { api } = services({ me: granted });
+        const storing: ((image: { did: string; versionId: string }) => void)[] = [];
+        vi.mocked(api.upload).mockImplementation(() => new Promise(resolve => { storing.push(resolve); }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Before. After.');
+        area.setSelectionRange(7, 7);
+        fireEvent.select(area);
+        await user.upload(chooser('Post'), file('a chart.png', 'image/png'));
+        await screen.findByRole('button', { name: 'Storing the image…' });
+
+        // The text box is gone while the preview is shown, and the image is stored meanwhile.
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+        expect(screen.queryByLabelText('Post')).toBeNull();
+        storing.shift()?.({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' });
+
+        await user.click(screen.getByRole('tab', { name: 'Write' }));
+        const back = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+        await waitFor(() => expect(back.value).toBe('Before.\n\n' + EMBED + '\n\n After.'));
+    });
+
+    it('gives the text box back its place when the reader returns from the preview', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Before. After.');
+        area.setSelectionRange(7, 7);
+        fireEvent.select(area);
+        await user.click(screen.getByRole('tab', { name: 'Preview' }));
+        await user.click(screen.getByRole('tab', { name: 'Write' }));
+
+        expect((screen.getByLabelText('Post') as HTMLTextAreaElement).selectionStart).toBe(7);
+    });
+
     it('is offered for an article and a reply as well, and to nobody who has not granted the service', async () => {
         const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
         const view = render(<App api={api} />);

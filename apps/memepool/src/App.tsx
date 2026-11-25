@@ -741,6 +741,17 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
     const upload = useContext(Uploads);
     const area = useRef<HTMLTextAreaElement | null>(null);
     const chooser = useRef<HTMLInputElement | null>(null);
+    // Where the reader was writing, kept apart from the text box: the box is
+    // gone while the preview is shown, and comes back without its place.
+    const caret = useRef<number | undefined>(undefined);
+    // Called when the text box comes and when it goes, and at no other time:
+    // the box as it comes back is given the place the reader left.
+    const placed = useCallback((element: HTMLTextAreaElement | null) => {
+        if (element && caret.current !== undefined) {
+            element.setSelectionRange(caret.current, caret.current);
+        }
+        area.current = element;
+    }, []);
     const [storing, setStoring] = useState(false);
     const [problem, setProblem] = useState('');
     // The text as it is when an image has been stored, which may be later than when it was chosen.
@@ -784,7 +795,7 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
             // Where the reader is writing when the image has been stored, in
             // the text as it then is: they may have gone on writing meanwhile.
             const text = latest.current;
-            const place = Math.min(area.current?.selectionStart ?? text.length, text.length);
+            const place = Math.min(area.current?.selectionStart ?? caret.current ?? text.length, text.length);
             const before = text.slice(0, place);
             const after = text.slice(place);
 
@@ -842,7 +853,17 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
                 <div role="tabpanel" id={`${id}-write`} aria-label={`${label}: write`}>
                     <label>
                         {label}
-                        <textarea ref={area} value={value} disabled={disabled} onChange={event => onChange(event.target.value)} rows={rows} />
+                        <textarea
+                            ref={placed}
+                            value={value}
+                            disabled={disabled}
+                            rows={rows}
+                            onSelect={event => { caret.current = event.currentTarget.selectionStart; }}
+                            onChange={event => {
+                                caret.current = event.target.selectionStart;
+                                onChange(event.target.value);
+                            }}
+                        />
                     </label>
                     {upload && (
                         <p className="adding">
