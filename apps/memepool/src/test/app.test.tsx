@@ -2666,8 +2666,80 @@ describe('the address of what is shown', () => {
         expect(screen.getByText('From Alice.')).toBeTruthy();
         expect(screen.queryByText('From Bob.')).toBeNull();
     });
+});
 
-    it('is where a reader who has yet to sign in arrives once they have', async () => {
+describe('a visitor, who has not signed in', () => {
+    const both = () => [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.')];
+    const at = (hash: string) => window.history.replaceState(null, '', `/${hash}`);
+    const lastRead = (api: Api) => vi.mocked(api.timeline).mock.calls.slice(-1)[0];
+
+    it('reads the publication a link names, with its author, and is offered nothing that publishes', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        state.people[BOB] = { name: 'Bob B.' };
+        state.responses = { boosts: [{ author: ALICE, did: 'did:cid:b' }], ratings: { ratings: [] }, tags: [] } as never;
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(await screen.findByText('Bob B.')).toBeTruthy();
+        expect(api.thread).toHaveBeenCalledWith('did:cid:2');
+        // Nobody is signed in, and nothing is asked that needs someone to be.
+        expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+        expect(screen.queryByRole('heading', { name: /Let Memepool publish for you/ })).toBeNull();
+        for (const name of ['Boost', 'Reply', 'Edit', 'Add image', 'Withdraw', 'Follow']) {
+            expect([name, screen.queryByRole('button', { name })]).toStrictEqual([name, null]);
+        }
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(api.state).not.toHaveBeenCalled();
+        expect(api.publish).not.toHaveBeenCalled();
+        // A link to copy is theirs to give on.
+        expect(screen.getAllByRole('button', { name: 'Copy link' }).length).toBeGreaterThan(0);
+    });
+
+    it('reads an author a link names, and the author\'s replies, and goes from one thing to another', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at(`#/a/${BOB}`);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('From Alice.')).toBeNull();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        // They have no timeline to go back to, and nobody to follow as.
+        expect(screen.queryByRole('button', { name: 'Back to your timeline' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Follow' })).toBeNull();
+        expect(screen.queryByLabelText('Post')).toBeNull();
+
+        await user.click(screen.getByRole('tab', { name: 'Replies' }));
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
+        await user.click(screen.getByRole('tab', { name: 'Posts' }));
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+    });
+
+    it('is asked to sign in where the address names nothing, and reads no timeline', async () => {
+        const { api } = services({ timeline: both() });
+        render(<App api={api} />);
+
+        expect(await screen.findByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+        expect(screen.queryByRole('heading', { name: /Timeline/ })).toBeNull();
+        expect(api.timeline).not.toHaveBeenCalled();
+    });
+
+    it('is told when a link names nothing published, and asked to sign in', async () => {
+        const { api } = services({ timeline: both() });
+        at('#/p/did:cid:none');
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.getByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+    });
+
+    it('signs in from what they are reading, and is still there, with what a reader may do', async () => {
         const { api, state } = services({ timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
         vi.mocked(api.login).mockImplementation(async body => {
@@ -2681,11 +2753,92 @@ describe('the address of what is shown', () => {
         render(<App api={api} pollMs={10} />);
         const user = userEvent.setup();
 
+        await screen.findByText('From Bob.');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
         await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
         await user.click(await screen.findByRole('button', { name: 'This is me' }));
-        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
-        expect(screen.getByText('From Bob.')).toBeTruthy();
+
+        expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy();
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
         expect(window.location.hash).toBe('#/p/did:cid:2');
+        expect(await screen.findByLabelText('Reply')).toBeTruthy();
+    });
+
+    it('keeps a sign-in that is under way when they go back from what they were reading, and return', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockResolvedValue({ answered: ALICE });
+        at('#/p/did:cid:2');
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        expect(await screen.findByRole('button', { name: 'This is me' })).toBeTruthy();
+
+        // Back from the post, to where the address names nothing.
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await waitFor(() => expect(screen.queryByText('From Bob.')).toBeNull());
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+
+        window.history.replaceState(null, '', '/#/p/did:cid:2');
+        fireEvent(window, new PopStateEvent('popstate'));
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a sign-in started where the address names nothing when they go on to something', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockResolvedValue({ answered: ALICE });
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        expect(await screen.findByRole('button', { name: 'This is me' })).toBeTruthy();
+
+        window.history.pushState(null, '', '/#/p/did:cid:2');
+        fireEvent(window, new PopStateEvent('popstate'));
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not left waiting when they go back while a link within what they read is looked up', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        // A link to another publication is followed, and its lookup does not answer.
+        vi.mocked(api.publication).mockImplementation(() => new Promise(() => undefined));
+        window.history.pushState(null, '', '/#/p/did:cid:1');
+        fireEvent(window, new PopStateEvent('popstate'));
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+
+        expect(await screen.findByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+        expect(screen.queryByText('Loading…')).toBeNull();
+    });
+
+    it('is a visitor once more after signing out, at what was being read', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByLabelText('Reply');
+        await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+        expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
     });
 });
 
