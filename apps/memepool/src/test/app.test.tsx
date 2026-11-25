@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
 import type { Api, Me, Publication, Responses } from '../api';
+import { hashOf, linkTo, routeOf } from '../route';
 
 const ALICE = 'did:cid:bagaaieraalicealicealicealicealicealicealicealicealicealice';
 const BOB = 'did:cid:bagaaierabobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbo';
@@ -2432,6 +2433,146 @@ describe('editing', () => {
         await screen.findByRole('button', { name: 'Boost' });
 
         expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    });
+});
+
+describe('the address of what is shown', () => {
+    const both = () => [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.')];
+    const lastRead = (api: Api) => vi.mocked(api.timeline).mock.calls.slice(-1)[0];
+    const at = (hash: string) => window.history.replaceState(null, '', `/${hash}`);
+    const go = (hash: string) => {
+        window.history.pushState(null, '', `/${hash}`);
+        fireEvent(window, new PopStateEvent('popstate'));
+    };
+
+    it('names a publication or an author, and nothing else', () => {
+        expect(routeOf(`#/p/${BOB}`)).toStrictEqual({ publication: BOB });
+        expect(routeOf(`#/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
+        expect(routeOf(`#/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
+        for (const hash of ['', '#', '#/', '#/p/', '#/p/not-a-did', `#/x/${BOB}`, `#/p/${BOB}/replies`, `#/a/${BOB}/posts`, `#/a/${BOB}/replies/more`, '#/p/did:cid:a?b', '#/p/did:cid:<b>']) {
+            expect([hash, routeOf(hash)]).toStrictEqual([hash, null]);
+        }
+
+        // An address is read back as the route it was made from.
+        for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }]) {
+            expect(routeOf(hashOf(route))).toStrictEqual(route);
+        }
+        expect(hashOf(null)).toBe('');
+        expect(linkTo({ publication: BOB }, { origin: 'https://node.example', pathname: '/memepool/', search: '' })).toBe(`https://node.example/memepool/#/p/${BOB}`);
+    });
+
+    it('opens the publication a link names, of whatever kind, for a reader who follows nobody', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('From Alice.')).toBeNull();
+        expect(api.thread).toHaveBeenCalledWith('did:cid:2');
+        // The link is still the address of what is shown.
+        expect(window.location.hash).toBe('#/p/did:cid:2');
+    });
+
+    it('shows the author a link names, and the author\'s replies where it names them', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        at(`#/a/${BOB}`);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('From Alice.')).toBeNull();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+
+        cleanup();
+        at(`#/a/${BOB}/replies`);
+        render(<App api={api} />);
+        expect(await screen.findByRole('heading', { name: /Replies/ })).toBeTruthy();
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
+    });
+
+    it('follows the reader from one thing to another, and back', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Alice.');
+        expect(window.location.hash).toBe('');
+
+        // To an author, to the author's replies, and to a post.
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await user.click(screen.getByRole('tab', { name: 'Replies' }));
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}/replies`));
+        await user.click(screen.getByRole('tab', { name: 'Posts' }));
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+
+        // Back to the reader's own timeline, which has no name.
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(await screen.findByRole('button', { name: 'Back to your timeline' }));
+        await waitFor(() => expect(window.location.hash).toBe(''));
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+
+        // The browser's own back and forward show what each address names.
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        go('#/p/did:cid:2');
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        go('');
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('gives each post a link to itself, and an author one, to copy', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        const copied: string[] = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied.push(text); } } });
+        render(<App api={api} />);
+
+        const article = (await screen.findByText('From Alice.')).closest('article')!;
+
+        // The time is the link, as it is elsewhere.
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:1');
+        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:1`]));
+
+        fireEvent.click(within(article).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        fireEvent.click(within(await waitFor(() => document.querySelector('.author') as HTMLElement)).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied[1]).toBe(`${window.location.origin}/#/a/${ALICE}`));
+    });
+
+    it('says so when a link names nothing published, and shows the timeline', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        at('#/p/did:cid:none');
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.getByText('From Alice.')).toBeTruthy();
+    });
+
+    it('is where a reader who has yet to sign in arrives once they have', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockImplementation(async body => {
+            if (body?.confirm === ALICE) {
+                state.me = granted;
+                return { did: ALICE };
+            }
+            return { answered: ALICE };
+        });
+        at('#/p/did:cid:2');
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        await user.click(await screen.findByRole('button', { name: 'This is me' }));
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
     });
 });
 

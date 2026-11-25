@@ -6,5 +6,7 @@ import { afterEach } from 'vitest';
 // configuration does not inject.
 afterEach(() => {
     cleanup();
+    // Each test starts at the pages' own address, whatever the last one went to.
+    window.history.replaceState(null, '', '/');
     localStorage.clear();
 });

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { hashOf, linkTo, routeOf } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Person, Publication, Reply, Responses } from './api';
@@ -682,7 +683,10 @@ function Post({ publication, onOpen, onWithdraw, full, answers }: {
         <article className="post">
             <header>
                 <Identity did={object.author} />
-                <time>{when(publication)}</time>
+                {/* The time is the link to this publication alone, as it is elsewhere. */}
+                {publication.did
+                    ? <a className="when" href={hashOf({ publication: publication.did })} title="Link to this"><time>{when(publication)}</time></a>
+                    : <time>{when(publication)}</time>}
             </header>
             {answers && object.kind === 'reply' && typeof object.target === 'string' && (
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
@@ -692,6 +696,8 @@ function Post({ publication, onOpen, onWithdraw, full, answers }: {
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
+                {/* The address of this publication in these pages, to give to someone else. */}
+                {publication.did && <Copy text={linkTo({ publication: publication.did })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ publication: publication.did })}`} />}
                 {/* A post's DID is its address: what another wallet or node resolves it by. */}
                 {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
                 {/* What another text is given to show this version of the post inside it. */}
@@ -1526,6 +1532,99 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         return () => { reads.current += 1; };
     }, [loadTimeline]);
 
+    // What is shown has an address, which is kept as the reader goes from one
+    // thing to another, so that the address bar always holds a link to what is
+    // on the page and the browser's back button goes to what was shown before.
+    const address = open?.did ? hashOf({ publication: open.did }) : hashOf(author ? { author, replies } : null);
+    const addressed = useRef(address);
+
+    useEffect(() => {
+        if (address === addressed.current) {
+            return;
+        }
+        addressed.current = address;
+        if (address !== window.location.hash) {
+            window.history.pushState(null, '', address || `${window.location.pathname}${window.location.search}`);
+        }
+    }, [address]);
+
+    // Shows what the address names: at the start, which is how a link given by
+    // someone else is followed, and whenever the reader goes back or forward
+    // or follows a link within the pages. A publication is read from the
+    // indexer first, and what is shown stays until it has answered.
+    const sought = useRef('');
+    const arrive = useCallback(async () => {
+        const route = routeOf(window.location.hash);
+
+        if (route && 'publication' in route) {
+            const did = route.publication;
+
+            if (open?.did === did || sought.current === did) {
+                return;
+            }
+            sought.current = did;
+            try {
+                const found = await api.publication(did);
+
+                if (sought.current !== did) {
+                    return;
+                }
+                if (found) {
+                    setOpen(found);
+                    setError('');
+                }
+                else {
+                    setError('Nothing is published at that link, or not yet.');
+                }
+            }
+            catch (failure) {
+                if (sought.current === did) {
+                    setError(message(failure));
+                }
+            }
+            finally {
+                if (sought.current === did) {
+                    sought.current = '';
+                }
+            }
+            return;
+        }
+
+        sought.current = '';
+
+        const to = route ? route.author : null;
+        const listed = route ? route.replies === true : false;
+
+        if (to !== author || listed !== replies) {
+            setTimeline(null);
+            setFetched(0);
+            setTotal(0);
+            setWriting(false);
+            setAuthor(to);
+            setReplies(listed);
+        }
+        else if (open) {
+            loadTimeline();
+        }
+        setOpen(null);
+    }, [api, open, author, replies, loadTimeline]);
+
+    const arrived = useRef(false);
+
+    useEffect(() => {
+        if (!arrived.current) {
+            arrived.current = true;
+            arrive();
+        }
+        window.addEventListener('popstate', arrive);
+        window.addEventListener('hashchange', arrive);
+
+        return () => {
+            window.removeEventListener('popstate', arrive);
+            window.removeEventListener('hashchange', arrive);
+        };
+    }, [arrive]);
+
     const follow = (did: string) => {
         if (!did.startsWith('did:') || follows.includes(did)) {
             return;
@@ -1741,6 +1840,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                     {author !== me.did && (follows.includes(author)
                                         ? <button className="quiet" onClick={() => unfollow(author)}>Unfollow</button>
                                         : <button className="quiet" onClick={() => follow(author)}>Follow</button>)}
+                                    <Copy text={linkTo({ author, replies })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ author, replies })}`} />
                                     <Copy text={author} label="Copy DID" unable={`Could not copy. The DID is ${author}`} />
                                 </p>
                                 <Tabs
