@@ -210,7 +210,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: strin
             {asked && !answered && (
                 <>
                     <p>Scan this with your wallet, or open it on this device.</p>
-                    <QRCodeSVG value={asked.link} size={176} aria-label="Sign-in challenge" />
+                    <QRCodeSVG className="qr" value={asked.link} size={176} aria-label="Sign-in challenge" />
                     <p><a href={asked.link}>Open in your wallet</a></p>
                     <p className="muted">Waiting for your wallet…</p>
                     <details>
@@ -281,7 +281,7 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
                     </p>
                     {me.link && (
                         <>
-                            <QRCodeSVG value={me.link} size={176} aria-label="Grant request" />
+                            <QRCodeSVG className="qr" value={me.link} size={176} aria-label="Grant request" />
                             <p><a href={me.link}>Open in your wallet</a></p>
                             <label>
                                 Or copy the grant link
