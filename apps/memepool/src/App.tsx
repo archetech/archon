@@ -1478,7 +1478,24 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
 // and unmounted at sign-out, so whatever a request of that session answers
 // afterwards has nothing to change: the next reader starts with nothing of the
 // last one's.
-function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: () => void; onSignedOut: () => void }) {
+// Someone who has not signed in, who reads what an address names and does
+// nothing else: they are nobody, with no grant.
+const VISITOR: Me = { did: '' };
+
+function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
+    api: Api; me: Me; onCheck: () => void; onSignedOut: () => void;
+    // How a visitor signs in, from wherever they are.
+    onSignedIn?: (did: string) => void; pollMs?: number;
+}) {
+    const visitor = me === VISITOR;
+    // Whether a visitor has asked to sign in, from something they are reading.
+    const [signing, setSigning] = useState(false);
+    // Whether a publication an address names is being read, with nothing to show yet.
+    const [arriving, setArriving] = useState(() => {
+        const route = routeOf(window.location.hash);
+
+        return route !== null && 'publication' in route;
+    });
     const [follows, setFollows] = useState<string[]>(readFollows);
     const [timeline, setTimeline] = useState<Publication[] | null>(null);
     // How many publications the indexer has given, which is where its next page
@@ -1508,6 +1525,12 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // changed under, is dropped: its answer is to a question no longer asked.
     const loadTimeline = useCallback(async (older?: { shown: Publication[]; from: number }) => {
         const mine = reads.current += 1;
+
+        // A visitor has no timeline: they follow nobody the service knows of.
+        if (visitor && !author) {
+            setTimeline([]);
+            return;
+        }
 
         try {
             const page = await api.timeline(
@@ -1539,7 +1562,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 setError(message(failure));
             }
         }
-    }, [api, me.did, follows, author, replies]);
+    }, [api, me.did, visitor, follows, author, replies]);
 
     useEffect(() => {
         loadTimeline();
@@ -1598,12 +1621,15 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
         setLost('');
         if (!route || !('publication' in route)) {
+            setArriving(false);
             list(route ? route.author : null, route ? route.replies === true : false);
             return;
         }
         if (open?.did === route.publication) {
+            setArriving(false);
             return;
         }
+        setArriving(true);
 
         let found: Publication | undefined;
         let said = 'Nothing is published at that link, or not yet.';
@@ -1617,6 +1643,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         if (mine !== arrivals.current) {
             return;
         }
+        setArriving(false);
         // What its author withdrew is published no longer.
         if (found?.state === 'published' && found.memeplex) {
             setOpen(found);
@@ -1824,16 +1851,32 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         onSignedOut();
     };
 
+    const signIn = visitor && onSignedIn && <SignIn api={api} onSignedIn={onSignedIn} pollMs={pollMs ?? 3000} />;
+
+    // A visitor whose address names nothing has nothing to read, and signs in.
+    if (visitor && !open && !author) {
+        return (
+            <main>
+                <h1>Memepool</h1>
+                {error && <p role="alert" className="error">{error}</p>}
+                {lost && <p role="alert" className="error">{lost}</p>}
+                {arriving ? <p className="muted">Loading…</p> : signIn}
+            </main>
+        );
+    }
+
     return (
         <Ways visit={visit} open={setOpen} gone={gone} embedding={embedding} upload={me.grant ? api.upload : undefined}>
             <main>
                 <header className="top">
                     <h1>Memepool</h1>
-                    <Identity did={me.did} />
-                    <button className="quiet" onClick={signOut}>Sign out</button>
+                    {!visitor && <Identity did={me.did} />}
+                    {!visitor && <button className="quiet" onClick={signOut}>Sign out</button>}
+                    {visitor && !signing && <button className="quiet" onClick={() => setSigning(true)}>Sign in</button>}
                 </header>
 
-                {!me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
+                {signing && signIn}
+                {!visitor && !me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
                 {error && <p role="alert" className="error">{error}</p>}
                 {lost && <p role="alert" className="error">{lost}</p>}
 
@@ -1855,10 +1898,10 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                     <>
                         {author && (
                             <section className="card author">
-                                <p><button className="quiet" onClick={() => visit(null)}>Back to your timeline</button></p>
+                                {!visitor && <p><button className="quiet" onClick={() => visit(null)}>Back to your timeline</button></p>}
                                 <Identity did={author} />
                                 <p>
-                                    {author !== me.did && (follows.includes(author)
+                                    {!visitor && author !== me.did && (follows.includes(author)
                                         ? <button className="quiet" onClick={() => unfollow(author)}>Unfollow</button>
                                         : <button className="quiet" onClick={() => follow(author)}>Follow</button>)}
                                     <Copy text={linkTo({ author, replies })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ author, replies })}`} />
@@ -2009,28 +2052,20 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
         return <main><h1>Memepool</h1><p className="muted">Loading…</p></main>;
     }
 
-    if (me === null) {
-        return (
-            <main>
-                <h1>Memepool</h1>
-                {error && <p role="alert" className="error">{error}</p>}
-                {/* The service has signed this browser in, whatever a read of the
-                    grant says next: the reader is shown as signed in, with the
-                    way to sign out, from here. */}
-                <SignIn api={api} onSignedIn={did => { setMe({ did }); loadMe(); }} pollMs={pollMs} />
-            </main>
-        );
-    }
-
     return (
         <Avatars.Provider value={api.avatar}>
             <People.Provider value={people}>
                 <Publications.Provider value={reading}>
                     {error && <p role="alert" className="error">{error}</p>}
+                    {/* Someone who has not signed in reads what an address names.
+                        Once the service has signed this browser in, whatever a
+                        read of the grant says next, they are shown as signed in. */}
                     <Reader
-                        key={`${session} ${me.did}`}
+                        key={`${session} ${me?.did ?? ''}`}
                         api={api}
-                        me={me}
+                        me={me ?? VISITOR}
+                        pollMs={pollMs}
+                        onSignedIn={did => { setMe({ did }); loadMe(); }}
                         onCheck={loadMe}
                         onSignedOut={() => {
                             sessions.current += 1;
