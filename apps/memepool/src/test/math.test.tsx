@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import Markdown, { Embeds, MATH_LIMIT } from '../Markdown';
+import Markdown, { Embeds, MATH_LIMIT, settleDollars } from '../Markdown';
 import type { Embedding } from '../Markdown';
 
 // Math as Memeplex says a client shows it: docs/plans/memeplex-reference-1436.md,
@@ -155,6 +155,16 @@ describe('math', () => {
         expect(page.textContent?.startsWith('$')).toBe(true);
         expect(page.textContent).toContain(' and \\');
         expect(page.textContent?.endsWith(' and $$z')).toBe(true);
+    });
+
+    it('settles the dollars of a long text of many code spans without going through them for each', () => {
+        // As long as a body may be, and all code spans and prices.
+        const text = Array.from({ length: 20_000 }, (_, index) => '`c$' + index + '` $5').join(' ');
+        const settled = settleDollars(text);
+
+        // Every dollar outside code is given a backslash, and none inside.
+        expect(settled.length).toBe(text.length + 20_000);
+        expect(settled.startsWith('`c$0` ' + String.fromCharCode(92) + '$5 `c$1` ')).toBe(true);
     });
 
     it('leaves a dollar alone in a bare address, in HTML and in code, where a backslash would be shown', () => {

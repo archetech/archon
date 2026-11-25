@@ -211,7 +211,22 @@ export function settleDollars(text: string): string {
 
     addresses(read);
 
-    const within = (at: number) => left.some(([from, to]) => at >= from && at < to);
+    // Asked of places in the order they come, so each list of ranges is gone
+    // through once however long the text is: a text is a stranger's, and may be
+    // all code spans.
+    const inOrder = (ranges: [number, number][]) => {
+        const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
+        let next = 0;
+
+        return (at: number) => {
+            while (next < sorted.length && sorted[next][1] <= at) {
+                next += 1;
+            }
+
+            return next < sorted.length && sorted[next][0] <= at;
+        };
+    };
+    const within = inOrder(left);
     // The runs of dollars that may be math: outside what is left alone, and
     // with no backslash already before them.
     const runs: { at: number; length: number }[] = [];
@@ -258,17 +273,19 @@ export function settleDollars(text: string): string {
         }
     }
 
-    let settled = '';
+    const parts: string[] = [];
+    const inAddress = inOrder(bare);
     let from = 0;
 
     for (const { at, length } of runs) {
-        if (!math.has(at) && !bare.some(([start, end]) => at >= start && at < end)) {
-            settled += text.slice(from, at) + (BACKSLASH + DOLLAR).repeat(length);
+        if (!math.has(at) && !inAddress(at)) {
+            parts.push(text.slice(from, at), (BACKSLASH + DOLLAR).repeat(length));
             from = at + length;
         }
     }
+    parts.push(text.slice(from));
 
-    return settled + text.slice(from);
+    return parts.join('');
 }
 
 // Math between two dollars each side is set apart, wherever it is written,
