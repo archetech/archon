@@ -41,7 +41,7 @@ classify() {
     [ -n "$code" ] && unit=true
     # Root-level files (package.json, lockfiles, tsconfig, compose files,
     # sample env) are included wholesale.
-    if grep -qE '^(docker/|packages/|services/|apps/|scripts/|rust/|python/|prebuilds/|[^/]+$)' <<<"$code"; then
+    if grep -qE '^(docker/|packages/|services/|apps/|scripts/|rust/|python/|[^/]+$)' <<<"$code"; then
         images=true
         e2e=true
     elif grep -qE '^(tests/(cli|cli-tests|cln|gatekeeper|fixtures)/|tests/convergence/vectors\.json$)' <<<"$code"; then
