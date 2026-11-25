@@ -305,17 +305,20 @@ async def create_id(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_id(body["name"], body.get("options") or {})}
 
 
-@protected_api.get("/ids/{identifier}")
+# A wallet may hold a name made with a slash in it before one was refused.
+# It is still read, removed and renamed by that name, so that it can be given
+# another.
+@protected_api.get("/ids/{identifier:path}")
 async def get_id(identifier: str) -> dict[str, Any]:
     return {"docs": await service.resolve_did(identifier)}
 
 
-@protected_api.delete("/ids/{identifier}")
+@protected_api.delete("/ids/{identifier:path}")
 async def delete_id(identifier: str) -> dict[str, bool]:
     return {"ok": await service.remove_id(identifier)}
 
 
-@protected_api.post("/ids/{identifier}/rename")
+@protected_api.post("/ids/{identifier:path}/rename")
 async def rename_id(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.rename_id(identifier, body["name"])}
 
@@ -345,12 +348,12 @@ async def add_alias(body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.add_alias(body["alias"], body["did"])}
 
 
-@protected_api.get("/aliases/{alias}")
+@protected_api.get("/aliases/{alias:path}")
 async def get_alias(alias: str) -> dict[str, Any]:
     return {"did": await service.get_alias(alias)}
 
 
-@protected_api.delete("/aliases/{alias}")
+@protected_api.delete("/aliases/{alias:path}")
 async def remove_alias(alias: str) -> dict[str, bool]:
     return {"ok": await service.remove_alias(alias)}
 

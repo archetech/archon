@@ -37,3 +37,31 @@ def test_accepts_as_a_vault_items_name(name):
 def test_refuses_as_a_vault_items_name(refused):
     with pytest.raises(KeymasterError, match=f"Invalid parameter: name {refused['error']}"):
         _validate(refused["name"], item=True)
+
+
+def test_an_asset_whose_alias_is_refused_is_not_made():
+    import asyncio
+
+    made = []
+
+    class Gatekeeper:
+        async def create_did(self, operation):
+            made.append(operation)
+            return "did:cid:made"
+
+    async def wallet():
+        return {"aliases": {"taken": "did:cid:x"}, "ids": {}}
+
+    async def never(*args, **kwargs):
+        raise AssertionError("nothing is looked up for an alias that is refused")
+
+    keymaster = SimpleNamespace(
+        max_alias_length=32, default_registry="hyperswarm", gatekeeper=Gatekeeper(),
+        load_wallet=wallet, fetch_id_info=never,
+    )
+    keymaster.validate_alias = lambda *args, **kwargs: Keymaster.validate_alias(keymaster, *args, **kwargs)
+
+    for alias, error in [("team/alice", "alias contains a slash"), ("..", "alias cannot be only dots"), ("taken", "alias already used")]:
+        with pytest.raises(KeymasterError, match=error):
+            asyncio.run(Keymaster.create_asset(keymaster, {"a": 1}, {"alias": alias}))
+    assert made == []

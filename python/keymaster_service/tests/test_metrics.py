@@ -25,6 +25,18 @@ def test_normalize_path_replaces_dynamic_segments() -> None:
         normalize_path("/api/v1/vaults/v1/items/secret")
         == "/api/v1/vaults/:id/items/:name"
     )
+    for path, label in [
+        ("/api/v1/ids/Alice", "/api/v1/ids/:id"),
+        ("/api/v1/ids/team/alice", "/api/v1/ids/:id"),
+        ("/api/v1/ids/Alice/rename", "/api/v1/ids/:id/rename"),
+        ("/api/v1/ids/team/alice/rename", "/api/v1/ids/:id/rename"),
+        ("/api/v1/ids/Alice/change-registry", "/api/v1/ids/:id/change-registry"),
+        ("/api/v1/ids/Alice/backup", "/api/v1/ids/:id/backup"),
+        ("/api/v1/ids/Alice/recover", "/api/v1/ids/:id/recover"),
+        ("/api/v1/aliases/team/alice", "/api/v1/aliases/:alias"),
+        ("/api/v1/aliases/alice", "/api/v1/aliases/:alias"),
+    ]:
+        assert normalize_path(path) == label
     # A name with slashes in it is one name, and one label.
     assert (
         normalize_path("/api/v1/vaults/v1/items/login: https://example.org/sign-in")

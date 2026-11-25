@@ -59,8 +59,9 @@ wallet_operations_total = Counter(
 # and other dynamic identifiers.
 _PATH_NORMALIZERS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/did/[^/]+"), "/did/:id"),
-    (re.compile(r"/ids/[^/]+"), "/ids/:id"),
-    (re.compile(r"/aliases/[^/]+"), "/aliases/:alias"),
+    # A stored name may hold slashes, and is one label whatever it holds.
+    (re.compile(r"/ids/.+?(/(?:rename|change-registry|backup|recover))?$"), r"/ids/:id\1"),
+    (re.compile(r"/aliases/.+"), "/aliases/:alias"),
     (re.compile(r"/addresses/check/[^/]+"), "/addresses/check/:address"),
     (re.compile(r"/addresses/import"), "/addresses/import"),
     (re.compile(r"/addresses/[^/]+"), "/addresses/:address"),

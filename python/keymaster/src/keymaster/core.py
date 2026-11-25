@@ -2924,6 +2924,9 @@ class Keymaster:
         controller = options.get("controller")
         valid_until = options.get("validUntil")
         alias = options.get("alias")
+        # Before anything is created: an asset whose alias is refused is not made.
+        if alias:
+            self.validate_alias(alias, await self.load_wallet(), "alias")
         id_info = await self.fetch_id_info(controller)
 
         # Gatekeeper rejects an asset operation whose controller is registered `local` unless the

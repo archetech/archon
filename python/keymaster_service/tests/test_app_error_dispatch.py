@@ -430,3 +430,42 @@ def test_vault_item_and_attachment_routes_take_a_name_with_slashes(monkeypatch):
 
     monkeypatch.setattr(app_module.service, "list_vault_items", list_items)
     assert client.get("/api/v1/vaults/vault/items").json() == {"items": {"a": {}}}
+
+
+def test_a_stored_name_with_a_slash_is_read_removed_and_renamed(monkeypatch):
+    """A wallet may hold a name made before a slash was refused (#1758)."""
+    calls = []
+
+    def recording(what, answer):
+        async def call(*args):
+            calls.append((what, *args))
+            return answer
+        return call
+
+    monkeypatch.setattr(app_module.service, "resolve_did", recording("resolve", {"didDocument": {}}))
+    monkeypatch.setattr(app_module.service, "remove_id", recording("remove", True))
+    monkeypatch.setattr(app_module.service, "rename_id", recording("rename", True))
+    monkeypatch.setattr(app_module.service, "get_alias", recording("alias", "did:cid:alice"))
+    monkeypatch.setattr(app_module.service, "remove_alias", recording("unalias", True))
+    monkeypatch.setattr(app_module.service, "backup_id", recording("backup", True))
+    monkeypatch.setattr(app_module.service, "get_current_id", recording("current", "Alice"))
+    app = FastAPI()
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    client = TestClient(app)
+
+    for name in ["team/alice", "a/b/c", "Alice"]:
+        path = quote(name, safe="")
+        assert client.get(f"/api/v1/ids/{path}").status_code == 200
+        assert client.post(f"/api/v1/ids/{path}/rename", json={"name": "new"}).json() == {"ok": True}
+        assert client.delete(f"/api/v1/ids/{path}").json() == {"ok": True}
+        assert client.get(f"/api/v1/aliases/{path}").json() == {"did": "did:cid:alice"}
+        assert client.delete(f"/api/v1/aliases/{path}").json() == {"ok": True}
+        assert calls[-5:] == [
+            ("resolve", name), ("rename", name, "new"), ("remove", name), ("alias", name), ("unalias", name),
+        ]
+
+    # The routes beside them are still their own.
+    assert client.get("/api/v1/ids/current").json() == {"current": "Alice"}
+    assert client.post("/api/v1/ids/Alice/backup").json() == {"ok": True}
+    assert calls[-2:] == [("current",), ("backup", "Alice")]
