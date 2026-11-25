@@ -8,7 +8,7 @@ export type Route =
     | { author: string; replies?: boolean }
     | null;
 
-const DID = /^did:[a-z0-9]+:[A-Za-z0-9._%-]+$/;
+const DID = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
 
 // The route a fragment names, or none for one that names nothing the pages
 // show. The fragment is whatever was in a link, so a DID is taken only where

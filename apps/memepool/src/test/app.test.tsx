@@ -2454,7 +2454,8 @@ describe('the address of what is shown', () => {
         }
 
         // An address is read back as the route it was made from.
-        for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }]) {
+        // A DID's own part may have colons in it.
+        for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }, { publication: 'did:web:example.org:users:alice' }]) {
             expect(routeOf(hashOf(route))).toStrictEqual(route);
         }
         expect(hashOf(null)).toBe('');
