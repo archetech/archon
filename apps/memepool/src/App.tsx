@@ -772,8 +772,6 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
             return;
         }
 
-        const at = area.current?.selectionStart ?? latest.current.length;
-
         setStoring(true);
         try {
             const { did, versionId } = await upload!(image);
@@ -783,8 +781,10 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
             }
 
             const words = image.name.replace(/\.[^.]*$/, '').replace(/[[\]\\\n]/g, ' ').trim() || 'image';
+            // Where the reader is writing when the image has been stored, in
+            // the text as it then is: they may have gone on writing meanwhile.
             const text = latest.current;
-            const place = Math.min(at, text.length);
+            const place = Math.min(area.current?.selectionStart ?? text.length, text.length);
             const before = text.slice(0, place);
             const after = text.slice(place);
 

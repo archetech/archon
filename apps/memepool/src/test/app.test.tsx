@@ -1699,6 +1699,29 @@ describe('adding an image to what is written', () => {
         expect(state.published).toStrictEqual([]);
     });
 
+    it('puts the embed where the reader is writing once the image is stored, though they wrote more meanwhile', async () => {
+        const { api } = services({ me: granted });
+        const storing: ((image: { did: string; versionId: string }) => void)[] = [];
+        vi.mocked(api.upload).mockImplementation(() => new Promise(resolve => { storing.push(resolve); }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Before. After.');
+        area.setSelectionRange(7, 7);
+        await user.upload(chooser('Post'), file('a chart.png', 'image/png'));
+        await screen.findByRole('button', { name: 'Storing the image…' });
+
+        // The reader goes to the start and writes more while the image is stored.
+        await user.type(area, 'New ', { initialSelectionStart: 0, initialSelectionEnd: 0 });
+        expect(area.value).toBe('New Before. After.');
+        area.setSelectionRange(11, 11);
+        storing.shift()?.({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' });
+
+        // No word is split: the embed is where the reader left off.
+        await waitFor(() => expect(area.value).toBe('New Before.\n\n' + EMBED + '\n\n After.'));
+    });
+
     it('is offered for an article and a reply as well, and to nobody who has not granted the service', async () => {
         const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
         const view = render(<App api={api} />);
