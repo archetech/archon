@@ -2620,23 +2620,54 @@ export default class Keymaster implements KeymasterInterface {
         return id.owned || [];
     }
 
+    // What any short text a wallet keeps has to be: something, no longer than
+    // a name may be, and printable.
+    private validateText(text: string, label: string): string {
+        if (typeof text !== 'string' || !text.trim()) {
+            throw new InvalidParameterError(`${label} must be a non-empty string`);
+        }
+
+        text = text.trim(); // Remove leading/trailing whitespace
+
+        if (text.length > this.maxAliasLength) {
+            throw new InvalidParameterError(`${label} too long`);
+        }
+
+        if (/[^\P{Cc}]/u.test(text)) {
+            throw new InvalidParameterError(`${label} contains unprintable characters`);
+        }
+
+        return text;
+    }
+
+    // What a vault's item may be called. It is the last thing in the path of
+    // a request for it, so it may hold a slash, as a login named for the
+    // address of its service does. A name of only dots is taken out of a path
+    // when it is read, and cannot be asked for.
+    private validateItemName(name: string, label: string = 'name'): string {
+        name = this.validateText(name, label);
+
+        if (name === '.' || name === '..') {
+            throw new InvalidParameterError(`${label} cannot be only dots`);
+        }
+
+        return name;
+    }
+
+    // The name of an identity, or an alias. It is given in the path of a
+    // request with an action after it, as in `/did/<name>/check`, so a slash
+    // in it cannot be told from the start of the action: the Python service
+    // reads `Alice/check` as a check of `Alice`. A new name may hold none; one
+    // a wallet already has is found as before.
     validateAlias(
         alias: string,
         wallet?: WalletFile,
         label: string = 'name'
     ) {
-        if (typeof alias !== 'string' || !alias.trim()) {
-            throw new InvalidParameterError(`${label} must be a non-empty string`);
-        }
+        alias = this.validateItemName(alias, label);
 
-        alias = alias.trim(); // Remove leading/trailing whitespace
-
-        if (alias.length > this.maxAliasLength) {
-            throw new InvalidParameterError(`${label} too long`);
-        }
-
-        if (/[^\P{Cc}]/u.test(alias)) {
-            throw new InvalidParameterError(`${label} contains unprintable characters`);
+        if (alias.includes('/')) {
+            throw new InvalidParameterError(`${label} contains a slash`);
         }
 
         const alreadyUsedError = `${label} already used`;
@@ -6622,7 +6653,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const vault = await this.getVault(vaultId);
         const { items } = await this.decryptVault(vault);
-        const validName = this.validateAlias(name);
+        const validName = this.validateItemName(name);
         const encryptedData = this.cipher.encryptBytes(vault.publicJwk, buffer);
         const cid = await this.gatekeeper.addText(encryptedData);
         const sha256 = this.cipher.hashMessage(buffer);
@@ -6733,7 +6764,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const tag of tags) {
             try {
-                tagSet.add(this.validateAlias(tag));
+                tagSet.add(this.validateText(tag, 'tag'));
             }
             catch (error) {
                 throw new InvalidParameterError(`Invalid tag: '${tag}'`);

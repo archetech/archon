@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -149,6 +150,72 @@ describe('addAlias', () => {
         catch (error: any) {
             expect(error.message).toBe('Invalid parameter: alias contains unprintable characters');
         }
+    });
+});
+
+// A name is given in the path of a request, where it is one segment (#1758).
+// The Python Keymaster runs the same names.
+describe('what a new name may be', () => {
+    const names = JSON.parse(readFileSync(new URL('../fixtures/keymaster-names.json', import.meta.url), 'utf8')) as {
+        accepted: string[]; refused: { name: string; error: string }[];
+        items: { accepted: string[]; refused: { name: string; error: string }[] };
+    };
+
+    it.each(names.accepted)('accepts %j as an alias, an identity\'s name and a vault item\'s', async name => {
+        const alice = await keymaster.createId('First');
+
+        expect(await keymaster.addAlias(name, alice)).toBe(true);
+        expect(await keymaster.removeAlias(name)).toBe(true);
+        expect(await keymaster.renameId('First', name)).toBe(true);
+        expect(await keymaster.addVaultItem(await keymaster.createVault(), name, Buffer.from('x'))).toBe(true);
+    });
+
+    it.each(names.refused)('refuses $name wherever a name is made', async ({ name, error }) => {
+        const alice = await keymaster.createId('First');
+
+        await expect(keymaster.addAlias(name, alice)).rejects.toThrow(`Invalid parameter: alias ${error}`);
+        await expect(keymaster.createId(name)).rejects.toThrow(`Invalid parameter: name ${error}`);
+        await expect(keymaster.renameId('First', name)).rejects.toThrow(`Invalid parameter: name ${error}`);
+        await expect(keymaster.createAsset({ a: 1 }, { alias: name })).rejects.toThrow(`Invalid parameter: alias ${error}`);
+    });
+
+    // A vault's item is the last thing in the path of a request for it, and a
+    // wallet names a login for the address of its service.
+    it.each(names.items.accepted)('accepts %j as a vault item\'s name, and gives the item back by it', async name => {
+        await keymaster.createId('First');
+        const vault = await keymaster.createVault();
+
+        expect(await keymaster.addVaultItem(vault, name, Buffer.from('x'))).toBe(true);
+        expect((await keymaster.getVaultItem(vault, name))!.toString()).toBe('x');
+        expect(await keymaster.removeVaultItem(vault, name)).toBe(true);
+    });
+
+    it.each(names.items.refused)('refuses $name as a vault item\'s name', async ({ name, error }) => {
+        await keymaster.createId('First');
+
+        await expect(keymaster.addVaultItem(await keymaster.createVault(), name, Buffer.from('x'))).rejects.toThrow(`Invalid parameter: name ${error}`);
+    });
+
+    it('still finds, renames and removes a name a wallet already has with a slash in it', async () => {
+        const alice = await keymaster.createId('Alice');
+        const wallet = await keymaster.loadWallet();
+
+        wallet.aliases = { ...wallet.aliases, 'team/alice': alice };
+        wallet.ids['old/name'] = { ...wallet.ids.Alice };
+        await keymaster.saveWallet(wallet, true);
+
+        expect(await keymaster.getAlias('team/alice')).toBe(alice);
+        expect((await keymaster.resolveDID('team/alice')).didDocument!.id).toBe(alice);
+        expect(await keymaster.removeAlias('team/alice')).toBe(true);
+        expect(await keymaster.renameId('old/name', 'new-name')).toBe(true);
+        expect(Object.keys((await keymaster.loadWallet()).ids)).toContain('new-name');
+    });
+
+    it('leaves a tag as it was, which is in no path', async () => {
+        await keymaster.createId('Alice');
+        const dmail = await keymaster.createDmail({ to: [await keymaster.createId('Bob')], cc: [], subject: 's', body: 'b' });
+
+        expect(await keymaster.fileDmail(dmail, ['work/urgent'])).toBe(true);
     });
 });
 

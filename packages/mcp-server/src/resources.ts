@@ -9,8 +9,8 @@ export const ARCHON_ASSET_URI_TEMPLATE = 'did:cid:{id}';
 
 // A vault item has no DID of its own -- it is a named entry inside a vault, keyed by
 // (container DID, name) -- so it is addressed as a DID URL fragment. Item names allow
-// anything printable (validateAlias only rejects control characters), including '#' and
-// spaces, so the fragment must be percent-encoded.
+// anything printable (Keymaster refuses control characters and a name of only dots),
+// including '#', '/' and spaces, so the fragment must be percent-encoded.
 export const ARCHON_VAULT_ITEM_URI_TEMPLATE = 'did:cid:{id}#{item}';
 
 export function vaultItemUri(containerDid: string, name: string): string {

@@ -305,17 +305,20 @@ async def create_id(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_id(body["name"], body.get("options") or {})}
 
 
-@protected_api.get("/ids/{identifier}")
+# A wallet may hold a name made with a slash in it before one was refused.
+# It is still read, removed and renamed by that name, so that it can be given
+# another.
+@protected_api.get("/ids/{identifier:path}")
 async def get_id(identifier: str) -> dict[str, Any]:
     return {"docs": await service.resolve_did(identifier)}
 
 
-@protected_api.delete("/ids/{identifier}")
+@protected_api.delete("/ids/{identifier:path}")
 async def delete_id(identifier: str) -> dict[str, bool]:
     return {"ok": await service.remove_id(identifier)}
 
 
-@protected_api.post("/ids/{identifier}/rename")
+@protected_api.post("/ids/{identifier:path}/rename")
 async def rename_id(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.rename_id(identifier, body["name"])}
 
@@ -345,12 +348,12 @@ async def add_alias(body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.add_alias(body["alias"], body["did"])}
 
 
-@protected_api.get("/aliases/{alias}")
+@protected_api.get("/aliases/{alias:path}")
 async def get_alias(alias: str) -> dict[str, Any]:
     return {"did": await service.get_alias(alias)}
 
 
-@protected_api.delete("/aliases/{alias}")
+@protected_api.delete("/aliases/{alias:path}")
 async def remove_alias(alias: str) -> dict[str, bool]:
     return {"ok": await service.remove_alias(alias)}
 
@@ -859,7 +862,7 @@ async def add_vault_item(identifier: str, request: Request, body: bytes) -> dict
     return {"ok": await service.add_vault_item(identifier, options["name"], body)}
 
 
-@protected_api.delete("/vaults/{identifier}/items/{name}")
+@protected_api.delete("/vaults/{identifier}/items/{name:path}")
 async def remove_vault_item(identifier: str, name: str) -> dict[str, bool]:
     return {"ok": await service.remove_vault_item(identifier, name)}
 
@@ -869,7 +872,7 @@ async def list_vault_items(identifier: str, request: Request) -> dict[str, Any]:
     return {"items": await service.list_vault_items(identifier, parse_resolve_options(request))}
 
 
-@protected_api.get("/vaults/{identifier}/items/{name}")
+@protected_api.get("/vaults/{identifier}/items/{name:path}")
 async def get_vault_item(identifier: str, name: str, request: Request) -> Response:
     item = await service.get_vault_item(identifier, name, parse_resolve_options(request))
     return Response(content=item or b"", media_type="application/octet-stream")
@@ -941,12 +944,12 @@ async def add_dmail_attachment(identifier: str, request: Request) -> dict[str, b
     return {"ok": await service.add_dmail_attachment(identifier, options["name"], await request.body())}
 
 
-@protected_api.delete("/dmail/{identifier}/attachments/{name}")
+@protected_api.delete("/dmail/{identifier}/attachments/{name:path}")
 async def remove_dmail_attachment(identifier: str, name: str) -> dict[str, bool]:
     return {"ok": await service.remove_dmail_attachment(identifier, name)}
 
 
-@protected_api.get("/dmail/{identifier}/attachments/{name}")
+@protected_api.get("/dmail/{identifier}/attachments/{name:path}")
 async def get_dmail_attachment(identifier: str, name: str) -> Response:
     return Response(content=await service.get_dmail_attachment(identifier, name), media_type="application/octet-stream")
 

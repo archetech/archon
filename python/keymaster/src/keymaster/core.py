@@ -476,7 +476,9 @@ class Keymaster:
     def did_match(self, did1: str, did2: str) -> bool:
         return did1.split(":")[-1] == did2.split(":")[-1]
 
-    def validate_alias(self, alias: str, wallet: dict[str, Any] | None = None, label: str = "name") -> str:
+    def validate_alias(
+        self, alias: str, wallet: dict[str, Any] | None = None, label: str = "name", item: bool = False,
+    ) -> str:
         if not isinstance(alias, str) or not alias.strip():
             raise KeymasterError(f"Invalid parameter: {label} must be a non-empty string")
         alias = alias.strip()
@@ -484,6 +486,17 @@ class Keymaster:
             raise KeymasterError(f"Invalid parameter: {label} too long")
         if any(not char.isprintable() for char in alias):
             raise KeymasterError(f"Invalid parameter: {label} contains unprintable characters")
+        # A name of only dots is taken out of a path when it is read, and
+        # cannot be asked for.
+        if alias in (".", ".."):
+            raise KeymasterError(f"Invalid parameter: {label} cannot be only dots")
+        # The name of an identity, or an alias, is given in the path of a
+        # request with an action after it, as in /did/<name>/check, so a slash
+        # in it cannot be told from the start of the action. A new name may
+        # hold none; one a wallet already has is found as before. A vault's
+        # item is the last thing in its path, and may.
+        if not item and "/" in alias:
+            raise KeymasterError(f"Invalid parameter: {label} contains a slash")
         if wallet and (alias in wallet.get("aliases", {}) or alias in wallet.get("ids", {})):
             raise KeymasterError(f"Invalid parameter: {label} already used")
         return alias
@@ -1979,7 +1992,7 @@ class Keymaster:
 
         vault = await self.get_vault(vault_id)
         decrypted = await self.decrypt_vault(vault)
-        valid_name = self.validate_alias(name)
+        valid_name = self.validate_alias(name, item=True)
         encrypted_data = encrypt_bytes(vault["publicJwk"], buffer)
         cid = await self.gatekeeper.add_text(encrypted_data)
         item = {
@@ -2911,6 +2924,9 @@ class Keymaster:
         controller = options.get("controller")
         valid_until = options.get("validUntil")
         alias = options.get("alias")
+        # Before anything is created: an asset whose alias is refused is not made.
+        if alias:
+            self.validate_alias(alias, await self.load_wallet(), "alias")
         id_info = await self.fetch_id_info(controller)
 
         # Gatekeeper rejects an asset operation whose controller is registered `local` unless the
