@@ -50,6 +50,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `GET /objects/:did/state` | Where an object the user published through this service stands: `{ state, registry? }`, with `pending` while it waits to be anchored and `none` when it never will be |
 | `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
 | `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
+| `POST /images` | Stores an image the user means to embed, sent as `application/octet-stream`, and makes an image asset of it; returns its `did`, `versionId`, `type`, `bytes`, `width` and `height` |
 | `GET /images/:did?versionId=` | An image asset at a version, as the image it is, for text that embeds it; 404 for anything else |
 | `GET /avatars/:did` | An identity's avatar, as the image it is, or 404 when it has none the service serves |
 
@@ -101,6 +102,26 @@ It is whatever the identity's owner chose, and the service did not store it:
   look for bytes a stranger named.
 
 Anything else is a 404, and the pages show a figure in the avatar's place.
+
+### Storing an image
+
+The client that publishes an object pins what the object embeds, so the service
+stores an image a user means to embed, as it stores an article's body. `POST /images`
+takes the bytes and makes an image asset of them, which the node's IPFS pins, and
+answers with the DID and version that an embed names.
+
+- **The asset is the service's own**, made on `hyperswarm`. An image is an Archon
+  asset and not a Memeplex object, so it is under no grant and on no grant's
+  registry: it is made where it costs nothing and can be embedded at once.
+- **It is an image text may embed, by what the bytes say**: PNG, JPEG, WebP or GIF,
+  at most 10,000,000 bytes and 40 megapixels. Anything else is refused and nothing
+  is stored. What a browser says the file is counts for nothing.
+- **It is for a user who has granted the service, and 30 in an hour.** An image is
+  pinned for good, and that is the only bound on what one user has the node keep.
+- **It is sent as `application/octet-stream`**, which is the body Drawbridge passes
+  on whole.
+
+The service does not count an animation's frames.
 
 ### Embedded images
 
