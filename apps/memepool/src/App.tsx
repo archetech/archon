@@ -455,7 +455,7 @@ function Quoted({ publication }: { publication: Publication }) {
                 <Identity did={object.author} />
                 <time>{when(publication)}</time>
             </header>
-            {object.title && <h3>{object.title}</h3>}
+            <Titled object={object} />
             <Body object={object} embeds={false} />
             {withdrawn && <p className="muted note">Its author has since withdrawn this.</p>}
             {unopened && <p role="alert" className="error">It cannot be opened as it is. Refresh, and try once more.</p>}
@@ -575,7 +575,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                         <Identity did={shown.memeplex!.author} />
                         <time>{when(shown)}</time>
                     </header>
-                    {shown.memeplex!.title && <h3>{shown.memeplex!.title}</h3>}
+                    <Titled object={shown.memeplex!} />
                     <Body object={shown.memeplex!} />
                     {withdrawn && <p className="muted note">Its author has since withdrawn this post.</p>}
                 </div>
@@ -687,7 +687,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers }: {
             {answers && object.kind === 'reply' && typeof object.target === 'string' && (
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
             )}
-            {object.title && <h3>{object.title}</h3>}
+            <Titled object={object} />
             <Body object={object} full={full} />
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
@@ -703,14 +703,22 @@ function Post({ publication, onOpen, onWithdraw, full, answers }: {
     );
 }
 
-// What an article shows above its body, as it was written.
-function Heading({ title, summary }: { title: string; summary: string }) {
+// What an entry shows above its text, as it was written: its title, and the
+// subtitle a writer may give under it. A summary is a paper's, and is shown
+// under them where there is one.
+function Heading({ title, subtitle = '', summary = '' }: { title: string; subtitle?: string; summary?: string }) {
     return (
         <>
             {title.trim() && <h3>{title.trim()}</h3>}
+            {subtitle.trim() && <p className="subtitle">{subtitle.trim()}</p>}
             {summary.trim() && <p className="text summary">{summary.trim()}</p>}
         </>
     );
+}
+
+// The title and subtitle of an object that has them.
+function Titled({ object }: { object: NonNullable<Publication['memeplex']> }) {
+    return <Heading title={object.title ?? ''} subtitle={typeof object.subtitle === 'string' ? object.subtitle : ''} />;
 }
 
 // A text the reader writes, which is Markdown, with a view of how it will be
@@ -934,13 +942,13 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 }
 
 // An article: a post with a title, whose body the service stores apart from
-// the entry. The summary is what a timeline shows of it.
+// the entry. A timeline shows its title, and the subtitle where it has one.
 function ArticleComposer({ onPublish, onCancel }: {
-    onPublish: (article: { title: string; summary?: string; body: string }) => Promise<void>;
+    onPublish: (article: { title: string; subtitle?: string; body: string }) => Promise<void>;
     onCancel: () => void;
 }) {
     const [title, setTitle] = useState('');
-    const [summary, setSummary] = useState('');
+    const [subtitle, setSubtitle] = useState('');
     const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
     // Whether an image is being stored for what is written.
@@ -951,7 +959,7 @@ function ArticleComposer({ onPublish, onCancel }: {
         setBusy(true);
         setError('');
         try {
-            await onPublish({ title: title.trim(), ...(summary.trim() ? { summary: summary.trim() } : {}), body });
+            await onPublish({ title: title.trim(), ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}), body });
         }
         catch (failure) {
             setError(message(failure));
@@ -966,8 +974,8 @@ function ArticleComposer({ onPublish, onCancel }: {
                 <input value={title} disabled={busy} onChange={event => setTitle(event.target.value)} />
             </label>
             <label>
-                Summary
-                <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
+                Subtitle
+                <input value={subtitle} disabled={busy} maxLength={300} onChange={event => setSubtitle(event.target.value)} />
             </label>
             <Draft
                 label="Article"
@@ -975,7 +983,7 @@ function ArticleComposer({ onPublish, onCancel }: {
                 onChange={setBody}
                 disabled={busy}
                 rows={14}
-                before={<Heading title={title} summary={summary} />}
+                before={<Heading title={title} subtitle={subtitle} />}
                 onStoring={setStoring}
             />
             {error && <p role="alert" className="error">{error}</p>}
@@ -991,8 +999,9 @@ interface Waiting {
     did: string;
     // A post's or a reply's text, which is Markdown.
     text?: string;
-    // An article's title, which is shown as it was written.
+    // An article's title and subtitle, which are shown as they were written.
     title?: string;
+    subtitle?: string;
     target?: string;
     // The chain it waits to be anchored on, once the service has said.
     registry?: string;
@@ -1015,6 +1024,7 @@ function readWaiting(reader: string): Waiting[] {
                 did: each.did,
                 ...(typeof each.text === 'string' ? { text: each.text } : {}),
                 ...(typeof each.title === 'string' ? { title: each.title } : {}),
+                ...(typeof each.subtitle === 'string' ? { subtitle: each.subtitle } : {}),
                 ...(typeof each.target === 'string' ? { target: each.target } : {}),
                 ...(typeof each.registry === 'string' ? { registry: each.registry } : {}),
                 ...(each.failed === true ? { failed: true } : {}),
@@ -1037,7 +1047,7 @@ function Awaited({ entry, author, onDismiss }: { entry: Waiting; author: string;
                     {entry.failed ? 'Not published' : ['Waiting to be anchored', ...(entry.registry ? ['on', entry.registry] : [])].join(' ')}
                 </span>
             </header>
-            {entry.title !== undefined && <h3>{entry.title}</h3>}
+            {entry.title !== undefined && <Heading title={entry.title} subtitle={entry.subtitle} />}
             {entry.text !== undefined && <Markdown text={entry.text} />}
             {entry.failed && (
                 <footer>
@@ -1234,7 +1244,10 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     const article = object.text === undefined && object.content !== undefined;
     const [text, setText] = useState(object.text ?? '');
     const [title, setTitle] = useState(object.title ?? '');
+    const [subtitle, setSubtitle] = useState(typeof object.subtitle === 'string' ? object.subtitle : '');
     const [summary, setSummary] = useState(typeof object.summary === 'string' ? object.summary : '');
+    // A summary is a paper's. An article that was given one keeps the place to change it.
+    const summarized = object.kind === 'paper' || typeof object.summary === 'string';
     // The body as the service holds it, once it has been read.
     const [held, setHeld] = useState<string | undefined>(undefined);
     const [body, setBody] = useState('');
@@ -1285,12 +1298,13 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
             // A body that has not changed is the one the entry already refers
             // to. A changed one is sent, and the service stores it.
-            const { content, summary: _summary, ...rest } = fields;
+            const { content, summary: _summary, subtitle: _subtitle, ...rest } = fields;
 
-            void _summary;
+            void _summary; void _subtitle;
             await api.edit(publication.did!, {
                 ...rest,
                 title: title.trim(),
+                ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
                 // A paper has a summary, which may be empty. A post has one or none.
                 ...(summary.trim() || object.kind === 'paper' ? { summary: summary.trim() } : {}),
                 ...(body === held ? { content } : { body }),
@@ -1304,7 +1318,9 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     };
 
     if (article) {
-        const unchanged = title.trim() === object.title && summary.trim() === (typeof object.summary === 'string' ? object.summary : '') && body === held;
+        const unchanged = title.trim() === object.title && body === held
+            && subtitle.trim() === (typeof object.subtitle === 'string' ? object.subtitle : '')
+            && summary.trim() === (typeof object.summary === 'string' ? object.summary : '');
 
         return (
             <div className="composer">
@@ -1313,16 +1329,22 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                     <input value={title} disabled={busy} onChange={event => setTitle(event.target.value)} />
                 </label>
                 <label>
-                    Summary
-                    <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
+                    Subtitle
+                    <input value={subtitle} disabled={busy} maxLength={300} onChange={event => setSubtitle(event.target.value)} />
                 </label>
+                {summarized && (
+                    <label>
+                        Summary
+                        <textarea value={summary} disabled={busy} onChange={event => setSummary(event.target.value)} rows={2} />
+                    </label>
+                )}
                 <Draft
                     label="Article"
                     value={body}
                     onChange={setBody}
                     disabled={busy || held === undefined}
                     rows={14}
-                    before={<Heading title={title} summary={summary} />}
+                    before={<Heading title={title} subtitle={subtitle} summary={summary} />}
                     onStoring={setStoring}
                 />
                 {error && <p role="alert" className="error">{error}</p>}
@@ -1653,7 +1675,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                     return Boolean(each.failed) === failed && each.registry === registry
                         ? [each]
-                        : [{ did: each.did, text: each.text, title: each.title, target: each.target, registry, ...(failed ? { failed } : {}) }];
+                        : [{ did: each.did, text: each.text, title: each.title, subtitle: each.subtitle, target: each.target, registry, ...(failed ? { failed } : {}) }];
                 });
 
                 return next.length === now.length && next.every((each, index) => each === now[index]) ? now : next;
@@ -1749,7 +1771,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                 onPublish={async article => {
                                     const did = await api.publish({ kind: 'post', ...article });
 
-                                    setWaiting(current => [...current, { did, title: article.title }]);
+                                    setWaiting(current => [...current, { did, title: article.title, ...(article.subtitle ? { subtitle: article.subtitle } : {}) }]);
                                     setWriting(false);
                                 }}
                             />

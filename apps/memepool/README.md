@@ -21,8 +21,9 @@ publishes for the user under their grant. Everything they read comes from the
    node resolves it by.
 4. **Post and reply.** What the reader publishes is shown as waiting until its chain
    anchors it and the indexer has it: it is not a publication before then.
-   **An article** is a post with a title, a summary and a body. The body is sent to
-   the service, which stores it; a timeline shows the title and summary, and the
+   **An article** is a post with a title, a subtitle if the writer gives one, and a
+   body. A writer is asked for no summary: that is a paper's, its abstract. The body is sent to
+   the service, which stores it; a timeline shows the title and subtitle, and the
    body is read when the article is opened, from the node, by the CID its entry
    gives.
 

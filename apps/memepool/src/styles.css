@@ -90,6 +90,7 @@ button.identity.visit:hover strong, button.identity.visit:hover .mono, button.id
 .avatar img.loaded { opacity: 1; background: var(--line); }
 
 .post .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; }
+.post .subtitle { margin: 0 0 0.5rem; color: var(--soft); font-size: 1.05rem; overflow-wrap: anywhere; }
 .post .summary { font-style: italic; }
 
 /* Markdown is laid out by its own elements, and not by the line breaks in it. */
