@@ -574,7 +574,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 <div className="original">
                     <header>
                         <Identity did={shown.memeplex!.author} />
-                        <time>{when(shown)}</time>
+                        <a className="when" href={hashOf({ publication: address })} title="Link to this"><time>{when(shown)}</time></a>
                     </header>
                     <Titled object={shown.memeplex!} />
                     <Body object={shown.memeplex!} />
@@ -585,6 +585,8 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
             <footer>
                 {onOpen && shown && !withdrawn && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
+                {/* The link and the DID are the post's, which is what a boost is of. */}
+                <Copy text={linkTo({ publication: address })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ publication: address })}`} />
                 <Copy text={address} label="Copy DID" unable={`Could not copy. The DID is ${address}`} />
             </footer>
         </article>
@@ -1601,7 +1603,8 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         if (mine !== arrivals.current) {
             return;
         }
-        if (found) {
+        // What its author withdrew is published no longer.
+        if (found?.state === 'published' && found.memeplex) {
             setOpen(found);
             return;
         }

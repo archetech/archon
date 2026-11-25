@@ -2584,6 +2584,33 @@ describe('the address of what is shown', () => {
         expect(screen.queryByRole('alert')).toBeNull();
     });
 
+    it('opens nothing its author has withdrawn', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.', { state: 'withdrawn' });
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    });
+
+    it('gives a boost the link of the post it is of', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted, timeline: [boost] });
+        state.known['did:cid:2'] = original;
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        const copied: string[] = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied.push(text); } } });
+        render(<App api={api} />);
+
+        const article = (await screen.findByText('From Bob.')).closest('article')!;
+
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:2');
+        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:2`]));
+    });
+
     it('does not show a publication an address named once the reader has gone elsewhere', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         let answer!: (found: Publication) => void;
