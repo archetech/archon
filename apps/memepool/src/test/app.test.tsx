@@ -2764,6 +2764,50 @@ describe('a visitor, who has not signed in', () => {
         expect(await screen.findByLabelText('Reply')).toBeTruthy();
     });
 
+    it('keeps a sign-in that is under way when they go back from what they were reading, and return', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockResolvedValue({ answered: ALICE });
+        at('#/p/did:cid:2');
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        expect(await screen.findByRole('button', { name: 'This is me' })).toBeTruthy();
+
+        // Back from the post, to where the address names nothing.
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await waitFor(() => expect(screen.queryByText('From Bob.')).toBeNull());
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+
+        window.history.replaceState(null, '', '/#/p/did:cid:2');
+        fireEvent(window, new PopStateEvent('popstate'));
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'This is me' })).toBeTruthy();
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not left waiting when they go back while a link within what they read is looked up', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Bob.');
+        // A link to another publication is followed, and its lookup does not answer.
+        vi.mocked(api.publication).mockImplementation(() => new Promise(() => undefined));
+        window.history.pushState(null, '', '/#/p/did:cid:1');
+        fireEvent(window, new PopStateEvent('popstate'));
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+
+        expect(await screen.findByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+        expect(screen.queryByText('Loading…')).toBeNull();
+    });
+
     it('is a visitor once more after signing out, at what was being read', async () => {
         const { api, state } = services({ me: granted, timeline: both() });
         state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');

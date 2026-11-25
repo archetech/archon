@@ -1591,6 +1591,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         addressed.current = address;
         arrivals.current += 1;
         setLost('');
+        setArriving(false);
         if (address !== window.location.hash) {
             window.history.pushState(null, '', address || `${window.location.pathname}${window.location.search}`);
         }
@@ -1851,19 +1852,10 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         onSignedOut();
     };
 
-    const signIn = visitor && onSignedIn && <SignIn api={api} onSignedIn={onSignedIn} pollMs={pollMs ?? 3000} />;
-
     // A visitor whose address names nothing has nothing to read, and signs in.
-    if (visitor && !open && !author) {
-        return (
-            <main>
-                <h1>Memepool</h1>
-                {error && <p role="alert" className="error">{error}</p>}
-                {lost && <p role="alert" className="error">{lost}</p>}
-                {arriving ? <p className="muted">Loading…</p> : signIn}
-            </main>
-        );
-    }
+    // The sign-in is at one place in the page wherever the visitor goes, so
+    // that one under way is not put away by going somewhere else.
+    const nowhere = visitor && !open && !author;
 
     return (
         <Ways visit={visit} open={setOpen} gone={gone} embedding={embedding} upload={me.grant ? api.upload : undefined}>
@@ -1872,15 +1864,16 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                     <h1>Memepool</h1>
                     {!visitor && <Identity did={me.did} />}
                     {!visitor && <button className="quiet" onClick={signOut}>Sign out</button>}
-                    {visitor && !signing && <button className="quiet" onClick={() => setSigning(true)}>Sign in</button>}
+                    {visitor && !nowhere && !signing && <button className="quiet" onClick={() => setSigning(true)}>Sign in</button>}
                 </header>
 
-                {signing && signIn}
+                {visitor && onSignedIn && (signing || (nowhere && !arriving)) && <SignIn api={api} onSignedIn={onSignedIn} pollMs={pollMs ?? 3000} />}
+                {nowhere && arriving && <p className="muted">Loading…</p>}
                 {!visitor && !me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
                 {error && <p role="alert" className="error">{error}</p>}
                 {lost && <p role="alert" className="error">{lost}</p>}
 
-                {open ? (
+                {nowhere ? null : open ? (
                     <Thread
                         key={open.did}
                         api={api}
