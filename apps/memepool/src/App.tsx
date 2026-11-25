@@ -901,6 +901,12 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
                                 if (!upload || storing) {
                                     return;
                                 }
+                                // What was copied as text is pasted as text. A spreadsheet or a
+                                // document puts a picture of what was copied on the clipboard
+                                // beside its words, and that picture is not what the reader meant.
+                                if ([...event.clipboardData.items].some(item => item.kind === 'string' && item.type === 'text/plain')) {
+                                    return;
+                                }
                                 // The first file on the clipboard, which is an image copied from
                                 // a page or another app, or a screenshot. Pasting more than one
                                 // at a time is left to the Add image button, one at a time.

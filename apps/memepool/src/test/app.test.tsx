@@ -1680,6 +1680,27 @@ describe('adding an image to what is written', () => {
         await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: 'Before.\n\n![image](did:cid:bagaaieraimage?versionId=bafyimage)\n\n After.' }]));
     });
 
+    // A spreadsheet or a document copies a picture of the selection beside its words.
+    it('pastes what was copied as text as text, though a picture of it is on the clipboard as well', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+        const picture = { kind: 'file', type: 'image/png', getAsFile: () => file('image.png', 'image/png') };
+        const words = { kind: 'string', type: 'text/plain' };
+        const markup = { kind: 'string', type: 'text/html' };
+
+        for (const items of [[words, markup, picture], [picture, words], [markup, picture, words]]) {
+            // The paste is left to the browser, which puts the words in.
+            expect(fireEvent.paste(area, { clipboardData: { items } })).toBe(true);
+        }
+        expect(api.upload).not.toHaveBeenCalled();
+
+        // An image copied from a page has its markup beside it and no words, and is taken.
+        expect(fireEvent.paste(area, { clipboardData: { items: [markup, picture] } })).toBe(false);
+        await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(area.value).toContain('![image](did:cid:bagaaieraimage?versionId=bafyimage)'));
+    });
+
     it('leaves text pasted into the text box alone, and stores no image for what is no file', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
