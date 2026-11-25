@@ -475,10 +475,20 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         res.json(true);
     });
 
+    // What a publication is shown with is read by anyone, as the publication
+    // itself is from the indexer: who its author says they are, their avatar,
+    // and the images its text embeds. Everything else is for a user who has
+    // signed in.
+    const open = (req: Request): boolean => req.method === 'GET' && /^\/(identities|avatars|images)\/[^/]+$/.test(req.path);
+
     router.use((req: Request, res: Response, next: NextFunction) => {
         const token = cookieOf(req);
         const user = token ? sessions.get(token) : undefined;
 
+        if (!user && open(req)) {
+            next();
+            return;
+        }
         if (!user) {
             res.status(401).json({ error: 'not signed in' });
             return;
@@ -719,7 +729,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const none = () => { res.status(404).json({ error: 'no object of yours that this service published' }); };
         const did = String(req.params.did);
 
-        if (!did.startsWith('did:')) {
+        if (!isDid(did)) {
             none();
             return;
         }
@@ -753,7 +763,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // passed on only when that domain says the address is this identity's.
     //
     // Asking a domain is a request to somewhere a stranger chose, so what is
-    // found out is kept a while, and it is for a user who has signed in.
+    // found out is kept a while.
     const identities = new Expiring<Promise<{ name?: string; address?: string }>>(IDENTITY_KEPT, now);
     const identityOf = async (did: string): Promise<{ name?: string; address?: string }> => {
         const doc = await keymaster.resolveDID(did);
@@ -796,7 +806,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.get('/identities/:did', async (req, res) => {
         const did = String(req.params.did);
 
-        if (!did.startsWith('did:')) {
+        if (!isDid(did)) {
             res.status(404).json({ error: 'no such identity' });
             return;
         }
@@ -818,7 +828,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // not store it. What it says of its own size is its owner's claim, used to
     // refuse early, and no more than the limit is read whatever it says.
     const imageOf = async (did: string, serves: { types: Set<string>; limit: number; pixels?: number; versionId?: string }): Promise<{ type: string; data: Buffer } | null> => {
-        if (!images || !did.startsWith('did:')) {
+        if (!images || !isDid(did)) {
             return null;
         }
 
@@ -844,15 +854,13 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // An identity's avatar: the image asset its document names as `avatar`,
     // which is where a wallet puts one. It is whatever the identity's owner
     // chose, so it is served only as an image of a kind and size the service
-    // accepts, and a browser is told not to take it for anything else. Reading
-    // one has the node look for bytes a stranger named, so it is for a user who
-    // has signed in, as the rest of what is below is.
+    // accepts, and a browser is told not to take it for anything else.
     router.get('/avatars/:did', async (req, res) => {
         const none = () => { res.status(404).json({ error: 'no avatar' }); };
 
         // Only a DID is resolved: a name would have the wallet look it up, and
         // an address would have it ask the address's domain.
-        if (!images || !String(req.params.did).startsWith('did:')) {
+        if (!images || !isDid(String(req.params.did))) {
             none();
             return;
         }
@@ -967,7 +975,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
 
         try {
-            const image = versionId && String(req.params.did).startsWith('did:')
+            const image = versionId && isDid(String(req.params.did))
                 ? await imageOf(String(req.params.did), { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS, versionId })
                 : null;
 
@@ -992,6 +1000,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     return router;
 }
+
+// Whether a string has the shape of a DID. One from a request or from a
+// stranger's document is asked of the node only where it has: the node's
+// client puts it in the path of its request, where anything else would name
+// something other than a DID.
+const isDid = (did: string): boolean => /^did:[a-z0-9]+:[A-Za-z0-9._%-]{1,200}$/.test(did);
 
 export function createMemepoolApp(options: MemepoolOptions): express.Express {
     const app = express();
