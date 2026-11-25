@@ -2,11 +2,31 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
 
 GATEKEEPER_TIMEOUT_SECONDS = 30.0
+
+
+def _segment(value: Any) -> str:
+    """One value as one segment of a request's path.
+
+    A value put into a path as it is can name another path: a slash starts a
+    new segment, and a segment of dots is taken away with the one before it
+    when the address is read. Encoded, it is one segment whatever it holds. A
+    colon is left as it is, since it separates nothing in a path and DIDs and
+    registry names are full of them.
+
+    A value that is nothing but one or two dots cannot be a segment at all: no
+    encoding of it arrives as itself, and another spelling of it would arrive
+    as another name. It is refused before anything is sent.
+    """
+    text = str(value)
+    if text in (".", ".."):
+        raise ValueError(f'Invalid parameter: "{text}" cannot be part of a request\'s path')
+    return quote(text, safe=":")
 
 
 class GatekeeperTimeoutError(Exception):
@@ -88,7 +108,7 @@ class GatekeeperClient:
         return response.json()
 
     async def resolve_did(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
-        response = await self._client.get(f"/did/{did}", params=options or {})
+        response = await self._client.get(f"/did/{_segment(did)}", params=options or {})
         response.raise_for_status()
         return response.json()
 
@@ -103,7 +123,7 @@ class GatekeeperClient:
         return bool(response.json())
 
     async def get_block(self, registry: str, block: str | None = None) -> dict[str, Any] | None:
-        path = f"/block/{registry}/{block}" if block else f"/block/{registry}/latest"
+        path = f"/block/{_segment(registry)}/{_segment(block)}" if block else f"/block/{_segment(registry)}/latest"
         response = await self._client.get(path)
         response.raise_for_status()
         return response.json()
@@ -123,7 +143,7 @@ class GatekeeperClient:
         return response.text
 
     async def get_data(self, cid: str) -> bytes | None:
-        response = await self._client.get(f"/ipfs/data/{cid}")
+        response = await self._client.get(f"/ipfs/data/{_segment(cid)}")
         if response.status_code == 404:
             return None
         response.raise_for_status()
@@ -139,7 +159,7 @@ class GatekeeperClient:
         return response.text
 
     async def get_text(self, cid: str) -> str | None:
-        response = await self._client.get(f"/ipfs/text/{cid}")
+        response = await self._client.get(f"/ipfs/text/{_segment(cid)}")
         if response.status_code == 404:
             return None
         response.raise_for_status()
@@ -176,7 +196,7 @@ class GatekeeperClient:
         return response.json()
 
     async def unpublish_lightning(self, did: str) -> bool:
-        response = await self._client.delete(f"/lightning/publish/{did}")
+        response = await self._client.delete(f"/lightning/publish/{_segment(did)}")
         response.raise_for_status()
         return bool(response.json().get("ok"))
 
