@@ -762,7 +762,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting }: {
                 {/* A post's DID is its address: what another wallet or node resolves it by. */}
                 {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
                 {/* What another text is given to show this version of the post inside it. */}
-                {publication.did && shownVersion(publication) && (
+                {publication.did && shownVersion(publication) && !waiting && (
                     <Copy text={embedFor(publication)} label="Copy embed" unable={`Could not copy. The embed is ${embedFor(publication)}`} />
                 )}
             </footer>
@@ -1889,7 +1889,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         show();
         inTurn(own.filter(post => !found.has(`${post.did} ${versionKey(post)}`)), async post => {
             found.set(`${post.did} ${versionKey(post)}`, awaited(post, await api.unanchored(post.did!).catch(() => undefined)) ?? null);
-        }).then(show);
+            // Each as it is read: one the node is slow to give keeps no other from showing.
+            show();
+        });
     }, [api, me.did, timeline, refreshes]);
 
     // How an embed in a text is shown: an object at its version from the
@@ -2099,7 +2101,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                     publication={each.did && edits[each.did] ? { ...each, memeplex: edits[each.did] } : each}
                                     waiting={Boolean(each.did && edits[each.did])}
                                     answers
-                                    onOpen={setOpen}
+                                    onOpen={opened => setOpen(opened.did === each.did ? each : opened)}
                                     onWithdraw={changeable(each)
                                         ? async () => {
                                             try {

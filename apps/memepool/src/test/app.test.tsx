@@ -2545,6 +2545,9 @@ describe('editing', () => {
 
         expect(within(article).getByText('Edit waiting to be anchored')).toBeTruthy();
         expect(screen.queryByText('As it was.')).toBeNull();
+        // An embed is of a version, and the one listed is the version before the edit.
+        expect(within(article).queryByRole('button', { name: 'Copy embed' })).toBeNull();
+        expect(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Copy embed' })).toBeTruthy();
         expect(screen.getByText('From Bob.')).toBeTruthy();
         expect(screen.queryByText('Not yet.')).toBeNull();
         expect(api.unanchored).not.toHaveBeenCalledWith('did:cid:2');
@@ -2643,6 +2646,31 @@ describe('editing', () => {
 
         await user.click(screen.getByRole('button', { name: 'Refresh' }));
         await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(110));
+    });
+
+    it('lists each waiting edit as the node gives it, and opens the post as it is anchored where nothing more can be read', async () => {
+        const one = under(post('did:cid:1', ALICE, 'One, as it was.'), 'did:cid:grant');
+        const two = under(post('did:cid:2', ALICE, 'Two, as it was.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [one, two] });
+        const node = vi.mocked(api.unanchored).getMockImplementation()!;
+        state.unanchored['did:cid:2'] = { versionId: 'op-edit', memeplex: { ...two.memeplex!, text: 'Two, as I left it.' } };
+        // The node never answers for the first.
+        vi.mocked(api.unanchored).mockImplementation(did => (did === 'did:cid:1' ? new Promise(() => undefined) : node(did)));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const article = (await screen.findByText('Two, as I left it.')).closest('article')!;
+
+        expect(screen.getByText('One, as it was.')).toBeTruthy();
+
+        // Opened where the indexer and the node can say nothing more, it is what is anchored.
+        vi.mocked(api.publication).mockResolvedValue(undefined);
+        vi.mocked(api.unanchored).mockRejectedValue(new Error('no node'));
+        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+        expect(await screen.findByText('Two, as it was.')).toBeTruthy();
+        expect(screen.queryByText('Two, as I left it.')).toBeNull();
     });
 
     it('saves nothing from an editor that was open when an edit was found to be waiting', async () => {
