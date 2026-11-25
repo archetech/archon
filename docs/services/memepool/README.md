@@ -48,7 +48,6 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `PUT /objects/:did` | Replaces one of the user's objects with another version |
 | `DELETE /objects/:did` | Withdraws one of the user's objects |
 | `GET /objects/:did/state` | Where an object the user published through this service stands: `{ state, registry? }`, with `pending` while it waits to be anchored and `none` when it never will be |
-| `GET /objects/:did/content` | The body of an article the service published, as `text/markdown`: of its latest version, or of the one `?versionId=` names |
 | `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
 | `POST /images` | Stores an image the user means to embed, sent as `application/octet-stream`, and makes an image asset of it; returns its `did`, `versionId`, `type`, `bytes`, `width` and `height` |
 | `GET /images/:did?versionId=` | An image asset at a version, as the image it is, for text that embeds it; 404 for anything else |
@@ -155,12 +154,10 @@ service stores the content of what it publishes and takes none on trust.
   `content`, `pdf` or `source` is refused, since those would be bytes the service
   never saw and does not keep. An edit may send back the reference the entry already
   has, to leave its body as it is, or a new `body` to replace it.
-- **It reads the body of what it published, and no other.** `GET /objects/:did/content`
-  answers 404 for an entry the service did not create: such an entry can refer to
-  anything, of any size. That includes one that was created elsewhere and then
-  transferred to the service, which an asset's owner can do to any identity. A reader
-  asks for the body of the version it is showing, with `versionId`, since the latest
-  version may be an edit that is not anchored yet.
+- **It reads no body back.** Publishing is what this service is for. An article's
+  body is on IPFS under the CID its entry gives, and the node serves it to whoever
+  asks (`GET /api/v1/ipfs/text/:cid`), which is where the pages read it: an article
+  is read on any node, and not only the one it was published through.
 - **It stores a body only for an object it would publish.** The object is checked
   first, with the grant's scope and what an edit may change, so that a request it
   refuses leaves nothing pinned.
