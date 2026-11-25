@@ -2125,6 +2125,14 @@ describe('an article', () => {
         await waitFor(() => expect(state.published).toStrictEqual([
             { kind: 'post', title: 'On DIDs', subtitle: 'What they are for.', body: 'Every post is one.' },
         ]));
+        // What waits to be anchored has the subtitle the preview showed, and keeps it when the page is read anew.
+        const waiting = (await screen.findByRole('heading', { name: 'On DIDs' })).closest('.waiting') as HTMLElement;
+        expect(within(waiting).getByText('What they are for.').className).toBe('subtitle');
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)).toMatchObject([{ title: 'On DIDs', subtitle: 'What they are for.' }]);
+        state.states[JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)[0].did] = { state: 'pending', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(within(waiting).getByRole('status').textContent).toBe('Waiting to be anchored on BTC:mainnet'));
+        expect(within(waiting).getByText('What they are for.')).toBeTruthy();
         // Waiting to be anchored, under its title, and the short form is back.
         expect((await screen.findByRole('heading', { name: 'On DIDs' })).closest('.waiting')).not.toBeNull();
         expect(screen.getByLabelText('Post')).toBeTruthy();

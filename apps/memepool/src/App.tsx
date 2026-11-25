@@ -999,8 +999,9 @@ interface Waiting {
     did: string;
     // A post's or a reply's text, which is Markdown.
     text?: string;
-    // An article's title, which is shown as it was written.
+    // An article's title and subtitle, which are shown as they were written.
     title?: string;
+    subtitle?: string;
     target?: string;
     // The chain it waits to be anchored on, once the service has said.
     registry?: string;
@@ -1023,6 +1024,7 @@ function readWaiting(reader: string): Waiting[] {
                 did: each.did,
                 ...(typeof each.text === 'string' ? { text: each.text } : {}),
                 ...(typeof each.title === 'string' ? { title: each.title } : {}),
+                ...(typeof each.subtitle === 'string' ? { subtitle: each.subtitle } : {}),
                 ...(typeof each.target === 'string' ? { target: each.target } : {}),
                 ...(typeof each.registry === 'string' ? { registry: each.registry } : {}),
                 ...(each.failed === true ? { failed: true } : {}),
@@ -1045,7 +1047,7 @@ function Awaited({ entry, author, onDismiss }: { entry: Waiting; author: string;
                     {entry.failed ? 'Not published' : ['Waiting to be anchored', ...(entry.registry ? ['on', entry.registry] : [])].join(' ')}
                 </span>
             </header>
-            {entry.title !== undefined && <h3>{entry.title}</h3>}
+            {entry.title !== undefined && <Heading title={entry.title} subtitle={entry.subtitle} />}
             {entry.text !== undefined && <Markdown text={entry.text} />}
             {entry.failed && (
                 <footer>
@@ -1673,7 +1675,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                     return Boolean(each.failed) === failed && each.registry === registry
                         ? [each]
-                        : [{ did: each.did, text: each.text, title: each.title, target: each.target, registry, ...(failed ? { failed } : {}) }];
+                        : [{ did: each.did, text: each.text, title: each.title, subtitle: each.subtitle, target: each.target, registry, ...(failed ? { failed } : {}) }];
                 });
 
                 return next.length === now.length && next.every((each, index) => each === now[index]) ? now : next;
@@ -1769,7 +1771,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                 onPublish={async article => {
                                     const did = await api.publish({ kind: 'post', ...article });
 
-                                    setWaiting(current => [...current, { did, title: article.title }]);
+                                    setWaiting(current => [...current, { did, title: article.title, ...(article.subtitle ? { subtitle: article.subtitle } : {}) }]);
                                     setWriting(false);
                                 }}
                             />
