@@ -2060,25 +2060,25 @@ describe('previewing what is written', () => {
         expect(screen.getByLabelText('Post')).toBeTruthy();
     });
 
-    it('shows an article with its title and summary above its body', async () => {
+    it('shows an article with its title and subtitle above its body', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
         const user = userEvent.setup();
 
         await user.click(await screen.findByRole('button', { name: 'Write an article' }));
         await user.type(screen.getByLabelText('Title'), 'On DIDs');
-        await user.type(screen.getByLabelText('Summary'), 'A summary.');
+        await user.type(screen.getByLabelText('Subtitle'), 'What they are for.');
         await user.type(screen.getByLabelText('Article'), '## A section{Enter}{Enter}- one{Enter}- two');
         await user.click(screen.getByRole('tab', { name: 'Preview' }));
 
         const preview = screen.getByRole('tabpanel', { name: 'Article preview' });
         expect(within(preview).getByRole('heading', { name: 'On DIDs' })).toBeTruthy();
-        expect(within(preview).getByText('A summary.')).toBeTruthy();
+        expect(within(preview).getByText('What they are for.').className).toBe('subtitle');
         expect(within(preview).getByRole('heading', { name: 'A section' })).toBeTruthy();
         expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
         // The body is set apart from what is above it, as an opened article's is.
         expect(preview.querySelector('.markdown')?.classList.contains('article')).toBe(true);
-        // The title and summary are still there to change.
+        // The title and subtitle are still there to change.
         expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('On DIDs');
     });
 
@@ -2108,7 +2108,7 @@ describe('an article', () => {
         memeplex: { kind: 'post', author, title: 'On DIDs', summary: 'A summary.', content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length }, v: 1 },
     }, 'did:cid:grant');
 
-    it('is written with a title, a summary and a body, which the service is sent to store', async () => {
+    it('is written with a title, a subtitle if the writer gives one, and a body, which the service is sent to store', async () => {
         const { api, state } = services({ me: granted });
         render(<App api={api} />);
         const user = userEvent.setup();
@@ -2116,16 +2116,70 @@ describe('an article', () => {
         await user.click(await screen.findByRole('button', { name: 'Write an article' }));
         expect((screen.getByRole('button', { name: 'Publish article' }) as HTMLButtonElement).disabled).toBe(true);
         await user.type(screen.getByLabelText('Title'), 'On DIDs');
-        await user.type(screen.getByLabelText('Summary'), 'A summary.');
+        // A writer is asked for no summary: that is a paper's.
+        expect(screen.queryByLabelText('Summary')).toBeNull();
+        await user.type(screen.getByLabelText('Subtitle'), ' What they are for. ');
         await user.type(screen.getByLabelText('Article'), 'Every post is one.');
         await user.click(screen.getByRole('button', { name: 'Publish article' }));
 
         await waitFor(() => expect(state.published).toStrictEqual([
-            { kind: 'post', title: 'On DIDs', summary: 'A summary.', body: 'Every post is one.' },
+            { kind: 'post', title: 'On DIDs', subtitle: 'What they are for.', body: 'Every post is one.' },
         ]));
         // Waiting to be anchored, under its title, and the short form is back.
         expect((await screen.findByRole('heading', { name: 'On DIDs' })).closest('.waiting')).not.toBeNull();
         expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('is written with no subtitle, and then has none', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), 'On DIDs');
+        await user.type(screen.getByLabelText('Article'), 'Every post is one.');
+        await user.click(screen.getByRole('button', { name: 'Publish article' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', title: 'On DIDs', body: 'Every post is one.' }]));
+    });
+
+    it('is shown with its subtitle under its title, in a timeline and where it is quoted', async () => {
+        const titled: Publication = { ...post('did:cid:1', ALICE, ''), memeplex: { kind: 'post', author: ALICE, title: 'On DIDs', subtitle: 'What they are for.', content: { cid: 'bafkreibody', type: 'text/markdown', bytes: 4 } } };
+        const { api } = services({ me: granted, timeline: [titled] });
+        render(<App api={api} />);
+
+        const entry = (await screen.findByRole('heading', { name: 'On DIDs' })).closest('article')!;
+        const subtitle = within(entry).getByText('What they are for.');
+
+        expect(subtitle.className).toBe('subtitle');
+        // Under the title, and above what says to open it.
+        expect(entry.querySelector('h3')!.nextElementSibling).toBe(subtitle);
+        expect(within(entry).getByText('Open it to read the full text.')).toBeTruthy();
+    });
+
+    it('has its subtitle changed, added and taken away by an edit, and keeps a summary it was given', async () => {
+        const first: Publication = under({
+            ...post('did:cid:1', ALICE, ''),
+            memeplex: { kind: 'post', author: ALICE, title: 'On DIDs', subtitle: 'What they are for.', summary: 'An old summary.', content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length }, v: 1 },
+        }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [first] });
+        state.bodies.bafkreibody = BODY;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        expect((screen.getByLabelText('Subtitle') as HTMLInputElement).value).toBe('What they are for.');
+        // An article that was given a summary keeps the place to change it.
+        expect((screen.getByLabelText('Summary') as HTMLTextAreaElement).value).toBe('An old summary.');
+
+        await user.clear(screen.getByLabelText('Subtitle'));
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(state.edited).toHaveLength(1));
+        expect(state.edited[0].object).not.toHaveProperty('subtitle');
+        expect(state.edited[0].object).toMatchObject({ title: 'On DIDs', summary: 'An old summary.' });
     });
 
     it('shows a waiting article\'s title as it was written, and a waiting post\'s text as Markdown', async () => {

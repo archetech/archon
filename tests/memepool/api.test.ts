@@ -815,6 +815,15 @@ describe('an article', () => {
         expect(await gatekeeper.getText(published.content.cid)).toBe(BODY);
     }, 120_000);
 
+    it('publishes an article with the subtitle a writer gives it', async () => {
+        const { agent } = await granted(alice);
+        const { did } = (await agent.post('/api/v1/objects').send({ kind: 'post', title: 'On DIDs', subtitle: 'What they are for.', body: BODY })).body;
+
+        expect(await objectOf(did)).toMatchObject({ kind: 'post', title: 'On DIDs', subtitle: 'What they are for.' });
+        // A subtitle is of a title: with none, there is nothing for it to be under.
+        expect((await agent.post('/api/v1/objects').send({ kind: 'post', subtitle: 'Of nothing.', text: 'A post.' })).status).toBe(400);
+    }, 120_000);
+
     it('takes no reference to content it has not stored', async () => {
         const { agent } = await granted(alice);
         const elsewhere = { cid: await gatekeeper.addText('kept by someone else'), type: 'text/markdown', bytes: 20 };
