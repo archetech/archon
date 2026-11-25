@@ -220,7 +220,7 @@ export async function startMemepool(
         pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
         registries: () => gatekeeper.listRegistries(),
         // The node's IPFS pins what is added to it.
-        content: { add: text => gatekeeper.addText(text), get: cid => gatekeeper.getText(cid) },
+        content: { add: text => gatekeeper.addText(text) },
         images: { get: (cid, limit) => readData(settings.gatekeeperURL, cid, limit) },
         addresses: { owner: (address, signal) => addressOwner(address, signal) },
         version,

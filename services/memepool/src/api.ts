@@ -29,11 +29,10 @@ export interface LoginKeymaster {
 }
 
 // Where the service keeps the content of what it publishes: its node's IPFS,
-// which pins what is added to it. `add` gives the CID of a text, and `get` the
-// text of a CID.
+// which pins what is added to it. `add` gives the CID of a text. Reading one
+// back is the node's to do, for whoever asks it.
 export interface ContentStore {
     add(text: string): Promise<string>;
-    get(cid: string): Promise<string | null>;
 }
 
 // Where the service reads an image from: its node's IPFS. `get` gives the bytes
@@ -742,33 +741,6 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         }
         catch {
             none();
-        }
-    });
-
-    router.get('/objects/:did/content', async (req, res) => {
-        const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
-        const object = content ? await publishedHere(String(req.params.did), versionId).catch(() => undefined) : undefined;
-        const reference = object?.content;
-
-        if (!content || typeof reference?.cid !== 'string' || reference.type !== 'text/markdown'
-            || !Number.isSafeInteger(reference.bytes) || reference.bytes > BODY_LIMIT) {
-            res.status(404).json({ error: 'no body the service holds' });
-            return;
-        }
-
-        try {
-            const text = await content.get(reference.cid);
-
-            if (typeof text !== 'string') {
-                throw new Error('the node has no such content');
-            }
-            // Text a user wrote, served from the pages' own origin: a browser
-            // is told what it is and not to take it for anything else.
-            res.setHeader('X-Content-Type-Options', 'nosniff');
-            res.type('text/markdown; charset=utf-8').send(text);
-        }
-        catch {
-            res.status(502).json({ error: 'the node does not have the body' });
         }
     });
 

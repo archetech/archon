@@ -76,10 +76,9 @@ export interface Api {
     // to it cites. 'no-revision' when that version is not in its history: no
     // other version stands in for it.
     revision(did: string, versionId: string): Promise<Publication | 'no-revision' | undefined>;
-    // The body of an article the service published, or nothing when it holds
-    // none for the object. `versionId` names the version whose body is wanted:
-    // the one a reader is shown, where the latest may be an edit not anchored.
-    content(did: string, versionId?: string): Promise<string | undefined>;
+    // The body of an article, read from the node by the CID its entry gives,
+    // or nothing when the node has none.
+    content(cid: string): Promise<string | undefined>;
     // The address of an identity's avatar, which answers 404 when it has none.
     avatar(did: string): string;
     // The address of an image asset at a version, which answers 404 for what
@@ -98,7 +97,7 @@ export interface Person {
     address?: string;
 }
 
-export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
+export function createApi(bases: { memepool: string; memeplex: string; node?: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
     const call = (base: string, path: string, init?: RequestInit): Promise<Response> =>
         fetcher(`${base}/api/v1${path}`, {
             credentials: 'same-origin',
@@ -212,18 +211,11 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
             // not know the question answers with the publication as it is.
             return publication.versions?.[publication.current ?? -1]?.opid === versionId ? publication : undefined;
         },
-        async content(did, versionId) {
-            const version = versionId ? `?versionId=${encodeURIComponent(versionId)}` : '';
-            const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/content${version}`);
+        async content(cid) {
+            // The node serves what is on IPFS itself, to anyone, by its CID.
+            const response = await fetcher(`${bases.node ?? ''}/api/v1/ipfs/text/${encodeURIComponent(cid)}`);
 
-            if (response.status === 404) {
-                return undefined;
-            }
-            if (!response.ok) {
-                throw await failure(response);
-            }
-
-            return response.text();
+            return response.ok ? response.text() : undefined;
         },
         avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,
         image: (did, versionId) => `${bases.memepool}/api/v1/images/${encodeURIComponent(did)}?versionId=${encodeURIComponent(versionId)}`,

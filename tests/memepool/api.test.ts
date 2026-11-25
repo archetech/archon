@@ -97,12 +97,10 @@ async function granted(wallet: Keymaster) {
 }
 
 // Where the service keeps a body: its node's IPFS, as the service wires it.
-// How many bodies the service has stored, and read back.
+// How many bodies the service has stored.
 let stored = 0;
-let read = 0;
 const content = {
     add: (text: string) => { stored += 1; return gatekeeper.addText(text); },
-    get: (cid: string) => { read += 1; return gatekeeper.getText(cid); },
 };
 let limits: number[] = [];
 const images = {
@@ -137,7 +135,6 @@ const objectOf = async (did: string) => ((await gatekeeper.resolveDID(did)).didD
 
 beforeEach(async () => {
     stored = 0;
-    read = 0;
     limits = [];
     owners = {};
     lookups = [];
@@ -818,19 +815,6 @@ describe('an article', () => {
         expect(await gatekeeper.getText(published.content.cid)).toBe(BODY);
     }, 120_000);
 
-    it('gives the body of what it published to a reader, as text a browser will not take for a page', async () => {
-        const { agent } = await granted(alice);
-        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
-        const reader = await signIn(bob);
-        const read = await reader.get(`/api/v1/objects/${did}/content`);
-
-        expect(read.status).toBe(200);
-        expect(read.text).toBe(BODY);
-        expect(read.headers['content-type']).toBe('text/markdown; charset=utf-8');
-        expect(read.headers['x-content-type-options']).toBe('nosniff');
-        expect((await request(app).get(`/api/v1/objects/${did}/content`)).status).toBe(401);
-    }, 120_000);
-
     it('takes no reference to content it has not stored', async () => {
         const { agent } = await granted(alice);
         const elsewhere = { cid: await gatekeeper.addText('kept by someone else'), type: 'text/markdown', bytes: 20 };
@@ -885,53 +869,13 @@ describe('an article', () => {
         const revised = await objectOf(did);
 
         expect(revised.content.cid).not.toBe(first.content.cid);
-        expect((await agent.get(`/api/v1/objects/${did}/content`)).text).toBe(`${BODY}More.\n`);
+        expect(await gatekeeper.getText(revised.content.cid)).toBe(`${BODY}More.\n`);
         // The earlier body is still on the node, for the versions that refer to it.
         expect(await gatekeeper.getText(first.content.cid)).toBe(BODY);
 
         // An edit cannot bring in a reference the entry does not already have.
         const other = { cid: await gatekeeper.addText('another'), type: 'text/markdown', bytes: 7 };
         expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: 'Retitled', content: other })).status).toBe(400);
-    }, 120_000);
-
-    it('reads no body for an entry that has none, or that it did not publish', async () => {
-        const { agent } = await granted(alice);
-        const post = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' })).body.did;
-        // An entry someone else made can refer to anything.
-        const foreign = await alice.createAsset({
-            memeplex: { v: 1, kind: 'post', author: aliceDid, grant: 'did:cid:any', title: 'Elsewhere', content: { cid: await gatekeeper.addText('theirs'), type: 'text/markdown', bytes: 6 } },
-        }, { registry: 'hyperswarm' });
-
-        for (const did of [post, foreign, aliceDid, 'did:cid:unknown']) {
-            expect((await agent.get(`/api/v1/objects/${did}/content`)).status).toBe(404);
-        }
-    }, 120_000);
-
-    it('reads nothing through an entry it did not create, though it has been handed it', async () => {
-        const { agent } = await granted(alice);
-        // An asset can be transferred to any identity, which signs nothing.
-        const foreign = await alice.createAsset({
-            memeplex: { v: 1, kind: 'post', author: aliceDid, grant: 'did:cid:any', title: 'Planted', content: { cid: await gatekeeper.addText('anything at all'), type: 'text/markdown', bytes: 15 } },
-        }, { registry: 'hyperswarm' });
-
-        await alice.transferAsset(foreign, serviceDid);
-        expect((await gatekeeper.resolveDID(foreign)).didDocument?.controller).toBe(serviceDid);
-
-        expect((await agent.get(`/api/v1/objects/${foreign}/content`)).status).toBe(404);
-        expect(read).toBe(0);
-    }, 120_000);
-
-    it('gives the body of the version that is asked for', async () => {
-        const { agent } = await granted(alice);
-        const { did } = (await agent.post('/api/v1/objects').send(article)).body;
-        const first = (await gatekeeper.resolveDID(did)).didDocumentMetadata!.versionId!;
-
-        await anchor();
-        await agent.put(`/api/v1/objects/${did}`).send({ kind: 'post', title: article.title, body: 'Rewritten.\n' });
-
-        expect((await agent.get(`/api/v1/objects/${did}/content`)).text).toBe('Rewritten.\n');
-        expect((await agent.get(`/api/v1/objects/${did}/content?versionId=${first}`)).text).toBe(BODY);
-        expect((await agent.get(`/api/v1/objects/${did}/content?versionId=bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)).status).toBe(404);
     }, 120_000);
 
     it('stores no body for an object it would not publish', async () => {

@@ -33,7 +33,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         published: [] as Record<string, unknown>[],
         edited: [] as { did: string; object: Record<string, unknown> }[],
         responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
-        // The bodies the service holds, by the DID of the entry.
+        // The bodies the node has, by CID.
         bodies: {} as Record<string, string>,
         // What the service says of each identity, by its DID.
         people: {} as Record<string, { name?: string; address?: string }>,
@@ -63,7 +63,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         state: vi.fn(async (did: string) => state.states[did]),
         upload: vi.fn(async () => ({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' })),
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
-        content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
+        content: vi.fn(async (cid: string) => state.bodies[cid]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
         image: (did: string, version: string) => `/memepool/api/v1/images/${encodeURIComponent(did)}?versionId=${version}`,
@@ -2164,7 +2164,7 @@ describe('an article', () => {
 
     it('is read in full when it is opened', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
-        state.bodies['did:cid:1'] = BODY;
+        state.bodies.bafkreibody = BODY;
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -2172,18 +2172,18 @@ describe('an article', () => {
 
         expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
         // The body asked for is that of the version shown.
-        expect(api.content).toHaveBeenCalledWith('did:cid:1', 'op-did:cid:1');
+        expect(api.content).toHaveBeenCalledWith('bafkreibody');
         expect(screen.getByText('A summary.')).toBeTruthy();
     });
 
-    it('says so when the service does not hold the body, or could not read it', async () => {
+    it('says so when the node does not have the body, or it could not be read', async () => {
         const { api } = services({ me: granted, timeline: [article('did:cid:1', BOB)] });
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         render(<App api={api} />);
         const user = userEvent.setup();
 
         await user.click(await screen.findByRole('button', { name: 'Open' }));
-        expect(await screen.findByText(/this service does not hold it/)).toBeTruthy();
+        expect(await screen.findByText('The full text is not on this node.')).toBeTruthy();
 
         vi.mocked(api.content).mockRejectedValue(new ApiError(502, 'the node does not have the body'));
         await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -2194,7 +2194,7 @@ describe('an article', () => {
 
     it('is edited with its body, and sends the body only when it has changed', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
-        state.bodies['did:cid:1'] = BODY;
+        state.bodies.bafkreibody = BODY;
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -2215,7 +2215,7 @@ describe('an article', () => {
 
     it('sends a changed body for the service to store, in place of the reference', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
-        state.bodies['did:cid:1'] = BODY;
+        state.bodies.bafkreibody = BODY;
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -2234,8 +2234,8 @@ describe('an article', () => {
     it('reads the body again when another version is shown, and lets it be edited again', async () => {
         const first = article('did:cid:1');
         const { api, state } = services({ me: granted, timeline: [first] });
-        state.bodies['did:cid:1 op-did:cid:1'] = BODY;
-        state.bodies['did:cid:1 op-second'] = 'Rewritten.';
+        state.bodies.bafkreibody = BODY;
+        state.bodies.bafkreisecond = 'Rewritten.';
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -2269,8 +2269,8 @@ describe('an article', () => {
             memeplex: { kind: 'paper', author: ALICE, title: 'On DIDs', summary: 'A summary.', authors: [ALICE], content: { cid: 'bafkreibody', type: 'text/markdown', bytes: BODY.length }, v: 1 },
         }, 'did:cid:grant');
         const { api, state } = services({ me: granted, timeline: [paper] });
-        state.bodies['did:cid:1 op-did:cid:1'] = BODY;
-        state.bodies['did:cid:1 op-second'] = 'Rewritten elsewhere.';
+        state.bodies.bafkreibody = BODY;
+        state.bodies.bafkreisecond = 'Rewritten elsewhere.';
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -2298,7 +2298,7 @@ describe('an article', () => {
         }]));
     });
 
-    it('cannot be changed here when the service does not hold its body', async () => {
+    it('cannot be changed here when the node does not have its body', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
         render(<App api={api} />);
         const user = userEvent.setup();
@@ -2306,7 +2306,7 @@ describe('an article', () => {
         await user.click(await screen.findByRole('button', { name: 'Open' }));
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
 
-        expect((await screen.findByRole('alert')).textContent).toMatch(/does not hold the full text/);
+        expect((await screen.findByRole('alert')).textContent).toMatch(/full text is not on this node/);
         expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
         expect(state.edited).toStrictEqual([]);
     });
@@ -2398,21 +2398,26 @@ describe('the services\' client', () => {
         expect(asked[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', body: '{"kind":"post","text":"x"}', headers: { 'Content-Type': 'application/json' } });
     });
 
-    it('reads a body as text, and none when the service holds none', async () => {
-        const asked: string[] = [];
-        const fetcher = (async (url: string) => {
-            asked.push(url);
+    it('reads a body from the node by its CID, as text, and none when the node has none', async () => {
+        const asked: { url: string; init?: RequestInit }[] = [];
+        const fetcher = (async (url: string, init?: RequestInit) => {
+            asked.push({ url, init });
 
-            return url === '/memepool/api/v1/objects/did%3Acid%3A1/content'
-                ? new Response('# On DIDs\n', { status: 200, headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
-                : new Response(JSON.stringify({ error: 'no body the service holds' }), { status: 404 });
+            return url === 'https://node.example/api/v1/ipfs/text/bafkreibody'
+                ? new Response('# On DIDs\n', { status: 200 })
+                : new Response('no such content', { status: 500 });
         }) as unknown as typeof fetch;
-        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
+        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex', node: 'https://node.example' }, fetcher);
 
-        expect(await api.content('did:cid:1')).toBe('# On DIDs\n');
-        expect(await api.content('did:cid:2')).toBeUndefined();
-        expect(await api.content('did:cid:1', 'bafy version')).toBeUndefined();
-        expect(asked[2]).toBe('/memepool/api/v1/objects/did%3Acid%3A1/content?versionId=bafy%20version');
+        expect(await api.content('bafkreibody')).toBe('# On DIDs\n');
+        expect(await api.content('bafkreinone')).toBeUndefined();
+        // It is the node's to give to anyone, so nothing of the reader is sent with the asking.
+        expect(asked[0].init).toBeUndefined();
+
+        // With no node named, it is the host the pages are on.
+        const here = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
+        await here.content('bafkreibody');
+        expect(asked[2].url).toBe('/api/v1/ipfs/text/bafkreibody');
     });
 
     it('reads a publication at a version, and takes no other version for it', async () => {

@@ -316,24 +316,23 @@ const embedFor = (publication: Publication) => {
 // The version of a publication that is shown: the last one attributed.
 const shownVersion = (publication: Publication) => publication.versions[publication.current ?? 0]?.opid;
 
-// The body of an article, which is kept apart from its entry. The service
-// holds the bodies of what it published, and no others. The body read is that
-// of the version shown, so that it goes with the title and summary beside it
-// and is read again when another version is shown.
-function Article({ api, did, version }: { api: Api; did: string; version?: string }) {
+// The body of an article, which is kept apart from its entry, on IPFS. The
+// entry gives its CID, and the node serves it: an article is read wherever
+// it is shown. A CID names one text, so another version's is another CID.
+function Article({ api, cid }: { api: Api; cid: string }) {
     const [body, setBody] = useState<{ text?: string; error?: string } | null>(null);
 
     useEffect(() => {
         let stale = false;
 
         setBody(null);
-        api.content(did, version).then(
+        api.content(cid).then(
             text => { if (!stale) setBody({ text }); },
             failure => { if (!stale) setBody({ error: message(failure) }); },
         );
 
         return () => { stale = true; };
-    }, [api, did, version]);
+    }, [api, cid]);
 
     if (!body) {
         return <p className="muted">Reading the full text.</p>;
@@ -342,7 +341,7 @@ function Article({ api, did, version }: { api: Api; did: string; version?: strin
         return <p role="alert" className="error">The full text could not be read: {body.error}</p>;
     }
     if (body.text === undefined) {
-        return <p className="muted">The full text is kept apart from this entry, and this service does not hold it.</p>;
+        return <p className="muted">The full text is not on this node.</p>;
     }
 
     return <Markdown text={body.text} className="text article" />;
@@ -350,16 +349,17 @@ function Article({ api, did, version }: { api: Api; did: string; version?: strin
 
 // `full` shows the body of an article, where a list shows its summary alone.
 function Body({ object, full, embeds = true }: {
-    object: NonNullable<Publication['memeplex']>; full?: { api: Api; did: string; version?: string }; embeds?: boolean;
+    object: NonNullable<Publication['memeplex']>; full?: Api; embeds?: boolean;
 }) {
     const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
     const article = object.text === undefined && object.content !== undefined;
+    const cid = (object.content as { cid?: unknown } | undefined)?.cid;
 
     return (
         <>
             {/* A post's text is Markdown. An article's summary is a line about it, shown as it is. */}
             {words && (article ? <p className="text summary">{words}</p> : <Markdown text={words} embeds={embeds} />)}
-            {article && (full ? <Article api={full.api} did={full.did} version={full.version} /> : <p className="muted">Open it to read the full text.</p>)}
+            {article && (full && typeof cid === 'string' ? <Article api={full} cid={cid} /> : <p className="muted">Open it to read the full text.</p>)}
             {!words && !article && object.target && (
                 <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
             )}
@@ -688,7 +688,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers }: {
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
             )}
             {object.title && <h3>{object.title}</h3>}
-            <Body object={object} full={full && publication.did ? { api: full, did: publication.did, version: shownVersion(publication) } : undefined} />
+            <Body object={object} full={full} />
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
@@ -1250,13 +1250,13 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
         let stale = false;
 
-        api.content(publication.did!, shownVersion(publication)).then(
+        api.content(String((object.content as { cid?: unknown } | undefined)?.cid ?? '')).then(
             read => {
                 if (stale) {
                     return;
                 }
                 if (read === undefined) {
-                    setError('This service does not hold the full text, so it cannot be changed here.');
+                    setError('The full text is not on this node, so it cannot be changed here.');
                     return;
                 }
                 setHeld(read);

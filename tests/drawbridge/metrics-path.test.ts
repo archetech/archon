@@ -33,7 +33,6 @@ describe('metrics route labels', () => {
         ['/memeplex/api/v1/tags/did%3acid%3abagaaiera', '/memeplex/api/v1/tags/:did'],
         ['/memeplex/api/v1/coauthors/did:cid:bagaaiera', '/memeplex/api/v1/coauthors/:did'],
         ['/memepool/api/v1/objects/did:cid:bagaaiera', '/memepool/api/v1/objects/:did'],
-        ['/memepool/api/v1/objects/did:cid:bagaaiera/content', '/memepool/api/v1/objects/:did/content'],
         ['/memepool/api/v1/objects/did:cid:bagaaiera/state', '/memepool/api/v1/objects/:did/state'],
         ['/memepool/api/v1/avatars/did:cid:bagaaiera', '/memepool/api/v1/avatars/:did'],
         ['/memepool/api/v1/identities/did:cid:bagaaiera', '/memepool/api/v1/identities/:did'],
