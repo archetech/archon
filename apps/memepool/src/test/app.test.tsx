@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
@@ -1598,6 +1600,18 @@ describe('a boost', () => {
 });
 
 describe('adding an image to what is written', () => {
+    it('shows the reader its button, and not the browser\'s own file chooser', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+
+        await screen.findByLabelText('Post');
+        expect(chooser('Post').hidden).toBe(true);
+        expect(screen.getByRole('button', { name: 'Add image' })).toBeTruthy();
+        // The pages style every input, which is a rule the browser's own for what is hidden gives way to.
+        const styles = readFileSync(join(process.cwd(), 'src', 'styles.css'), 'utf8');
+        expect(styles).toMatch(/\[hidden\]\s*\{\s*display:\s*none\s*!important/);
+    });
+
     const EMBED = '![a chart](did:cid:bagaaieraimage?versionId=bafyimage)';
     const file = (name: string, type: string, bytes = 100) => new File([new Uint8Array(bytes)], name, { type });
     const chooser = (label: string) => screen.getByLabelText('An image to add to ' + label) as HTMLInputElement;

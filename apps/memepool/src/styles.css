@@ -152,6 +152,11 @@ label.inline input { display: inline-block; width: 8rem; margin: 0 0 0 0.25rem; 
 
 label { display: block; font-size: 0.9rem; color: var(--soft); margin: 0.5rem 0; }
 
+/* What is marked hidden is not shown, whatever else a rule here says of its
+   kind: a rule for every input would otherwise show the file chooser that the
+   Add image button stands for. */
+[hidden] { display: none !important; }
+
 input, textarea {
     display: block;
     width: 100%;
