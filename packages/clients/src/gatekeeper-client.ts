@@ -1,3 +1,4 @@
+import { segment } from './path.js';
 import axiosModule, { AxiosError, type AxiosInstance, type AxiosStatic } from 'axios';
 import {
     BatchMetadata,
@@ -225,7 +226,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getGenesis(did: string): Promise<DidCidDocument> {
         try {
-            const response = await this.axios.get(`${this.API}/did/${did}/genesis`);
+            const response = await this.axios.get(`${this.API}/did/${segment(did)}/genesis`);
             return response.data;
         } catch (error) {
             throwError(error);
@@ -236,11 +237,11 @@ export default class GatekeeperClient implements GatekeeperInterface {
         try {
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);
-                const response = await this.axios.get(`${this.API}/did/${did}?${queryParams.toString()}`);
+                const response = await this.axios.get(`${this.API}/did/${segment(did)}?${queryParams.toString()}`);
                 return response.data;
             }
             else {
-                const response = await this.axios.get(`${this.API}/did/${did}`);
+                const response = await this.axios.get(`${this.API}/did/${segment(did)}`);
                 return response.data;
             }
         }
@@ -373,7 +374,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getQueue(registry: string): Promise<Operation[]> {
         try {
-            const response = await this.axios.get(`${this.API}/queue/${registry}`);
+            const response = await this.axios.get(`${this.API}/queue/${segment(registry)}`);
             return response.data;
         }
         catch (error) {
@@ -383,7 +384,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async clearQueue(registry: string, events: Operation[]): Promise<boolean> {
         try {
-            const response = await this.axios.post(`${this.API}/queue/${registry}/clear`, events);
+            const response = await this.axios.post(`${this.API}/queue/${segment(registry)}/clear`, events);
             return response.data;
         }
         catch (error) {
@@ -413,7 +414,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async rewindRegistry(registry: string, fromHeight: number): Promise<boolean> {
         try {
-            const response = await this.axios.post(`${this.API}/block/${registry}/rewind`, { fromHeight });
+            const response = await this.axios.post(`${this.API}/block/${segment(registry)}/rewind`, { fromHeight });
             return response.data;
         } catch (error) {
             throwError(error);
@@ -422,7 +423,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getJSON(cid: string): Promise<object> {
         try {
-            const response = await this.axios.get(`${this.API}/ipfs/json/${cid}`);
+            const response = await this.axios.get(`${this.API}/ipfs/json/${segment(cid)}`);
             return response.data;
         }
         catch (error) {
@@ -448,7 +449,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
             // Text is returned as it was stored. Left to itself the HTTP
             // client reads a body that looks like JSON as JSON, so that `123`
             // would come back a number and `"a"` without its quotes.
-            const response = await this.axios.get(`${this.API}/ipfs/text/${cid}`, {
+            const response = await this.axios.get(`${this.API}/ipfs/text/${segment(cid)}`, {
                 params: limit === undefined ? undefined : { limit },
                 responseType: 'text',
                 transformResponse: [(data: unknown) => data],
@@ -486,7 +487,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getData(cid: string, limit?: number): Promise<Buffer> {
         try {
-            const response = await this.axios.get(`${this.API}/ipfs/data/${cid}`, {
+            const response = await this.axios.get(`${this.API}/ipfs/data/${segment(cid)}`, {
                 params: limit === undefined ? undefined : { limit },
                 responseType: 'arraybuffer'
             });
@@ -519,7 +520,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
     async *getDataStream(cid: string): AsyncGenerator<Uint8Array> {
         let response: any;
         try {
-            response = await this.axios.get(`${this.API}/ipfs/stream/${cid}`, {
+            response = await this.axios.get(`${this.API}/ipfs/stream/${segment(cid)}`, {
                 responseType: 'stream',
             });
             yield* response.data;
@@ -537,8 +538,8 @@ export default class GatekeeperClient implements GatekeeperInterface {
     async getBlock(registry: string, block?: BlockId): Promise<BlockInfo | null> {
         try {
             const url = block !== undefined
-                ? `${this.API}/block/${registry}/${block}`
-                : `${this.API}/block/${registry}/latest`;
+                ? `${this.API}/block/${segment(registry)}/${segment(block)}`
+                : `${this.API}/block/${segment(registry)}/latest`;
             const response = await this.axios.get(url);
             return response.data;
         } catch (error) {
@@ -548,7 +549,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async addBlock(registry: string, block: BlockInfo): Promise<boolean> {
         try {
-            const response = await this.axios.post(`${this.API}/block/${registry}`, block);
+            const response = await this.axios.post(`${this.API}/block/${segment(registry)}`, block);
             return response.data;
         }
         catch (error) {
