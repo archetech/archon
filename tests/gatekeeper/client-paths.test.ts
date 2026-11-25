@@ -53,8 +53,24 @@ describe('a segment of a path', () => {
         expect(segment('a#b')).toBe('a%23b');
         expect(segment('a b')).toBe('a%20b');
         expect(segment('a\\b')).toBe('a%5Cb');
-        expect(segment('..')).toBe('%252E%252E');
-        expect(segment('.')).toBe('%252E');
+    });
+});
+
+describe('a value of only dots', () => {
+    // No encoding of it arrives as itself, and another spelling of it would
+    // arrive as another name, which may be something's.
+    it('is refused, and nothing is asked', async () => {
+        const gatekeeper = await GatekeeperClient.create({ url });
+        const keymaster = await KeymasterClient.create({ url });
+
+        expect(() => segment('.')).toThrow('cannot be part of a request\'s path');
+        expect(() => segment('..')).toThrow('cannot be part of a request\'s path');
+        asked = [];
+        await expect(gatekeeper.resolveDID('..')).rejects.toMatch(/cannot be part of a request's path/);
+        await expect(gatekeeper.getJSON('.')).rejects.toMatch(/cannot be part of a request's path/);
+        await expect(keymaster.removeId('.')).rejects.toThrow('cannot be part of a request\'s path');
+        await expect(keymaster.resolveDID('..')).rejects.toThrow('cannot be part of a request\'s path');
+        expect(asked).toStrictEqual([]);
     });
 });
 
@@ -72,12 +88,10 @@ describe('the Gatekeeper client', () => {
 
         await tried(() => gatekeeper.resolveDID(TRAVERSAL));
         await tried(() => gatekeeper.resolveDID(TRAVERSAL, { versionSequence: 1 }));
-        await tried(() => gatekeeper.resolveDID('..'));
 
         expect(asked).toStrictEqual([
             'GET /api/v1/did/did:cid:x%2F..%2F..%2Fipfs%2Fstream%2Fbafyother',
             'GET /api/v1/did/did:cid:x%2F..%2F..%2Fipfs%2Fstream%2Fbafyother?versionSequence=1',
-            'GET /api/v1/did/%252E%252E',
         ]);
     });
 
@@ -86,14 +100,12 @@ describe('the Gatekeeper client', () => {
 
         await tried(() => gatekeeper.getText('x/../../did/did:cid:y'));
         await tried(() => gatekeeper.getData('x?limit=0'));
-        await tried(() => gatekeeper.getJSON('..'));
         await tried(() => gatekeeper.getQueue('BTC:mainnet/../../version'));
         await tried(() => gatekeeper.getBlock('BTC:mainnet', '../../../version' as never));
 
         expect(asked).toStrictEqual([
             'GET /api/v1/ipfs/text/x%2F..%2F..%2Fdid%2Fdid:cid:y',
             'GET /api/v1/ipfs/data/x%3Flimit%3D0',
-            'GET /api/v1/ipfs/json/%252E%252E',
             'GET /api/v1/queue/BTC:mainnet%2F..%2F..%2Fversion',
             'GET /api/v1/block/BTC:mainnet/..%2F..%2F..%2Fversion',
         ]);
@@ -119,12 +131,15 @@ describe('the Keymaster client', () => {
         await tried(() => keymaster.removeId('../../wallet'));
         await tried(() => keymaster.getAlias('a/b'));
         await tried(() => keymaster.listGroups('did:cid:x&other=1'));
+        // A value of a query is no part of the path, and arrives as it was.
+        await tried(() => keymaster.listSchemas('..'));
 
         expect(asked).toStrictEqual([
             'GET /api/v1/did/x%2F..%2F..%2Fwallet',
             'DELETE /api/v1/ids/..%2F..%2Fwallet',
             'GET /api/v1/aliases/a%2Fb',
             'GET /api/v1/groups?owner=did:cid:x%26other%3D1',
+            'GET /api/v1/schemas?owner=..',
         ]);
     });
 });

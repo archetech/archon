@@ -1399,7 +1399,7 @@ export default class KeymasterClient implements KeymasterInterface {
     async listGroups(owner?: string): Promise<string[]> {
         try {
             if (owner) {
-                const response = await this.axios.get(`${this.API}/groups?owner=${segment(owner)}`);
+                const response = await this.axios.get(`${this.API}/groups`, { params: { owner } });
                 return response.data.groups;
             }
             else {
@@ -1461,7 +1461,7 @@ export default class KeymasterClient implements KeymasterInterface {
     async listSchemas(owner?: string): Promise<string[]> {
         try {
             if (owner) {
-                const response = await this.axios.get(`${this.API}/schemas?owner=${segment(owner)}`);
+                const response = await this.axios.get(`${this.API}/schemas`, { params: { owner } });
                 return response.data.schemas;
             }
             else {

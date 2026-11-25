@@ -7,12 +7,19 @@
 // the service finds no such DID.
 //
 // A colon is left as it is: it is no separator in a path, and DIDs and
-// registry names are full of them. A value that is nothing but one or two dots
-// cannot be made a segment by encoding its dots, since an address is read with
-// `%2E` taken for a dot, so its percent signs are encoded as well: the service
-// is asked for a name no DID has.
+// registry names are full of them.
+//
+// A value that is nothing but one or two dots cannot be a segment at all. An
+// address is read with such a segment taken away, and with `%2E` taken for a
+// dot, so no encoding of it arrives as itself; and any other spelling of it
+// would arrive as another name, which may be something's. It is refused before
+// anything is sent.
 export function segment(value: string | number | undefined): string {
-    const encoded = encodeURIComponent(String(value)).replace(/%3A/gi, ':');
+    const text = String(value);
 
-    return encoded === '.' || encoded === '..' ? encoded.replace(/\./g, '%252E') : encoded;
+    if (text === '.' || text === '..') {
+        throw new Error(`Invalid parameter: "${text}" cannot be part of a request's path`);
+    }
+
+    return encodeURIComponent(text).replace(/%3A/gi, ':');
 }

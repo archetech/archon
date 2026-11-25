@@ -17,12 +17,16 @@ def _segment(value: Any) -> str:
     new segment, and a segment of dots is taken away with the one before it
     when the address is read. Encoded, it is one segment whatever it holds. A
     colon is left as it is, since it separates nothing in a path and DIDs and
-    registry names are full of them. A value that is nothing but one or two
-    dots is given with its percent signs encoded as well, since an address may
-    be read with ``%2E`` taken for a dot.
+    registry names are full of them.
+
+    A value that is nothing but one or two dots cannot be a segment at all: no
+    encoding of it arrives as itself, and another spelling of it would arrive
+    as another name. It is refused before anything is sent.
     """
-    encoded = quote(str(value), safe=":")
-    return encoded.replace(".", "%252E") if encoded in (".", "..") else encoded
+    text = str(value)
+    if text in (".", ".."):
+        raise ValueError(f'Invalid parameter: "{text}" cannot be part of a request\'s path')
+    return quote(text, safe=":")
 
 
 class GatekeeperTimeoutError(Exception):

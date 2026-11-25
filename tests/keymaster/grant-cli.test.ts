@@ -60,8 +60,8 @@ beforeEach(() => {
         'POST /grants': () => ({ body: { did: 'did:cid:grant' } }),
         'GET /grants': () => ({ body: { grants: GRANTS } }),
         'GET /did/did:cid:grant': () => ({ body: { docs: { didDocumentRegistration: { registry: 'BTC:mainnet' } } } }),
-        'PUT /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
-        'DELETE /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
+        'PUT /grants/did:cid:grant': () => ({ body: { ok: true } }),
+        'DELETE /grants/did:cid:grant': () => ({ body: { ok: true } }),
         'DELETE /grants/clients%2Fexample': () => ({ body: { ok: true } }),
     };
 });
@@ -172,7 +172,7 @@ describe('update-grant', () => {
 
         expect(status).toBe(0);
         expect(stdout).toBe('OK');
-        expect(requests).toEqual([{ route: 'PUT /grants/did%3Acid%3Agrant', body: { changes } }]);
+        expect(requests).toEqual([{ route: 'PUT /grants/did:cid:grant', body: { changes } }]);
     });
 
     it.each([
@@ -187,7 +187,7 @@ describe('update-grant', () => {
     });
 
     it('fails when the node did not accept the change', async () => {
-        routes['PUT /grants/did%3Acid%3Agrant'] = () => ({ body: { ok: false } });
+        routes['PUT /grants/did:cid:grant'] = () => ({ body: { ok: false } });
 
         const { status, stdout, stderr } = await run('update-grant', 'did:cid:grant', '--no-expiry');
 
@@ -203,7 +203,7 @@ describe('revoke-grant', () => {
 
         expect(status).toBe(0);
         expect(stdout).toBe('OK');
-        expect(requests).toEqual([{ route: 'DELETE /grants/did%3Acid%3Agrant', body: undefined }]);
+        expect(requests).toEqual([{ route: 'DELETE /grants/did:cid:grant', body: undefined }]);
     });
 
     it('names an alias with a slash as one path segment', async () => {
@@ -214,7 +214,7 @@ describe('revoke-grant', () => {
     });
 
     it('fails when the node did not accept the revocation', async () => {
-        routes['DELETE /grants/did%3Acid%3Agrant'] = () => ({ body: { ok: false } });
+        routes['DELETE /grants/did:cid:grant'] = () => ({ body: { ok: false } });
 
         const { status, stdout, stderr } = await run('revoke-grant', 'did:cid:grant');
 
@@ -224,7 +224,7 @@ describe('revoke-grant', () => {
     });
 
     it('fails with the refusal Keymaster gives', async () => {
-        routes['DELETE /grants/did%3Acid%3Agrant'] = () => ({ status: 400, body: { error: 'Error: Invalid parameter: id: not a grant' } });
+        routes['DELETE /grants/did:cid:grant'] = () => ({ status: 400, body: { error: 'Error: Invalid parameter: id: not a grant' } });
 
         const { status, stderr } = await run('revoke-grant', 'did:cid:grant');
 

@@ -47,8 +47,6 @@ def test_segment_leaves_a_did_and_a_registry_as_they_are():
     ("a?b=c", "a%3Fb%3Dc"),
     ("a#b", "a%23b"),
     ("a b", "a%20b"),
-    ("..", "%252E%252E"),
-    (".", "%252E"),
     ("a..b", "a..b"),
 ])
 def test_segment_encodes_what_would_end_or_leave_the_segment(value, encoded):
@@ -63,11 +61,45 @@ def test_a_string_in_the_place_of_a_did_asks_for_no_other_route(monkeypatch):
 
 @pytest.mark.parametrize("call, path", [
     (lambda client: client.get_text("x/../../did/did:cid:y"), "/api/v1/ipfs/text/x%2F..%2F..%2Fdid%2Fdid:cid:y"),
-    (lambda client: client.get_data(".."), "/api/v1/ipfs/data/%252E%252E"),
-    (lambda client: client.get_block("BTC:mainnet/../x", ".."), "/api/v1/block/BTC:mainnet%2F..%2Fx/%252E%252E"),
+    (lambda client: client.get_block("BTC:mainnet/../x", "a/.."), "/api/v1/block/BTC:mainnet%2F..%2Fx/a%2F.."),
 ])
 def test_a_string_in_the_place_of_a_cid_or_a_registry_asks_for_no_other_route(monkeypatch, call, path):
     assert _asked(monkeypatch, call) == [path]
+
+
+@pytest.mark.parametrize("call", [
+    lambda client: client.resolve_did(".."),
+    lambda client: client.get_data("."),
+    lambda client: client.get_block("BTC:mainnet", ".."),
+])
+def test_a_value_of_only_dots_is_refused_and_nothing_is_asked(monkeypatch, call):
+    paths = []
+
+    def respond(request):
+        paths.append(request.url.raw_path.decode())
+        return httpx.Response(404, json={})
+
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(
+        **kwargs, transport=httpx.MockTransport(respond),
+    ))
+
+    async def run():
+        client = GatekeeperClient("http://gatekeeper:4224")
+        try:
+            await call(client)
+        finally:
+            await client.close()
+
+    with pytest.raises(ValueError, match="cannot be part of a request's path"):
+        asyncio.run(run())
+    assert paths == []
+
+
+@pytest.mark.parametrize("value", [".", ".."])
+def test_segment_refuses_a_value_of_only_dots(value):
+    with pytest.raises(ValueError):
+        _segment(value)
 
 
 def test_a_did_is_asked_for_as_it_was(monkeypatch):
