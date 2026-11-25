@@ -346,3 +346,87 @@ def test_lightning_routes_answer_400_with_no_body(monkeypatch, path, field):
 
     assert response.status_code == 400
     assert response.json() == {"error": f"Invalid parameter: {field}"}
+
+
+def test_a_name_with_a_slash_is_taken_for_another_name_and_an_action(monkeypatch):
+    """Why a new name may hold no slash (#1758).
+
+    A path is decoded before a route is chosen, so a request to resolve the
+    name ``Alice/check`` is a request to check the name ``Alice``, and a name
+    with a slash anywhere else matches no route that takes one segment.
+    """
+    calls = []
+
+    async def resolve(identifier, options=None):
+        calls.append(("resolve", identifier))
+        return {"didDocument": {"id": "did:cid:alice"}}
+
+    async def check(identifier):
+        calls.append(("check", identifier))
+        return {"did": "did:cid:alice", "issues": [], "canRepair": False}
+
+    monkeypatch.setattr(app_module.service, "resolve_did", resolve)
+    monkeypatch.setattr(app_module.service, "check_did", check)
+    app = FastAPI()
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    client = TestClient(app)
+
+    answer = client.get(f"/api/v1/did/{quote('Alice/check', safe='')}")
+    assert answer.status_code == 200
+    assert "report" in answer.json() and "docs" not in answer.json()
+    assert calls == [("check", "Alice")]
+
+    assert client.get(f"/api/v1/did/{quote('team/alice', safe='')}").status_code == 404
+    assert calls == [("check", "Alice")]
+
+    # A name with none is resolved.
+    assert client.get("/api/v1/did/Alice").status_code == 200
+    assert calls[-1] == ("resolve", "Alice")
+
+
+def test_vault_item_and_attachment_routes_take_a_name_with_slashes(monkeypatch):
+    """A wallet names a login for the address of its service (#1758)."""
+    calls = []
+
+    async def get_item(identifier, name, options=None):
+        calls.append(("get", identifier, name))
+        return b"x"
+
+    async def remove_item(identifier, name):
+        calls.append(("remove", identifier, name))
+        return True
+
+    async def get_attachment(identifier, name):
+        calls.append(("attachment", identifier, name))
+        return b"y"
+
+    async def remove_attachment(identifier, name):
+        calls.append(("unattach", identifier, name))
+        return True
+
+    monkeypatch.setattr(app_module.service, "get_vault_item", get_item)
+    monkeypatch.setattr(app_module.service, "remove_vault_item", remove_item)
+    monkeypatch.setattr(app_module.service, "get_dmail_attachment", get_attachment)
+    monkeypatch.setattr(app_module.service, "remove_dmail_attachment", remove_attachment)
+    app = FastAPI()
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    client = TestClient(app)
+
+    for name in ["login: https://example.org/sign-in", "docs/readme.md", "plain.txt"]:
+        path = quote(name, safe="")
+        assert client.get(f"/api/v1/vaults/vault/items/{path}").content == b"x"
+        assert client.delete(f"/api/v1/vaults/vault/items/{path}").json() == {"ok": True}
+        assert client.get(f"/api/v1/dmail/mail/attachments/{path}").content == b"y"
+        assert client.delete(f"/api/v1/dmail/mail/attachments/{path}").json() == {"ok": True}
+        assert calls[-4:] == [
+            ("get", "vault", name), ("remove", "vault", name), ("attachment", "mail", name), ("unattach", "mail", name),
+        ]
+
+    # Listing a vault's items is still its own route.
+    async def list_items(identifier, options=None):
+        return {"a": {}}
+
+    monkeypatch.setattr(app_module.service, "list_vault_items", list_items)
+    assert client.get("/api/v1/vaults/vault/items").json() == {"items": {"a": {}}}

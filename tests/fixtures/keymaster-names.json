@@ -1,0 +1,74 @@
+{
+  "description": "What a new name may be, for both Keymasters. The name of an identity, or an alias, is given in the path of a request with an action after it, and may hold no slash. A vault item's name is the last thing in its path, and may. None may be only dots.",
+  "accepted": [
+    "Alice",
+    "alice@example.org",
+    "Alice Smith",
+    "team-alice",
+    "team.alice",
+    "a..b",
+    "...",
+    ".hidden",
+    "name.",
+    "back\\slash",
+    "50%",
+    "what?",
+    "#1"
+  ],
+  "refused": [
+    {
+      "name": "team/alice",
+      "error": "contains a slash"
+    },
+    {
+      "name": "Alice/check",
+      "error": "contains a slash"
+    },
+    {
+      "name": "/",
+      "error": "contains a slash"
+    },
+    {
+      "name": "/alice",
+      "error": "contains a slash"
+    },
+    {
+      "name": "alice/",
+      "error": "contains a slash"
+    },
+    {
+      "name": "../wallet",
+      "error": "contains a slash"
+    },
+    {
+      "name": ".",
+      "error": "cannot be only dots"
+    },
+    {
+      "name": "..",
+      "error": "cannot be only dots"
+    },
+    {
+      "name": " .. ",
+      "error": "cannot be only dots"
+    }
+  ],
+  "items": {
+    "accepted": [
+      "login: https://a.example/in",
+      "docs/readme.md",
+      "a/b/c",
+      "/"
+    ],
+    "refused": [
+      {
+        "name": ".",
+        "error": "cannot be only dots"
+      },
+      {
+        "name": "..",
+        "error": "cannot be only dots"
+      }
+    ]
+  }
+}

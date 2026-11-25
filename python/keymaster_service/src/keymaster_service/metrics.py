@@ -80,9 +80,9 @@ _PATH_NORMALIZERS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/files/[^/]+"), "/files/:id"),
     (re.compile(r"/ipfs/data/[^/]+"), "/ipfs/data/:cid"),
     (re.compile(r"/vaults/[^/]+/members/[^/]+"), "/vaults/:id/members/:member"),
-    (re.compile(r"/vaults/[^/]+/items/[^/]+"), "/vaults/:id/items/:name"),
+    (re.compile(r"/vaults/[^/]+/items/.+"), "/vaults/:id/items/:name"),
     (re.compile(r"/vaults/[^/]+"), "/vaults/:id"),
-    (re.compile(r"/dmail/[^/]+/attachments/[^/]+"), "/dmail/:id/attachments/:name"),
+    (re.compile(r"/dmail/[^/]+/attachments/.+"), "/dmail/:id/attachments/:name"),
     (re.compile(r"/dmail/[^/]+"), "/dmail/:id"),
     (re.compile(r"/notices/[^/]+"), "/notices/:id"),
 )

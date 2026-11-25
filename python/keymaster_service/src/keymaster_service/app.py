@@ -859,7 +859,7 @@ async def add_vault_item(identifier: str, request: Request, body: bytes) -> dict
     return {"ok": await service.add_vault_item(identifier, options["name"], body)}
 
 
-@protected_api.delete("/vaults/{identifier}/items/{name}")
+@protected_api.delete("/vaults/{identifier}/items/{name:path}")
 async def remove_vault_item(identifier: str, name: str) -> dict[str, bool]:
     return {"ok": await service.remove_vault_item(identifier, name)}
 
@@ -869,7 +869,7 @@ async def list_vault_items(identifier: str, request: Request) -> dict[str, Any]:
     return {"items": await service.list_vault_items(identifier, parse_resolve_options(request))}
 
 
-@protected_api.get("/vaults/{identifier}/items/{name}")
+@protected_api.get("/vaults/{identifier}/items/{name:path}")
 async def get_vault_item(identifier: str, name: str, request: Request) -> Response:
     item = await service.get_vault_item(identifier, name, parse_resolve_options(request))
     return Response(content=item or b"", media_type="application/octet-stream")
@@ -941,12 +941,12 @@ async def add_dmail_attachment(identifier: str, request: Request) -> dict[str, b
     return {"ok": await service.add_dmail_attachment(identifier, options["name"], await request.body())}
 
 
-@protected_api.delete("/dmail/{identifier}/attachments/{name}")
+@protected_api.delete("/dmail/{identifier}/attachments/{name:path}")
 async def remove_dmail_attachment(identifier: str, name: str) -> dict[str, bool]:
     return {"ok": await service.remove_dmail_attachment(identifier, name)}
 
 
-@protected_api.get("/dmail/{identifier}/attachments/{name}")
+@protected_api.get("/dmail/{identifier}/attachments/{name:path}")
 async def get_dmail_attachment(identifier: str, name: str) -> Response:
     return Response(content=await service.get_dmail_attachment(identifier, name), media_type="application/octet-stream")
 
