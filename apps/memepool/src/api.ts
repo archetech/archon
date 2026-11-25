@@ -239,8 +239,16 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
             const versionId = doc.didDocumentMetadata?.versionId;
             const memeplex = doc.didDocumentData?.memeplex;
 
-            return typeof versionId === 'string' && memeplex && typeof memeplex === 'object'
-                ? { versionId, memeplex: memeplex as NonNullable<Publication['memeplex']> }
+            // It is shown before any verifier has read it, so it is taken only
+            // where what the pages show of it is what they can show.
+            const shape = memeplex && typeof memeplex === 'object' && !Array.isArray(memeplex) ? memeplex as Record<string, unknown> : undefined;
+            const worded = shape !== undefined
+                && typeof shape.kind === 'string' && typeof shape.author === 'string'
+                && ['text', 'title', 'subtitle', 'summary', 'target', 'targetVersion'].every(field => shape[field] === undefined || typeof shape[field] === 'string')
+                && (shape.content === undefined || (typeof shape.content === 'object' && shape.content !== null && !Array.isArray(shape.content)));
+
+            return typeof versionId === 'string' && worded
+                ? { versionId, memeplex: shape as NonNullable<Publication['memeplex']> }
                 : undefined;
         },
         avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,

@@ -2592,6 +2592,59 @@ describe('editing', () => {
         expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
     });
 
+    it('shows the thread, and offers the edit, though the node is slow to give a reply of the reader\'s', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const reply = under({ ...post('did:cid:3', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:1', targetVersion: 'op-did:cid:1' } }, 'did:cid:grant');
+        const { api } = services({ me: granted, timeline: [mine] });
+        const node = vi.mocked(api.unanchored).getMockImplementation()!;
+        vi.mocked(api.unanchored).mockImplementation(did => (did === 'did:cid:3' ? new Promise(() => undefined) : node(did)));
+        vi.mocked(api.thread).mockResolvedValue([{ publication: reply, depth: 1 }]);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByText('A reply.')).toBeTruthy();
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+        expect(screen.queryByText('Loading replies…')).toBeNull();
+    });
+
+    it('shows nothing the node gives that is not the same object, or that the pages cannot show, and offers no edit over it', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        // Another's, or another kind of object, at a version the indexer has not read.
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...mine.memeplex!, author: BOB, text: 'Not mine.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('A post.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledWith('did:cid:1'));
+        expect(screen.queryByText('Not mine.')).toBeNull();
+        expect(screen.queryByText('Edit waiting to be anchored')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.getByText('A post.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    });
+
+    it('asks the node about each of the reader\'s posts once as older ones are listed, and anew when the list is read from its start', async () => {
+        const posts = Array.from({ length: 60 }, (_, at) => under(post(`did:cid:${at + 1}`, ALICE, `Post ${at + 1}.`), 'did:cid:grant'));
+        const { api } = services({ me: granted, timeline: posts });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('Post 1.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(50));
+        await user.click(await screen.findByRole('button', { name: /older/i }));
+        await screen.findByText('Post 60.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(60));
+
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(110));
+    });
+
     it('saves nothing from an editor that was open when an edit was found to be waiting', async () => {
         const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
         const { api, state } = services({ me: granted, timeline: [mine] });
@@ -3118,6 +3171,13 @@ describe('the services\' client', () => {
         // What is no Memeplex object, and what the node cannot give, are nothing.
         expect(await api.unanchored('did:cid:2')).toBeUndefined();
         expect(await api.unanchored('did:cid:3')).toBeUndefined();
+
+        // Nor is an object whose words are not words: it is shown before any verifier has read it.
+        for (const memeplex of [{ kind: 'post', author: ALICE, title: 42 }, { kind: 'post', text: 'x' }, { kind: 'post', author: ALICE, content: 'cid' }, ['post'], 'post']) {
+            const odd = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, (async () => new Response(JSON.stringify({ didDocumentMetadata: { versionId: 'op' }, didDocumentData: { memeplex } }), { status: 200 })) as unknown as typeof fetch);
+
+            expect([memeplex, await odd.unanchored('did:cid:1')]).toStrictEqual([memeplex, undefined]);
+        }
     });
 
     it('reads a body from the node by its CID, as text, and none when the node has none', async () => {

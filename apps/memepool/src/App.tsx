@@ -325,13 +325,39 @@ const shownVersion = (publication: Publication) => publication.versions[publicat
 // What the node has of a publication, where that is a version its chain has
 // yet to anchor: one the indexer has not read, or has read and says is
 // pending. A version that will never be published is none.
+//
+// Nothing is known where what the node has is not the same object: an edit
+// changes neither what kind of object it is nor whose.
 const awaited = (
     publication: Publication, last: { versionId: string; memeplex: NonNullable<Publication['memeplex']> } | undefined,
-): NonNullable<Publication['memeplex']> | null => {
+): NonNullable<Publication['memeplex']> | null | undefined => {
     const known = publication.versions.find(each => each.opid === last?.versionId);
 
-    return last && (!known || known.outcome === 'pending') ? last.memeplex : null;
+    if (!last || (known && known.outcome !== 'pending')) {
+        return null;
+    }
+
+    return last.memeplex.kind === publication.memeplex?.kind && last.memeplex.author === publication.memeplex?.author
+        ? last.memeplex
+        : undefined;
 };
+
+// Has each of some things done, a few at a time, and gives what each made.
+async function inTurn<T, R>(things: T[], make: (thing: T) => Promise<R>, atOnce = 6): Promise<R[]> {
+    const made: R[] = new Array(things.length);
+    let next = 0;
+
+    await Promise.all(Array.from({ length: Math.min(atOnce, things.length) }, async () => {
+        while (next < things.length) {
+            const at = next;
+
+            next += 1;
+            made[at] = await make(things[at]);
+        }
+    }));
+
+    return made;
+}
 
 // The body of an article, which is kept apart from its entry, on IPFS. The
 // entry gives its CID, and the node serves it: an article is read wherever
@@ -1480,7 +1506,20 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                 api.publication(opened.did!),
                 own(opened) ? last(opened) : undefined,
             ]);
-            const replied = await Promise.all(thread.map(each => each.publication).filter(own).map(async each => [each, await last(each)] as const));
+
+            // The reader's own replies are read apart, each for itself, so
+            // that one the node is slow to give keeps nothing else from showing.
+            inTurn(thread.map(reply => reply.publication).filter(own), async reply => {
+                const edit = awaited(reply, await last(reply));
+
+                if (asked === reads.current) {
+                    setAnswers(current => {
+                        const { [reply.did!]: had, ...others } = current;
+
+                        return edit ? { ...others, [reply.did!]: edit } : had ? others : current;
+                    });
+                }
+            });
 
             if (asked === reads.current) {
                 const shown = latest ?? opened;
@@ -1493,11 +1532,6 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                 }
                 // Where the node could not say, it is not known that no edit waits.
                 setWaits(own(shown) && mineLast === undefined ? undefined : awaited(shown, mineLast));
-                setAnswers(Object.fromEntries(replied.flatMap(([each, found]) => {
-                    const edit = awaited(each, found);
-
-                    return edit ? [[each.did!, edit]] : [];
-                })));
                 setError('');
             }
         }
@@ -1828,22 +1862,35 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // it, marked as waiting, wherever it is listed.
     const [edits, setEdits] = useState<Record<string, NonNullable<Publication['memeplex']>>>({});
     const looks = useRef(0);
+    // What the node said of each post at the version listed, since the list
+    // was last read from its start: an older page adds posts to the list, and
+    // the ones already asked about are not asked about once more.
+    const looked = useRef({ read: -1, found: new Map<string, NonNullable<Publication['memeplex']> | null>() });
 
     useEffect(() => {
         const look = looks.current += 1;
-        const own = (timeline ?? []).filter(each => each.did && each.memeplex?.author === me.did && each.state === 'published');
 
-        Promise.all(own.map(async each => [each, await api.unanchored(each.did!).catch(() => undefined)] as const)).then(found => {
-            if (look !== looks.current) {
-                return;
+        if (looked.current.read !== refreshes) {
+            looked.current = { read: refreshes, found: new Map() };
+        }
+
+        const { found } = looked.current;
+        const own = (timeline ?? []).filter(post => post.did && post.memeplex?.author === me.did && post.state === 'published');
+        const show = () => {
+            if (look === looks.current) {
+                setEdits(Object.fromEntries(own.flatMap(post => {
+                    const edit = found.get(`${post.did} ${versionKey(post)}`);
+
+                    return edit ? [[post.did!, edit]] : [];
+                })));
             }
-            setEdits(Object.fromEntries(found.flatMap(([each, last]) => {
-                const edit = awaited(each, last);
+        };
 
-                return edit ? [[each.did!, edit]] : [];
-            })));
-        });
-    }, [api, me.did, timeline]);
+        show();
+        inTurn(own.filter(post => !found.has(`${post.did} ${versionKey(post)}`)), async post => {
+            found.set(`${post.did} ${versionKey(post)}`, awaited(post, await api.unanchored(post.did!).catch(() => undefined)) ?? null);
+        }).then(show);
+    }, [api, me.did, timeline, refreshes]);
 
     // How an embed in a text is shown: an object at its version from the
     // indexer, as a card, and an image from the service.
