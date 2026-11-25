@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { createApi } from './api';
+import 'katex/dist/katex.min.css';
 import './styles.css';
 
 // Where the node offers the two services. The defaults are Drawbridge's mounts

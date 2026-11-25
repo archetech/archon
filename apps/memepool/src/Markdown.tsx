@@ -2,7 +2,11 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 
 // Text as Memeplex says a client shows it: docs/plans/memeplex-reference-1436.md,
 // "Text formatting". It is GitHub Flavored Markdown, and it is written by
@@ -21,7 +25,11 @@ import remarkGfm from 'remark-gfm';
 // shown as the image, which the pages' own service serves. Anything else, and
 // a DID with no version, is shown by its words.
 //
-// Math is not rendered yet.
+// Math is written as it is in Pandoc, Jupyter and GitHub: between single
+// dollars in a line, between double dollars set apart, and in a fenced block
+// marked `math`. It is LaTeX, which KaTeX renders to elements, with the
+// commands that reach outside the math turned off. Math that cannot be
+// rendered is shown as it was written.
 
 const scheme = (url: string) => /^([a-z][a-z0-9+.-]*):/i.exec(url.trim())?.[1].toLowerCase();
 
@@ -63,6 +71,9 @@ export const Embeds = createContext<Embedding | undefined>(undefined);
 
 interface Node {
     type: string;
+    value?: string;
+    lang?: string | null;
+    position?: { start: { offset?: number }; end: { offset?: number } };
     url?: string;
     alt?: string | null;
     identifier?: string;
@@ -90,7 +101,12 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
         (node.type === 'image' ? node.url : node.type === 'imageReference' ? defined.get(node.identifier ?? '') : undefined);
     const embeds = (node: Node) => embedOf(addressOf(node) ?? '') !== undefined;
     const walk = (parent: Node) => {
-        parent.children = parent.children?.flatMap(child => {
+        // A node that holds nothing is given no list of what it holds: one
+        // that is there and empty of meaning is read as a list by what follows.
+        if (!parent.children) {
+            return;
+        }
+        parent.children = parent.children.flatMap(child => {
             if (child.type !== 'paragraph' || !child.children?.some(embeds)) {
                 walk(child);
                 return [child];
@@ -125,6 +141,189 @@ const liftEmbeds = (limit: number) => () => (tree: Node) => {
     define(tree);
     walk(tree);
 };
+
+// The longest math rendered, in characters of LaTeX. Longer is shown as written.
+export const MATH_LIMIT = 4000;
+
+const DOLLAR = String.fromCharCode(36);
+
+// Says which dollars are math, before the text is read as Markdown.
+//
+// The parser takes any two dollars in a line for math, so a sentence naming
+// two prices would be. The rule shared with Pandoc is narrower, and it is a
+// rule about the dollars themselves, whatever Markdown is around them: a
+// dollar opens math when something other than a space comes straight after
+// it, and the next dollar closes that math when something other than a space
+// comes straight before it and no digit after it. Math holds no dollar of its
+// own, so a dollar is math only with the very next one, and only where both
+// are as the rule says.
+//
+// Every other dollar is written with a backslash before it, which Markdown
+// reads as the dollar alone. The parser is then left with the pairs that are
+// math, and the text around them is Markdown as it would be anyway.
+//
+// Dollars in code, in math set apart on lines of its own, in HTML and in an
+// address given apart from its link are left as they are: a backslash there
+// would be shown.
+//
+// What is code is found by reading the text with no math in it, since a
+// dollar before a span of code would otherwise be taken to open math that
+// closes inside the span. Math set apart is found by reading it with math.
+const plain = unified().use(remarkParse).use(remarkGfm);
+const withMath = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const BACKSLASH = String.fromCharCode(92);
+
+export function settleDollars(text: string): string {
+    if (!text.includes(DOLLAR)) {
+        return text;
+    }
+
+    const left: [number, number][] = [];
+    const leave = (kinds: string[]) => function each(node: Node): void {
+        const from = node.position?.start.offset;
+        const to = node.position?.end.offset;
+
+        if (from !== undefined && to !== undefined && kinds.includes(node.type)) {
+            left.push([from, to]);
+            return;
+        }
+        node.children?.forEach(each);
+    };
+
+    const read = plain.parse(text) as unknown as Node;
+
+    leave(['code', 'inlineCode', 'html', 'definition'])(read);
+    leave(['math'])(withMath.parse(text) as unknown as Node);
+
+    // An address written bare, with no brackets, is a link as it stands. A
+    // dollar in one may be math, where it is one of a pair. Where it is not,
+    // it is left without a backslash, which would become part of the address.
+    const bare: [number, number][] = [];
+    const addresses = (node: Node) => {
+        const from = node.position?.start.offset;
+        const to = node.position?.end.offset;
+
+        if (node.type === 'link' && from !== undefined && to !== undefined && text.charAt(from) !== '[') {
+            bare.push([from, to]);
+        }
+        node.children?.forEach(addresses);
+    };
+
+    addresses(read);
+
+    // Asked of places in the order they come, so each list of ranges is gone
+    // through once however long the text is: a text is a stranger's, and may be
+    // all code spans.
+    const inOrder = (ranges: [number, number][]) => {
+        const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
+        let next = 0;
+
+        return (at: number) => {
+            while (next < sorted.length && sorted[next][1] <= at) {
+                next += 1;
+            }
+
+            return next < sorted.length && sorted[next][0] <= at;
+        };
+    };
+    const within = inOrder(left);
+    // The runs of dollars that may be math: outside what is left alone, and
+    // with no backslash already before them.
+    const runs: { at: number; length: number }[] = [];
+
+    for (let at = 0; at < text.length; at += 1) {
+        if (text.charAt(at) !== DOLLAR || within(at)) {
+            continue;
+        }
+
+        let slashes = 0;
+
+        while (text.charAt(at - 1 - slashes) === BACKSLASH) {
+            slashes += 1;
+        }
+
+        // A backslash is before this dollar alone: the next may open math.
+        if (slashes % 2 === 1) {
+            continue;
+        }
+
+        let length = 1;
+
+        while (text.charAt(at + length) === DOLLAR && !within(at + length)) {
+            length += 1;
+        }
+        runs.push({ at, length });
+        at += length - 1;
+    }
+
+    const opens = ({ at, length }: { at: number; length: number }) => /\S/.test(text.charAt(at + length));
+    const closes = ({ at, length }: { at: number; length: number }) => /\S/.test(text.charAt(at - 1)) && !/\d/.test(text.charAt(at + length));
+    const math = new Set<number>();
+
+    for (let index = 0; index < runs.length; index += 1) {
+        const open = runs[index];
+        const close = runs[index + 1];
+
+        // Math is one or two dollars each side, the same number, with
+        // something between them and no line left empty.
+        if (close && open.length <= 2 && open.length === close.length && opens(open) && closes(close)
+            && !/\n[ \t]*\n/.test(text.slice(open.at, close.at))) {
+            math.add(open.at).add(close.at);
+            index += 1;
+        }
+    }
+
+    const parts: string[] = [];
+    const inAddress = inOrder(bare);
+    let from = 0;
+
+    for (const { at, length } of runs) {
+        if (!math.has(at) && !inAddress(at)) {
+            parts.push(text.slice(from, at), (BACKSLASH + DOLLAR).repeat(length));
+            from = at + length;
+        }
+    }
+    parts.push(text.slice(from));
+
+    return parts.join('');
+}
+
+// Math between two dollars each side is set apart, wherever it is written,
+// and math too long to render is shown as it was written.
+const markMath = () => (tree: Node, file: unknown) => {
+    const source = String(file);
+    const walk = (parent: Node) => {
+        if (!parent.children) {
+            return;
+        }
+        parent.children = parent.children.map(child => {
+            const from = child.position?.start.offset;
+            const long = (child.value ?? '').length > MATH_LIMIT;
+
+            if (child.type === 'math' || (child.type === 'code' && child.lang === 'math')) {
+                return long ? { type: 'code', value: child.value } : child;
+            }
+            if (child.type !== 'inlineMath' || from === undefined) {
+                walk(child);
+                return child;
+            }
+            if (long) {
+                return { type: 'inlineCode', value: child.value };
+            }
+
+            return source.charAt(from + 1) === DOLLAR
+                ? { ...child, data: { ...child.data, hProperties: { className: ['language-math', 'math-display'] } } }
+                : child;
+        });
+    };
+
+    walk(tree);
+};
+
+// How KaTeX is asked to render: what is written is a stranger's, so no command
+// that makes a link, loads an image or sets a class or an attribute is run, and
+// a macro may expand only so far.
+const MATH = [[rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 500, maxSize: 20 }]];
 
 // One embed, as what its DID turns out to be.
 function Embed({ did, version, words }: { did: string; version: string; words: string }) {
@@ -222,12 +421,13 @@ const components: Components = {
 // shown inside a card has its own embeds shown by their words, so that an embed
 // is never inside another.
 export default function Markdown({ text, className = 'text', embeds = true }: { text: string; className?: string; embeds?: boolean }) {
-    const plugins = useMemo(() => [remarkGfm, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
+    const plugins = useMemo(() => [remarkGfm, remarkMath, markMath, liftEmbeds(embeds ? EMBED_LIMIT : 0)], [embeds]);
+    const settled = useMemo(() => settleDollars(text), [text]);
 
     return (
         <div className={`${className} markdown`}>
-            <ReactMarkdown remarkPlugins={plugins as never} urlTransform={safeUrl} components={components}>
-                {text}
+            <ReactMarkdown remarkPlugins={plugins as never} rehypePlugins={MATH as never} urlTransform={safeUrl} components={components}>
+                {settled}
             </ReactMarkdown>
         </div>
     );
