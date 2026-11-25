@@ -1305,7 +1305,13 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
 
 // The reader's own post or reply, being rewritten. Its kind and what it answers
 // stay as they are: an edit that changed them would not be the same object.
-function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: boolean) => void }) {
+function Edit({ api, publication, blocked = false, onDone }: {
+    api: Api; publication: Publication; onDone: (saved?: boolean) => void;
+    // Whether what is written cannot be saved: an edit of this already waits,
+    // or the node cannot say that none does, and this one would be made of
+    // the version before it.
+    blocked?: boolean;
+}) {
     const object = publication.memeplex!;
     const article = object.text === undefined && object.content !== undefined;
     const [text, setText] = useState(object.text ?? '');
@@ -1414,7 +1420,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                     onStoring={setStoring}
                 />
                 {error && <p role="alert" className="error">{error}</p>}
-                <button disabled={busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
+                {blocked && <p className="muted">An edit of this is waiting to be anchored, and another cannot be saved until it is.</p>}
+                <button disabled={blocked || busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
                 <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
             </div>
         );
@@ -1424,7 +1431,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
         <div className="composer">
             <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || storing || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
+            {blocked && <p className="muted">An edit of this is waiting to be anchored, and another cannot be saved until it is.</p>}
+            <button disabled={blocked || busy || storing || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
             <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
         </div>
     );
@@ -1451,21 +1459,28 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     const [error, setError] = useState('');
     const reads = useRef(0);
     // What an edit of the reader's says while its chain has not anchored it,
-    // as the node has it.
-    const [waits, setWaits] = useState<NonNullable<Publication['memeplex']> | null>(null);
+    // as the node has it: none where the node says there is none, and not
+    // known until the node has said. A post is another's to edit, or nobody's,
+    // until then.
+    const [waits, setWaits] = useState<NonNullable<Publication['memeplex']> | null | undefined>(undefined);
+    // The same for each reply of the reader's own that the thread shows.
+    const [answers, setAnswers] = useState<Record<string, NonNullable<Publication['memeplex']>>>({});
 
     const load = useCallback(async () => {
         const asked = reads.current += 1;
 
         try {
-            const [thread, latest, last] = await Promise.all([
+            // What the node has of what the reader wrote, which is ahead of the
+            // indexer while an edit waits. The page may have been read anew
+            // since the edit was made, and only the node still knows of it.
+            const own = (each: Publication) => each.did !== undefined && each.memeplex?.author === me.did && each.state === 'published';
+            const last = (each: Publication) => api.unanchored(each.did!).catch(() => undefined);
+            const [thread, latest, mineLast] = await Promise.all([
                 api.thread(opened.did!),
                 api.publication(opened.did!),
-                // What the node has of the reader's own post, which is ahead of
-                // the indexer while an edit waits. The page may have been read
-                // anew since the edit was made, and only the node still knows of it.
-                mine ? api.unanchored(opened.did!).catch(() => undefined) : undefined,
+                own(opened) ? last(opened) : undefined,
             ]);
+            const replied = await Promise.all(thread.map(each => each.publication).filter(own).map(async each => [each, await last(each)] as const));
 
             if (asked === reads.current) {
                 const shown = latest ?? opened;
@@ -1476,7 +1491,13 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                     setRoot(latest);
                     setEdited(of => (of !== undefined && versionKey(latest) !== of ? undefined : of));
                 }
-                setWaits(awaited(shown, last));
+                // Where the node could not say, it is not known that no edit waits.
+                setWaits(own(shown) && mineLast === undefined ? undefined : awaited(shown, mineLast));
+                setAnswers(Object.fromEntries(replied.flatMap(([each, found]) => {
+                    const edit = awaited(each, found);
+
+                    return edit ? [[each.did!, edit]] : [];
+                })));
                 setError('');
             }
         }
@@ -1485,7 +1506,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                 setError(message(failure));
             }
         }
-    }, [api, opened, mine, onRead]);
+    }, [api, opened, me.did, onRead]);
 
     useEffect(() => {
         load();
@@ -1508,21 +1529,24 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             <button className="quiet" onClick={load}>Refresh</button>
             {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
-            <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={waits !== null} />
+            <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} />
             {/* One edit at a time: the next is of the post as the last one left it. */}
-            {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && !waits && (
+            {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
             {/* An editor is of one version. When another is shown it starts again from that one,
                 so that what is saved was written against what the reader saw. */}
-            {editing && <Edit key={versionKey(root)} api={api} publication={root} onDone={saved => { setEditing(false); if (saved) { setEdited(versionKey(root)); load(); } }} />}
+            {editing && <Edit key={versionKey(root)} api={api} publication={root} blocked={waits !== null} onDone={saved => { setEditing(false); if (saved) { setEdited(versionKey(root)); load(); } }} />}
             {(edited !== undefined || waits) && <p className="muted">Your edit is waiting to be anchored. Until it is, others see this as it was.</p>}
             <Respond api={api} me={me} grants={grants} target={root} />
             {error && <p role="alert" className="error">{error}</p>}
             {replies === null && !error && <p className="muted">Loading replies…</p>}
             {replies?.map(each => (
                 <div key={each.publication.did} style={{ marginLeft: `${Math.min(each.depth, 6)}rem` }}>
-                    <Post publication={each.publication} />
+                    <Post
+                        publication={answers[each.publication.did ?? ''] ? { ...each.publication, memeplex: answers[each.publication.did ?? ''] } : each.publication}
+                        waiting={Boolean(answers[each.publication.did ?? ''])}
+                    />
                 </div>
             ))}
             {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (

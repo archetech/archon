@@ -67,7 +67,13 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         upload: vi.fn(async () => ({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' })),
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (cid: string) => state.bodies[cid]),
-        unanchored: vi.fn(async (did: string) => state.unanchored[did]),
+        // The node has every object, at the version shown unless a test says it has a later one.
+        unanchored: vi.fn(async (did: string) => {
+            const shown = [...state.timeline, ...Object.values(state.known)].find(each => each.did === did);
+            const opid = shown?.versions[shown.current ?? 0]?.opid;
+
+            return state.unanchored[did] ?? (shown?.memeplex && opid ? { versionId: opid, memeplex: shown.memeplex } : undefined);
+        }),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
         image: (did: string, version: string) => `/memepool/api/v1/images/${encodeURIComponent(did)}?versionId=${version}`,
@@ -2564,17 +2570,76 @@ describe('editing', () => {
         expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull();
     });
 
-    it('still opens the reader\'s post when the node cannot say what it has', async () => {
+    it('opens the reader\'s post when the node cannot say what it has, and offers no edit until it can', async () => {
         const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
-        const { api } = services({ me: granted, timeline: [mine] });
+        const { api, state } = services({ me: granted, timeline: [mine] });
         vi.mocked(api.unanchored).mockRejectedValue(new Error('no node'));
         render(<App api={api} />);
         const user = userEvent.setup();
 
         await user.click(await screen.findByRole('button', { name: 'Open' }));
 
-        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.getByText('A post.')).toBeTruthy();
         expect(screen.queryByRole('alert')).toBeNull();
+        // An edit may be waiting that the node has not told of.
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+
+        state.unanchored['did:cid:1'] = { versionId: 'op-did:cid:1', memeplex: mine.memeplex! };
+        vi.mocked(api.unanchored).mockImplementation(async did => state.unanchored[did]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+    });
+
+    it('saves nothing from an editor that was open when an edit was found to be waiting', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        state.unanchored['did:cid:1'] = { versionId: 'op-did:cid:1', memeplex: mine.memeplex! };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await user.type(screen.getByLabelText('Edit'), ' More.');
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+
+        // An edit made elsewhere is found, of the version this editor was opened on.
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...mine.memeplex!, text: 'Edited elsewhere.' } };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/another cannot be saved until it is/)).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+        // What was written is still there, to keep.
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A post. More.');
+        expect(state.edited).toStrictEqual([]);
+    });
+
+    it('shows the author their post as an edit leaves it though another client made the post, and their reply in another\'s thread', async () => {
+        // Under a grant that is not this service's, so the post is not theirs to change here.
+        const elsewhere = under(post('did:cid:1', ALICE, 'As it was.'), 'did:cid:other-grant');
+        const theirs = post('did:cid:2', BOB, 'From Bob.');
+        const reply = under({ ...post('did:cid:3', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:2', targetVersion: 'op-did:cid:2' } }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [elsewhere, theirs] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...elsewhere.memeplex!, text: 'As I left it.' } };
+        state.unanchored['did:cid:3'] = { versionId: 'op-reply-edit', memeplex: { ...reply.memeplex!, text: 'A better reply.' } };
+        vi.mocked(api.thread).mockImplementation(async did => (did === 'did:cid:2' ? [{ publication: reply, depth: 1 }] : []));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('As I left it.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:1'));
+        expect(await screen.findByText('As I left it.')).toBeTruthy();
+        expect(screen.getByText('Edit waiting to be anchored')).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        const answer = (await screen.findByText('A better reply.')).closest('article')!;
+
+        expect(within(answer).getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('A reply.')).toBeNull();
     });
 
     it('offers no edit of a post that a refresh shows was withdrawn', async () => {
