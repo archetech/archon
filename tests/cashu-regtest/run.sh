@@ -33,7 +33,6 @@ trap cleanup EXIT
 
 if [[ -z "${SKIP_BUILD:-}" ]]; then
     echo "== images, under private tags"
-    (cd "$root" && node scripts/prefetch-prebuilds.mjs >/dev/null 2>&1 || true)
     for name in gatekeeper-ts keymaster-ts keymaster-py drawbridge lightning-mediator didcomm cli cln; do
         echo "   $name"
         docker build -q -f "$root/docker/Dockerfile.$name" -t "cashu-regtest/$name:local" "$root" >/dev/null
