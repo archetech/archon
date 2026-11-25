@@ -40,9 +40,7 @@ const named = (parts: (string | undefined)[]): Route => {
 // The route an address names, or none for one that names nothing the pages
 // show. The address is whatever was in a link, so a DID is taken only where
 // it has the shape of one.
-//
-// A link made when the route was in the fragment, `#/p/<DID>`, is still read.
-export function routeOf(at: Pick<Location, 'pathname' | 'hash'>): Route {
+export function routeOf(at: Pick<Location, 'pathname'>): Route {
     let path: string;
 
     try {
@@ -52,9 +50,7 @@ export function routeOf(at: Pick<Location, 'pathname' | 'hash'>): Route {
         return null;
     }
 
-    const under = path.startsWith(root) ? named(path.slice(root.length).split('/')) : null;
-
-    return under ?? named(at.hash.replace(/^#\/?/, '').split('/'));
+    return path.startsWith(root) ? named(path.slice(root.length).split('/')) : null;
 }
 
 // The path that names a route, which is the pages' own for the reader's timeline.

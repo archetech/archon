@@ -1711,8 +1711,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         arrivals.current += 1;
         setLost('');
         setArriving(false);
-        // A link from when the route was in the fragment is given its address.
-        if (address !== window.location.pathname || window.location.hash) {
+        if (address !== window.location.pathname) {
             window.history.pushState(null, '', address);
         }
     }, [address]);
@@ -1785,11 +1784,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
             arrive();
         }
         window.addEventListener('popstate', arrive);
-        window.addEventListener('hashchange', arrive);
 
         return () => {
             window.removeEventListener('popstate', arrive);
-            window.removeEventListener('hashchange', arrive);
         };
     }, [arrive]);
 

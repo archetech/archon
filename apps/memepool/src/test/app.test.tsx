@@ -2760,7 +2760,7 @@ describe('the address of what is shown', () => {
     };
 
     it('names a publication or an author, and nothing else', () => {
-        const at = (pathname: string, hash = '') => routeOf({ pathname, hash });
+        const at = (pathname: string) => routeOf({ pathname });
 
         expect(at(`/p/${BOB}`)).toStrictEqual({ publication: BOB });
         expect(at(`/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
@@ -2779,11 +2779,6 @@ describe('the address of what is shown', () => {
         expect(pathOf(null)).toBe('/');
         expect(linkTo({ publication: BOB }, { origin: 'https://node.example' })).toBe(`https://node.example/p/${BOB}`);
 
-        // A link made when the route was in the fragment is still read.
-        expect(at('/', `#/p/${BOB}`)).toStrictEqual({ publication: BOB });
-        expect(at('/', `#/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
-        expect(at('/', '#/p/not-a-did')).toBeNull();
-        expect(at('/', '#')).toBeNull();
     });
 
     it('is under the path the pages are served at, wherever that is', () => {
@@ -2791,25 +2786,14 @@ describe('the address of what is shown', () => {
         try {
             expect(pathOf({ publication: BOB })).toBe(`/memepool/p/${BOB}`);
             expect(pathOf(null)).toBe('/memepool/');
-            expect(routeOf({ pathname: `/memepool/a/${BOB}/replies`, hash: '' })).toStrictEqual({ author: BOB, replies: true });
+            expect(routeOf({ pathname: `/memepool/a/${BOB}/replies` })).toStrictEqual({ author: BOB, replies: true });
             // A path that is not under the pages' own names nothing.
-            expect(routeOf({ pathname: `/p/${BOB}`, hash: '' })).toBeNull();
+            expect(routeOf({ pathname: `/p/${BOB}` })).toBeNull();
             expect(linkTo({ author: BOB }, { origin: 'https://node.example' })).toBe(`https://node.example/memepool/a/${BOB}`);
         }
         finally {
             setRoot('/');
         }
-    });
-
-    it('gives a link made when the route was in the fragment its address', async () => {
-        const { api, state } = services({ me: granted, timeline: both() });
-        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
-        window.history.replaceState(null, '', '/#/p/did:cid:2');
-        render(<App api={api} />);
-
-        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
-        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
-        expect(window.location.hash).toBe('');
     });
 
     it('opens the publication a link names, of whatever kind, for a reader who follows nobody', async () => {
