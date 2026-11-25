@@ -897,6 +897,25 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
                                 caret.current = event.target.selectionStart;
                                 onChange(event.target.value);
                             }}
+                            onPaste={event => {
+                                if (!upload || storing) {
+                                    return;
+                                }
+                                // The first file on the clipboard, which is an image copied from
+                                // a page or another app, or a screenshot. Pasting more than one
+                                // at a time is left to the Add image button, one at a time.
+                                for (const item of event.clipboardData.items) {
+                                    if (item.kind === 'file') {
+                                        const image = item.getAsFile();
+
+                                        if (image) {
+                                            event.preventDefault();
+                                            add(image);
+                                            return;
+                                        }
+                                    }
+                                }
+                            }}
                         />
                     </label>
                     {upload && (

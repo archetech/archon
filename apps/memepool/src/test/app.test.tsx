@@ -1659,6 +1659,40 @@ describe('adding an image to what is written', () => {
         expect(api.upload).not.toHaveBeenCalled();
     });
 
+    it('takes an image pasted into the text box, and puts its embed where the reader was writing', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Before. After.');
+        area.setSelectionRange(7, 7);
+        fireEvent.paste(area, { clipboardData: { items: [{ kind: 'file', getAsFile: () => file('image.png', 'image/png') }] } });
+
+        await waitFor(() => expect(area.value).toBe('Before.\n\n![image](did:cid:bagaaieraimage?versionId=bafyimage)\n\n After.'));
+        expect(vi.mocked(api.upload).mock.calls[0][0]).toBeInstanceOf(File);
+
+        // Nothing of the paste reaches the text box as its own content.
+        expect(area.value).not.toContain('[object');
+
+        // It is published as the reader left it.
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: 'Before.\n\n![image](did:cid:bagaaieraimage?versionId=bafyimage)\n\n After.' }]));
+    });
+
+    it('leaves text pasted into the text box alone, and stores no image for what is no file', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.click(area);
+        await user.paste('Just words.');
+
+        expect(area.value).toBe('Just words.');
+        expect(api.upload).not.toHaveBeenCalled();
+    });
+
     it('says when the service did not store it, and leaves what was written', async () => {
         const { api } = services({ me: granted });
         vi.mocked(api.upload).mockRejectedValue(new ApiError(429, 'too many images; try again within the hour'));
