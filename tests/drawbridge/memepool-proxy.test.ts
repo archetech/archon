@@ -198,3 +198,32 @@ it('says the service is not enabled on a node that runs none', async () => {
 it('answers 502 when the service does not', async () => {
     expect((await request(drawbridge('http://127.0.0.1:1')).get('/memepool/api/v1/config')).status).toBe(502);
 });
+
+// An image is sent as bytes of no stated kind, which is the one body the node
+// reads whole and passes on as it came.
+it('passes on the bytes of an image as they were sent', async () => {
+    let received: { type?: string; bytes?: Buffer } = {};
+    const upstream = await listen(express().post('/api/v1/images', express.raw({ type: 'application/octet-stream', limit: '10mb' }), (req, res) => {
+        received = { type: req.headers['content-type'], bytes: req.body as Buffer };
+        res.json({ did: 'did:cid:image' });
+    }));
+    const url = 'http://127.0.0.1:' + (upstream.address() as AddressInfo).port;
+    // Every byte there is, so that none is lost to being read as text.
+    const image = Buffer.from(Array.from({ length: 4096 }, (_, index) => index % 256));
+    const node = express()
+        .use(express.json({ limit: '10mb' }))
+        .use(express.raw({ type: 'application/octet-stream', limit: '10mb' }))
+        .use('/memepool', memepoolProxy({ memepoolURL: url }));
+
+    try {
+        const response = await request(node).post('/memepool/api/v1/images').set('Content-Type', 'application/octet-stream').send(image);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toStrictEqual({ did: 'did:cid:image' });
+        expect(received.type).toBe('application/octet-stream');
+        expect(Buffer.compare(received.bytes!, image)).toBe(0);
+    }
+    finally {
+        await new Promise(resolve => upstream.close(resolve));
+    }
+});

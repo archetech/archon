@@ -38,6 +38,7 @@ describe('metrics route labels', () => {
         ['/memepool/api/v1/avatars/did:cid:bagaaiera', '/memepool/api/v1/avatars/:did'],
         ['/memepool/api/v1/identities/did:cid:bagaaiera', '/memepool/api/v1/identities/:did'],
         ['/memepool/api/v1/images/did:cid:bagaaiera', '/memepool/api/v1/images/:did'],
+        ['/memepool/api/v1/images', '/memepool/api/v1/images'],
         ['/memepool/api/v1/objects/did:cid:bagaaiera/anything', '/memepool/:other'],
         ['/memepool/api/v1/objects', '/memepool/api/v1/objects'],
         ['/memepool/api/v1/me', '/memepool/api/v1/me'],

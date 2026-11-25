@@ -59,6 +59,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async (did: string) => state.known[did]),
         state: vi.fn(async (did: string) => state.states[did]),
+        upload: vi.fn(async () => ({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' })),
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (did: string, version?: string) => state.bodies[`${did} ${version}`] ?? state.bodies[did]),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
@@ -1596,6 +1597,89 @@ describe('a boost', () => {
     });
 });
 
+describe('adding an image to what is written', () => {
+    const EMBED = '![a chart](did:cid:bagaaieraimage?versionId=bafyimage)';
+    const file = (name: string, type: string, bytes = 100) => new File([new Uint8Array(bytes)], name, { type });
+    const chooser = (label: string) => screen.getByLabelText('An image to add to ' + label) as HTMLInputElement;
+
+    it('has the service store it, and puts its embed where the reader was writing', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Before. After.');
+        area.setSelectionRange(7, 7);
+        await user.upload(chooser('Post'), file('a chart.png', 'image/png'));
+
+        await waitFor(() => expect(area.value).toBe('Before.\n\n' + EMBED + '\n\n After.'));
+        expect(vi.mocked(api.upload).mock.calls[0][0]).toBeInstanceOf(File);
+
+        // It is published as the reader left it, embed and all.
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', text: 'Before.\n\n' + EMBED + '\n\n After.' }]));
+    });
+
+    it('puts an image into an empty text alone, and names it by its file with nothing that would end the embed', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.upload(chooser('Post'), file('a [odd] name.final.jpg', 'image/jpeg'));
+        await waitFor(() => expect(area.value).toBe('![a  odd  name.final](did:cid:bagaaieraimage?versionId=bafyimage)'));
+    });
+
+    it('sends nothing that is not an image text may embed, and says why', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup({ applyAccept: false });
+
+        await screen.findByLabelText('Post');
+        await user.upload(chooser('Post'), file('drawing.svg', 'image/svg+xml'));
+        expect((await screen.findByRole('alert')).textContent).toMatch(/PNG, JPEG, WebP or GIF/);
+
+        await user.upload(chooser('Post'), file('huge.png', 'image/png', 10_000_001));
+        await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/10 MB at most/));
+        expect(api.upload).not.toHaveBeenCalled();
+    });
+
+    it('says when the service did not store it, and leaves what was written', async () => {
+        const { api } = services({ me: granted });
+        vi.mocked(api.upload).mockRejectedValue(new ApiError(429, 'too many images; try again within the hour'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'Kept.');
+        await user.upload(chooser('Post'), file('a chart.png', 'image/png'));
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/was not stored: too many images/);
+        expect(area.value).toBe('Kept.');
+        expect((screen.getByRole('button', { name: 'Add image' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('is offered for an article and a reply as well, and to nobody who has not granted the service', async () => {
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
+        const view = render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        await user.upload(chooser('Article'), file('a chart.png', 'image/png'));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(EMBED));
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        await user.click(within(screen.getByText('From Alice.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        expect(chooser('Reply')).toBeTruthy();
+        view.unmount();
+
+        render(<App api={services({ me: { did: ALICE, link: 'archon://auth?grant=x' } }).api} />);
+        await screen.findByRole('button', { name: 'Sign out' });
+        expect(screen.queryByRole('button', { name: 'Add image' })).toBeNull();
+    });
+});
+
 describe('a post embedded in another', () => {
     const QUOTED = 'did:cid:bagaaieraquotedquotedquotedquotedquotedquotedquotedquote';
     // A version is named by the CID of the operation that made it.
@@ -2252,6 +2336,15 @@ describe('the services\' client', () => {
 
         expect(await api.state('did:cid:1')).toStrictEqual({ state: 'pending', registry: 'BTC:mainnet' });
         expect(await api.state('did:cid:2')).toBeUndefined();
+    });
+
+    it('sends an image to the service as bytes, with the browser\'s cookies', async () => {
+        const { api, asked } = answering({ 'POST /memepool/api/v1/images': { status: 200, body: { did: 'did:cid:image', versionId: 'bafyv1', type: 'image/png' } } });
+        const image = new Blob([new Uint8Array(4)], { type: 'image/png' });
+
+        expect(await api.upload(image)).toMatchObject({ did: 'did:cid:image', versionId: 'bafyv1' });
+        expect(asked[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' } });
+        expect(asked[0].init?.body).toBe(image);
     });
 
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {

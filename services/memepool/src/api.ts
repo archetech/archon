@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
+import { imageSize } from 'image-size';
 import type { Request, Response, NextFunction } from 'express';
 import { PERMITTED_REGISTRIES, actionFor } from '@didcid/memeplex';
 import { MemeplexClientError, allows, liveGrants } from '@didcid/memeplex/client';
@@ -20,8 +21,11 @@ export interface LoginKeymaster {
         didDocument?: { controller?: string };
         didDocumentData?: unknown;
         didDocumentRegistration?: { registry?: string };
-        didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean };
+        didDocumentMetadata?: { versionSequence?: string | number; deactivated?: boolean; versionId?: string };
     }>;
+    // Makes an image asset of the bytes, which the node's IPFS pins. Needed
+    // only by a service that takes images.
+    createImage?(buffer: Buffer, options?: { registry?: string; filename?: string }): Promise<string>;
 }
 
 // Where the service keeps the content of what it publishes: its node's IPFS,
@@ -76,6 +80,12 @@ export interface MemepoolOptions {
     // Who is asked whose an address is. Without it the service confirms no
     // address, and names no author by one.
     addresses?: AddressBook;
+    // How many images one user may have the service store in an hour, and the
+    // registry their assets are made on. An image is an Archon asset and not a
+    // Memeplex object, so it is on no grant's registry: it is made where it
+    // costs nothing and can be embedded at once.
+    imagesPerHour?: number;
+    imageRegistry?: string;
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
@@ -893,6 +903,87 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         }
         catch {
             none();
+        }
+    });
+
+    // Takes an image a user means to embed, and makes an image asset of it.
+    //
+    // The client that publishes an object pins what the object embeds, so the
+    // service stores the image itself, on its node's IPFS, as it stores an
+    // article's body. The asset is the service's own: it is not a Memeplex
+    // object, and what a post says of it is the embed.
+    //
+    // It is pinned for good, so it is for a user who has granted the service,
+    // only so many in an hour, and only an image of a kind and size that text
+    // may embed, by what the bytes themselves say.
+    const stored = new Map<string, number[]>();
+    const hourly = options.imagesPerHour ?? 30;
+
+    router.post('/images', express.raw({ type: 'application/octet-stream', limit: IMAGE_LIMIT }), async (req: Request, res: Response) => {
+        const { user } = req as Signed;
+        const refuse = (status: number, error: string) => { res.status(status).json({ error }); };
+
+        if (!images || !keymaster.createImage) {
+            refuse(501, 'this service stores no images');
+            return;
+        }
+        if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+            refuse(400, 'expected the bytes of an image, as application/octet-stream');
+            return;
+        }
+
+        let kind: { type?: string; width?: number; height?: number };
+
+        try {
+            kind = imageSize(req.body);
+        }
+        catch {
+            refuse(400, 'not an image');
+            return;
+        }
+
+        const type = `image/${kind.type === 'jpg' ? 'jpeg' : kind.type}`;
+
+        if (!IMAGE_TYPES.has(type)) {
+            refuse(400, 'an image is PNG, JPEG, WebP or GIF');
+            return;
+        }
+        if (!kind.width || !kind.height || kind.width * kind.height > IMAGE_PIXELS) {
+            refuse(400, 'the image has more pixels than text may embed');
+            return;
+        }
+
+        try {
+            if (liveGrants(await client.grantsFrom(user), new Date(now())).length === 0) {
+                refuse(403, 'no grant to publish under');
+                return;
+            }
+
+            const since = now() - 60 * 60_000;
+            const recent = (stored.get(user) ?? []).filter(at => at > since);
+
+            if (recent.length >= hourly) {
+                refuse(429, 'too many images; try again within the hour');
+                return;
+            }
+            stored.set(user, [...recent, now()]);
+            // Whoever has stored nothing lately is forgotten, so the list does not grow with every user there has been.
+            if (stored.size > MAX_HELD) {
+                for (const [each, times] of stored) {
+                    if (times.every(at => at <= since)) stored.delete(each);
+                }
+            }
+
+            const did = await keymaster.createImage(req.body, { registry: options.imageRegistry ?? 'hyperswarm' });
+            const versionId = (await keymaster.resolveDID(did)).didDocumentMetadata?.versionId;
+
+            if (typeof versionId !== 'string') {
+                throw new Error('the image has no version');
+            }
+            res.json({ did, versionId, type, bytes: req.body.length, width: kind.width, height: kind.height });
+        }
+        catch {
+            refuse(502, 'the node did not store the image');
         }
     });
 

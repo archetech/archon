@@ -396,15 +396,25 @@ const asItIs = async (read: Reading | undefined, did: string): Promise<Publicati
     return now?.state === 'published' && now.memeplex ? now : undefined;
 };
 
+// How a reader has the service store an image to embed, where they may.
+const Uploads = createContext<((image: Blob) => Promise<{ did: string; versionId: string }>) | undefined>(undefined);
+
+// The images text may embed, as Text formatting bounds them.
+const IMAGE_KINDS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const IMAGE_BYTES = 10_000_000;
+
 // What a reader's pages are given to go by: the way to an author's posts, the
 // way to open a publication, and how an embed is shown.
-function Ways({ visit, open, embedding, children }: {
-    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding; children: ReactNode;
+function Ways({ visit, open, embedding, upload, children }: {
+    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding;
+    upload?: (image: Blob) => Promise<{ did: string; versionId: string }>; children: ReactNode;
 }) {
     return (
         <Visits.Provider value={visit}>
             <Opens.Provider value={open}>
-                <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+                <Uploads.Provider value={upload}>
+                    <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+                </Uploads.Provider>
             </Opens.Provider>
         </Visits.Provider>
     );
@@ -725,6 +735,56 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
     const [showing, setShowing] = useState<'write' | 'preview'>('write');
     const id = useId();
     const tabs = useRef<Partial<Record<'write' | 'preview', HTMLButtonElement | null>>>({});
+    const upload = useContext(Uploads);
+    const area = useRef<HTMLTextAreaElement | null>(null);
+    const chooser = useRef<HTMLInputElement | null>(null);
+    const [storing, setStoring] = useState(false);
+    const [problem, setProblem] = useState('');
+    // The text as it is when an image has been stored, which may be later than when it was chosen.
+    const latest = useRef(value);
+
+    latest.current = value;
+
+    // Has the service store the image chosen, and puts its embed where the
+    // reader was writing. The words of the embed are the file's name, for the
+    // reader to change to what the image shows.
+    const add = async (image: File) => {
+        setProblem('');
+        if (!IMAGE_KINDS.includes(image.type)) {
+            setProblem('An image is PNG, JPEG, WebP or GIF.');
+            return;
+        }
+        if (image.size > IMAGE_BYTES) {
+            setProblem('An image may be 10 MB at most.');
+            return;
+        }
+
+        const at = area.current?.selectionStart ?? latest.current.length;
+
+        setStoring(true);
+        try {
+            const { did, versionId } = await upload!(image);
+            const words = image.name.replace(/\.[^.]*$/, '').replace(/[[\]\\\n]/g, ' ').trim() || 'image';
+            const text = latest.current;
+            const place = Math.min(at, text.length);
+            const before = text.slice(0, place);
+            const after = text.slice(place);
+
+            onChange([
+                before,
+                before.trim() && !/\n\s*$/.test(before) ? '\n\n' : '',
+                `![${words}](${did}?versionId=${versionId})`,
+                after.trim() && !/^\s*\n/.test(after) ? '\n\n' : '',
+                after,
+            ].join(''));
+        }
+        catch (failure) {
+            setProblem(`The image was not stored: ${message(failure)}`);
+        }
+        finally {
+            setStoring(false);
+        }
+    };
 
     const tab = (view: 'write' | 'preview', name: string) => (
         <button
@@ -760,8 +820,32 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
                 <div role="tabpanel" id={`${id}-write`} aria-label={`${label}: write`}>
                     <label>
                         {label}
-                        <textarea value={value} disabled={disabled} onChange={event => onChange(event.target.value)} rows={rows} />
+                        <textarea ref={area} value={value} disabled={disabled} onChange={event => onChange(event.target.value)} rows={rows} />
                     </label>
+                    {upload && (
+                        <p className="adding">
+                            <input
+                                ref={chooser}
+                                type="file"
+                                hidden
+                                accept={IMAGE_KINDS.join(',')}
+                                aria-label={`An image to add to ${label}`}
+                                onChange={event => {
+                                    const [image] = event.target.files ?? [];
+
+                                    // The same image may be chosen once more.
+                                    event.target.value = '';
+                                    if (image) {
+                                        add(image);
+                                    }
+                                }}
+                            />
+                            <button type="button" className="quiet" disabled={disabled || storing} onClick={() => chooser.current?.click()}>
+                                {storing ? 'Storing the image…' : 'Add image'}
+                            </button>
+                            {problem && <span role="alert" className="error"> {problem}</span>}
+                        </p>
+                    )}
                 </div>
             ) : (
                 <div role="tabpanel" id={`${id}-preview`} aria-label={`${label} preview`} className="post preview">
@@ -1549,7 +1633,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     };
 
     return (
-        <Ways visit={visit} open={setOpen} embedding={embedding}>
+        <Ways visit={visit} open={setOpen} embedding={embedding} upload={me.grant ? api.upload : undefined}>
             <main>
                 <header className="top">
                     <h1>Memepool</h1>
