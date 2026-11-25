@@ -67,6 +67,9 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
     font-size: 0.85rem;
 }
 
+a.when { color: inherit; text-decoration: none; }
+a.when:hover, a.when:focus-visible { text-decoration: underline; }
+
 .identity { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
 button.identity.visit { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 button.identity.visit:hover strong, button.identity.visit:hover .mono, button.identity.visit:focus-visible strong { text-decoration: underline; }

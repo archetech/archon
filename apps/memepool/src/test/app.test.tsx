@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import App, { tagWord } from '../App';
 import { ApiError, createApi } from '../api';
 import type { Api, Me, Publication, Responses } from '../api';
+import { hashOf, linkTo, routeOf } from '../route';
 
 const ALICE = 'did:cid:bagaaieraalicealicealicealicealicealicealicealicealicealice';
 const BOB = 'did:cid:bagaaierabobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbobbo';
@@ -2432,6 +2433,259 @@ describe('editing', () => {
         await screen.findByRole('button', { name: 'Boost' });
 
         expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    });
+});
+
+describe('the address of what is shown', () => {
+    const both = () => [post('did:cid:1', ALICE, 'From Alice.'), post('did:cid:2', BOB, 'From Bob.')];
+    const lastRead = (api: Api) => vi.mocked(api.timeline).mock.calls.slice(-1)[0];
+    const at = (hash: string) => window.history.replaceState(null, '', `/${hash}`);
+    const go = (hash: string) => {
+        window.history.pushState(null, '', `/${hash}`);
+        fireEvent(window, new PopStateEvent('popstate'));
+    };
+
+    it('names a publication or an author, and nothing else', () => {
+        expect(routeOf(`#/p/${BOB}`)).toStrictEqual({ publication: BOB });
+        expect(routeOf(`#/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
+        expect(routeOf(`#/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
+        for (const hash of ['', '#', '#/', '#/p/', '#/p/not-a-did', `#/x/${BOB}`, `#/p/${BOB}/replies`, `#/a/${BOB}/posts`, `#/a/${BOB}/replies/more`, '#/p/did:cid:a?b', '#/p/did:cid:<b>']) {
+            expect([hash, routeOf(hash)]).toStrictEqual([hash, null]);
+        }
+
+        // An address is read back as the route it was made from.
+        // A DID's own part may have colons in it.
+        for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }, { publication: 'did:web:example.org:users:alice' }]) {
+            expect(routeOf(hashOf(route))).toStrictEqual(route);
+        }
+        expect(hashOf(null)).toBe('');
+        expect(linkTo({ publication: BOB }, { origin: 'https://node.example', pathname: '/memepool/', search: '' })).toBe(`https://node.example/memepool/#/p/${BOB}`);
+    });
+
+    it('opens the publication a link names, of whatever kind, for a reader who follows nobody', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('From Alice.')).toBeNull();
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+        // The link is still the address of what is shown.
+        expect(window.location.hash).toBe('#/p/did:cid:2');
+    });
+
+    it('shows the author a link names, and the author\'s replies where it names them', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        at(`#/a/${BOB}`);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('From Alice.')).toBeNull();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+
+        cleanup();
+        at(`#/a/${BOB}/replies`);
+        render(<App api={api} />);
+        expect(await screen.findByRole('heading', { name: /Replies/ })).toBeTruthy();
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
+    });
+
+    it('follows the reader from one thing to another, and back', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('From Alice.');
+        expect(window.location.hash).toBe('');
+
+        // To an author, to the author's replies, and to a post.
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await user.click(screen.getByRole('tab', { name: 'Replies' }));
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}/replies`));
+        await user.click(screen.getByRole('tab', { name: 'Posts' }));
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+
+        // Back to the reader's own timeline, which has no name.
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(await screen.findByRole('button', { name: 'Back to your timeline' }));
+        await waitFor(() => expect(window.location.hash).toBe(''));
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+
+        // The browser's own back and forward show what each address names.
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        go('#/p/did:cid:2');
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        go('');
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+
+        // And the browser's history itself, a step back and a step forward.
+        window.history.back();
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
+        window.history.back();
+        await waitFor(() => expect(window.location.hash).toBe(`#/a/${BOB}`));
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        window.history.forward();
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
+    });
+
+    it('gives each post a link to itself, and an author one, to copy', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        const copied: string[] = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied.push(text); } } });
+        render(<App api={api} />);
+
+        const article = (await screen.findByText('From Alice.')).closest('article')!;
+
+        // The time is the link, as it is elsewhere.
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:1');
+        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:1`]));
+
+        fireEvent.click(within(article).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        fireEvent.click(within(await waitFor(() => document.querySelector('.author') as HTMLElement)).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied[1]).toBe(`${window.location.origin}/#/a/${ALICE}`));
+    });
+
+    it('says so when a link names nothing published, and shows the timeline', async () => {
+        const { api } = services({ me: granted, timeline: both() });
+        at('#/p/did:cid:none');
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        // The timeline is read after, and what it says of the link stays.
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published at that link/);
+    });
+
+    it('shows the reader\'s timeline for a link to nothing, whatever was shown, until the reader goes elsewhere', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByRole('button', { name: 'Back' });
+        go('#/p/did:cid:none');
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:none');
+
+        // From an author's list as well, and it is said no longer once the reader has gone on.
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        expect(screen.queryByRole('alert')).toBeNull();
+        go('#/p/did:cid:none');
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published/);
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('does not open a boosted post that was asked for before the reader went elsewhere', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted, timeline: [boost] });
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const article = (await screen.findByText('From Bob.')).closest('article')!;
+        let answer!: (found: Publication) => void;
+        vi.mocked(api.publication).mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+
+        // Open is pressed, and the reader goes to an author before the post is read.
+        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
+        answer(original);
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(window.location.hash).toBe(`#/a/${BOB}`);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    });
+
+    it('opens nothing its author has withdrawn', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.', { state: 'withdrawn' });
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    });
+
+    it('gives a boost the link of the post it is of', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted, timeline: [boost] });
+        state.known['did:cid:2'] = original;
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        const copied: string[] = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied.push(text); } } });
+        render(<App api={api} />);
+
+        const article = (await screen.findByText('From Bob.')).closest('article')!;
+
+        expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('#/p/did:cid:2');
+        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/#/p/did:cid:2`]));
+    });
+
+    it('does not show a publication an address named once the reader has gone elsewhere', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        let answer!: (found: Publication) => void;
+        vi.mocked(api.publication).mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The reader opens another post while the link's is still being read.
+        state.known['did:cid:1'] = post('did:cid:1', ALICE, 'From Alice.');
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:1'));
+        answer(post('did:cid:2', BOB, 'From Bob.'));
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(window.location.hash).toBe('#/p/did:cid:1');
+        expect(screen.getByText('From Alice.')).toBeTruthy();
+        expect(screen.queryByText('From Bob.')).toBeNull();
+    });
+
+    it('is where a reader who has yet to sign in arrives once they have', async () => {
+        const { api, state } = services({ timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        vi.mocked(api.login).mockImplementation(async body => {
+            if (body?.confirm === ALICE) {
+                state.me = granted;
+                return { did: ALICE };
+            }
+            return { answered: ALICE };
+        });
+        at('#/p/did:cid:2');
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        await user.click(await screen.findByRole('button', { name: 'This is me' }));
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:2');
     });
 });
 
