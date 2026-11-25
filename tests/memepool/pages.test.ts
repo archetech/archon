@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import express from 'express';
 import request from 'supertest';
-import { headOf, imageIn, pageRoutes, wordsOf } from '../../services/memepool/src/pages.ts';
+import { embedsIn, headOf, pageRoutes, wordsOf } from '../../services/memepool/src/pages.ts';
 import type { Previews, Shown } from '../../services/memepool/src/pages.ts';
 
 // The page at the address of a publication or an author: what it says of
@@ -35,11 +35,13 @@ let known: Record<string, Shown>;
 let bodies: Record<string, string>;
 let names: Record<string, string>;
 let asked: string[];
+let checked: string[];
 
 const previews: Previews = {
     publication: async did => { asked.push(did); return known[did]; },
     body: async cid => bodies[cid],
     name: async did => names[did],
+    image: async (did, version) => { checked.push(`${did} ${version}`); return did === IMAGE; },
 };
 
 const isDid = (did: string) => /^did:[a-z0-9]+:[A-Za-z0-9._%-]{1,200}$/.test(did);
@@ -59,6 +61,7 @@ beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'memepool-pages-'));
     writeFileSync(join(dir, 'index.html'), BUILT);
     asked = [];
+    checked = [];
     bodies = { bafybody: `# Heading\n\nThe *first* line of the [body](https://example.org), at length.\n\n![a chart](${IMAGE}?versionId=bafyversion)\n` };
     names = { [ALICE]: 'Alice A.' };
     known = {
@@ -91,6 +94,45 @@ describe('the page at the address of a publication', () => {
         expect(tag(answer.text, 'og:url')).toBe(`https://node.example/memepool/p/${ARTICLE}`);
         expect(tag(answer.text, 'og:image')).toBe(`https://node.example/memepool/api/v1/images/${encodeURIComponent(IMAGE)}?versionId=bafyversion`);
         expect(tag(answer.text, 'twitter:card')).toBe('summary_large_image');
+    });
+
+    it('takes for its image the first thing the text embeds that is an image, and not a post it quotes or what is written as code', async () => {
+        bodies.bafybody = [
+            'A post is quoted first, which is embedded as an image is:',
+            `![a post](${POST}?versionId=bafypost)`,
+            '```',
+            `![in code](${IMAGE}?versionId=bafycode)`,
+            '```',
+            `![the chart](${IMAGE}?versionId=bafychart)`,
+        ].join('\n');
+
+        const answer = (await request(app()).get(`/p/${ARTICLE}`)).text;
+
+        expect(tag(answer, 'og:image')).toBe(`https://node.example/memepool/api/v1/images/${encodeURIComponent(IMAGE)}?versionId=bafychart`);
+        expect(checked).toStrictEqual([`${POST} bafypost`, `${IMAGE} bafychart`]);
+
+        // Where none of them is an image, the page names none.
+        bodies.bafybody = `![a post](${POST}?versionId=bafypost)`;
+        expect(tag((await request(app()).get(`/p/${ARTICLE}`)).text, 'og:image')).toBeUndefined();
+    });
+
+    it('is no page with a slash after its address, from which its files would not be found', async () => {
+        for (const path of [`/p/${ARTICLE}/`, `/a/${ALICE}/`, `/a/${ALICE}/replies/`]) {
+            const answer = await request(app()).get(path);
+
+            expect([path, answer.status]).toStrictEqual([path, 404]);
+        }
+    });
+
+    it('reads a text made to be slow to read no slower than any other', async () => {
+        const started = Date.now();
+
+        for (const hostile of ['!['.repeat(100_000), '['.repeat(200_000), '```'.repeat(60_000), `${'*'.repeat(100_000)}](`, '](did:cid:x?versionId='.repeat(8_000)]) {
+            bodies.bafybody = hostile;
+            known[ARTICLE].memeplex = { ...known[ARTICLE].memeplex, subtitle: undefined };
+            expect((await request(app()).get(`/p/${ARTICLE}`)).status).toBe(200);
+        }
+        expect(Date.now() - started).toBeLessThan(3000);
     });
 
     it('is the page the script shows the publication in, with its files found from there', async () => {
@@ -214,11 +256,18 @@ describe('what a line about a text says', () => {
         expect(wordsOf('')).toBe('');
     });
 
-    it('finds the first image a text embeds, which is an asset at a version', () => {
-        expect(imageIn(`![one](${IMAGE}?versionId=bafyone) ![two](${IMAGE}?versionId=bafytwo)`)).toStrictEqual({ did: IMAGE, version: 'bafyone' });
-        expect(imageIn('![remote](https://example.org/a.png)')).toBeUndefined();
-        expect(imageIn(`![no version](${IMAGE})`)).toBeUndefined();
-        expect(imageIn(`[a link](${IMAGE}?versionId=bafyone)`)).toBeUndefined();
+    it('finds what a text embeds, in its order: each a DID at a version', () => {
+        expect(embedsIn(`![one](${IMAGE}?versionId=bafyone) and ![two](${POST}?versionId=bafytwo)`)).toStrictEqual([
+            { did: IMAGE, version: 'bafyone' }, { did: POST, version: 'bafytwo' },
+        ]);
+        expect(embedsIn('![remote](https://example.org/a.png)')).toStrictEqual([]);
+        expect(embedsIn(`![no version](${IMAGE})`)).toStrictEqual([]);
+        // A link is no embed, nor is what follows the end of other words.
+        expect(embedsIn(`[a link](${IMAGE}?versionId=bafyone)`)).toStrictEqual([]);
+        expect(embedsIn(`![words] then [a link](${IMAGE}?versionId=bafyone)`)).toStrictEqual([]);
+        expect(embedsIn(`\`\`\`\n![in code](${IMAGE}?versionId=bafycode)\n\`\`\`\n![after](${IMAGE}?versionId=bafyafter)`)).toStrictEqual([{ did: IMAGE, version: 'bafyafter' }]);
+        // No more than a few are taken, however many there are.
+        expect(embedsIn(`![x](${IMAGE}?versionId=v) `.repeat(50))).toHaveLength(5);
     });
 
     it('is written into a head with nothing of it as markup', () => {

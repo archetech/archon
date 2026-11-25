@@ -96,6 +96,9 @@ export async function addressOwner(address: string, signal: AbortSignal, fetcher
     }
 }
 
+// Milliseconds the indexer is given to say what a publication is.
+const INDEXER_WAIT = 3000;
+
 export async function startMemepool(
     settings: MemepoolSettings,
     version: { version: string; commit: string },
@@ -168,7 +171,11 @@ export async function startMemepool(
         throw new Error(`Memepool's identity ${settings.name} is registered on local, so nothing it publishes can be on a grant's registry. Give the service a wallet whose identity is on another registry.`);
     }
 
-    const indexer = settings.indexerURL ? new IndexerClient(settings.indexerURL) : undefined;
+    // The page at an address is not kept waiting on what it says of itself:
+    // an indexer that does not answer leaves the page as it is.
+    const indexer = settings.indexerURL
+        ? new IndexerClient(settings.indexerURL, (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(INDEXER_WAIT) }))
+        : undefined;
     const app = createMemepoolApp({
         client,
         keymaster,
@@ -187,6 +194,13 @@ export async function startMemepool(
             publication: did => indexer.publication(did),
             // No more of a body than a line about it and its first image need.
             body: cid => gatekeeper.getText(cid, 1_000_000),
+            image: async (did, versionId) => {
+                const asset = await keymaster.resolveDID(did, { versionId });
+                const held = asset.didDocumentData as { image?: unknown; file?: { type?: unknown } } | undefined;
+
+                return !asset.didDocumentMetadata?.deactivated && Boolean(held?.image)
+                    && typeof held?.file?.type === 'string' && held.file.type.startsWith('image/');
+            },
             name: async did => {
                 const name = ((await keymaster.resolveDID(did)).didDocumentData as { name?: unknown } | undefined)?.name;
 

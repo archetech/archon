@@ -27,6 +27,10 @@ export interface Previews {
     body?(cid: string): Promise<string | undefined>;
     // The name an identity gives itself, which is a claim.
     name?(did: string): Promise<string | undefined>;
+    // Whether what a text embeds is an image the service serves. A text
+    // embeds a publication the same way, which is shown as a card and is no
+    // image. Without it, a page names no image a text embeds.
+    image?(did: string, version: string): Promise<boolean>;
 }
 
 export interface PageOptions {
@@ -42,6 +46,11 @@ export interface PageOptions {
 
 const TITLE = 90;
 const LINE = 200;
+// How much of a text is read for a line about it, and for the images it
+// embeds. It is a stranger's text, read for every asking, so no more of it is
+// gone over than those need.
+const READ = 4000;
+const EMBEDS = 5;
 
 const escape = (text: string): string => text.replace(/[&<>"']/g, found => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;',
@@ -64,6 +73,7 @@ function short(text: string, most: number): string {
 // The words of a Markdown text, without its marks: what a line about it says.
 export function wordsOf(markdown: string): string {
     return markdown
+        .slice(0, READ)
         .replace(/```[\s\S]*?```/g, ' ')
         .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -75,11 +85,29 @@ export function wordsOf(markdown: string): string {
         .trim();
 }
 
-// The first image a text embeds: an image asset at a version.
-export function imageIn(markdown: string): { did: string; version: string } | undefined {
-    const found = /!\[[^\]]*\]\(\s*(did:[a-z0-9]+:[A-Za-z0-9._%-]+)\?versionId=([A-Za-z0-9]+)\s*\)/.exec(markdown);
+// What a text embeds, in the order it does: each a DID at a version, which is
+// an image or a publication. Code is not read, since what is written in it
+// is shown as it is written and embeds nothing.
+//
+// The text is gone over once. An embed ends in `](<DID>?versionId=<version>)`,
+// which is looked for, and is one where a `![` opens the words before it.
+export function embedsIn(markdown: string, most = EMBEDS): { did: string; version: string }[] {
+    const text = markdown.replace(/```[^`]*```/g, ' ');
+    const ends = /\]\(\s*(did:[a-z0-9]+:[A-Za-z0-9._%-]{1,200})\?versionId=([A-Za-z0-9]{1,200})\s*\)/g;
+    const found: { did: string; version: string }[] = [];
+    let from = 0;
 
-    return found ? { did: found[1], version: found[2] } : undefined;
+    for (let end = ends.exec(text); end && found.length < most; end = ends.exec(text)) {
+        const words = text.slice(from, end.index);
+        const opens = words.lastIndexOf('![');
+
+        if (opens !== -1 && !words.slice(opens + 2).includes(']')) {
+            found.push({ did: end[1], version: end[2] });
+        }
+        from = end.index + end[0].length;
+    }
+
+    return found;
 }
 
 interface Described {
@@ -104,8 +132,15 @@ async function publicationAt(did: string, site: string, previews: Previews): Pro
     const body = cid && previews.body ? await previews.body(cid).catch(() => undefined) ?? '' : '';
     const written = text(object.text) || body;
     const words = wordsOf(written);
-    const embedded = imageIn(written);
-    const image = embedded ? `/api/v1/images/${encodeURIComponent(embedded.did)}?versionId=${embedded.version}` : undefined;
+    let image: string | undefined;
+
+    // The first of what it embeds that is an image, and not a publication.
+    for (const embed of previews.image ? embedsIn(written) : []) {
+        if (await previews.image!(embed.did, embed.version).catch(() => false)) {
+            image = `/api/v1/images/${encodeURIComponent(embed.did)}?versionId=${embed.version}`;
+            break;
+        }
+    }
     const title = wordsOf(text(object.title));
 
     if (title) {
@@ -162,7 +197,9 @@ export function headOf(described: Described, site: string, address?: string, roo
 }
 
 export function pageRoutes({ pagesDir, site, publicURL, previews, isDid }: PageOptions): express.Router {
-    const router = express.Router();
+    // A path with a slash after it is another address, from which the page's
+    // files would be looked for a directory further down.
+    const router = express.Router({ strict: true });
     const root = publicURL?.replace(/\/+$/, '');
 
     // The page, with its files found from where it is served: they are named
