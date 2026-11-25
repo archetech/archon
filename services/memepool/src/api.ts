@@ -475,10 +475,20 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         res.json(true);
     });
 
+    // What a publication is shown with is read by anyone, as the publication
+    // itself is from the indexer: who its author says they are, their avatar,
+    // and the images its text embeds. Everything else is for a user who has
+    // signed in.
+    const open = (req: Request): boolean => req.method === 'GET' && /^\/(identities|avatars|images)\/[^/]+$/.test(req.path);
+
     router.use((req: Request, res: Response, next: NextFunction) => {
         const token = cookieOf(req);
         const user = token ? sessions.get(token) : undefined;
 
+        if (!user && open(req)) {
+            next();
+            return;
+        }
         if (!user) {
             res.status(401).json({ error: 'not signed in' });
             return;
@@ -753,7 +763,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // passed on only when that domain says the address is this identity's.
     //
     // Asking a domain is a request to somewhere a stranger chose, so what is
-    // found out is kept a while, and it is for a user who has signed in.
+    // found out is kept a while.
     const identities = new Expiring<Promise<{ name?: string; address?: string }>>(IDENTITY_KEPT, now);
     const identityOf = async (did: string): Promise<{ name?: string; address?: string }> => {
         const doc = await keymaster.resolveDID(did);
@@ -844,9 +854,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // An identity's avatar: the image asset its document names as `avatar`,
     // which is where a wallet puts one. It is whatever the identity's owner
     // chose, so it is served only as an image of a kind and size the service
-    // accepts, and a browser is told not to take it for anything else. Reading
-    // one has the node look for bytes a stranger named, so it is for a user who
-    // has signed in, as the rest of what is below is.
+    // accepts, and a browser is told not to take it for anything else.
     router.get('/avatars/:did', async (req, res) => {
         const none = () => { res.status(404).json({ error: 'no avatar' }); };
 

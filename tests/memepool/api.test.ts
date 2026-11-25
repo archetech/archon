@@ -160,7 +160,12 @@ describe('signing in', () => {
         expect((await request(app).get('/api/v1/ready')).body).toBe(true);
         expect((await request(app).get('/api/v1/config')).body).toStrictEqual({ name: 'Memepool', did: serviceDid });
 
-        for (const [method, path] of [['get', '/api/v1/me'], ['post', '/api/v1/objects'], ['delete', '/api/v1/objects/did:cid:any']] as const) {
+        // What is read without one is what a publication is shown with, and no more.
+        for (const [method, path] of [
+            ['get', '/api/v1/me'], ['post', '/api/v1/objects'], ['delete', '/api/v1/objects/did:cid:any'],
+            ['post', '/api/v1/images'], ['get', '/api/v1/images'], ['get', '/api/v1/objects/did:cid:any/state'],
+            ['post', '/api/v1/identities/did:cid:any'], ['get', '/api/v1/avatars/did:cid:any/more'],
+        ] as const) {
             expect((await request(app)[method](path)).status).toBe(401);
         }
     });
@@ -959,7 +964,7 @@ describe('an author\'s avatar', () => {
         reader = await signIn(bob);
     }, 120_000);
 
-    it('is served as the image it is, to a user who has signed in, for the browser to keep a while and take for nothing else', async () => {
+    it('is served as the image it is, to anyone, for the browser to keep a while and take for nothing else', async () => {
         const image = await picture();
 
         await name(alice, aliceDid, await alice.createImage(image, { registry: 'hyperswarm' }));
@@ -972,9 +977,9 @@ describe('an author\'s avatar', () => {
         expect(Buffer.compare(served.body, image)).toBe(0);
         expect(limits).toStrictEqual([AVATAR_LIMIT]);
 
-        // Nobody else has the node read it.
-        expect((await avatarOf(aliceDid, request(app))).status).toBe(401);
-        expect(limits).toStrictEqual([AVATAR_LIMIT]);
+        // It is read by anyone, as a publication is, under the same limit.
+        expect(Buffer.compare((await avatarOf(aliceDid, request(app))).body, image)).toBe(0);
+        expect(new Set(limits)).toStrictEqual(new Set([AVATAR_LIMIT]));
     }, 120_000);
 
     it('is not found for an identity that names none, for one that does not exist, and for what is no DID', async () => {
@@ -1167,7 +1172,7 @@ describe('an embedded image', () => {
         reader = await signIn(bob);
     }, 120_000);
 
-    it('is served at the version named, for a browser to keep, and to a user who has signed in', async () => {
+    it('is served at the version named, for a browser to keep, to anyone', async () => {
         const first = await picture(255);
         const did = await alice.createImage(first, { registry: 'hyperswarm' });
         const version = await versionOf(did);
@@ -1185,7 +1190,7 @@ describe('an embedded image', () => {
         expect(Buffer.compare(served.body, first)).toBe(0);
         expect(limits).toStrictEqual([IMAGE_LIMIT]);
 
-        expect((await imageAt(did, version, request(app))).status).toBe(401);
+        expect((await imageAt(did, version, request(app))).status).toBe(200);
     }, 120_000);
 
     it('is not found without a version, at a version that is not the asset\'s, or for what is no DID', async () => {
@@ -1265,8 +1270,8 @@ describe('an author\'s name and address', () => {
         expect(answer.body).toStrictEqual({ did: aliceDid, name: 'Alice A.', address: 'alice@example.org' });
         expect(lookups).toStrictEqual(['alice@example.org']);
 
-        // Nobody who has not signed in has the service ask a domain.
-        expect((await request(app).get(`/api/v1/identities/${encodeURIComponent(aliceDid)}`)).status).toBe(401);
+        // It is read by anyone, as a publication is.
+        expect((await request(app).get(`/api/v1/identities/${encodeURIComponent(aliceDid)}`)).body).toStrictEqual({ did: aliceDid, name: 'Alice A.', address: 'alice@example.org' });
     }, 120_000);
 
     it('gives no address that its domain does not say is this identity\'s', async () => {
