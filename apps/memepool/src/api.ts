@@ -97,6 +97,9 @@ export interface Person {
     address?: string;
 }
 
+// The most bytes of a body the pages read, which the node is asked to hold to.
+export const BODY_LIMIT = 1_000_000;
+
 export function createApi(bases: { memepool: string; memeplex: string; node?: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
     const call = (base: string, path: string, init?: RequestInit): Promise<Response> =>
         fetcher(`${base}/api/v1${path}`, {
@@ -212,8 +215,9 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
             return publication.versions?.[publication.current ?? -1]?.opid === versionId ? publication : undefined;
         },
         async content(cid) {
-            // The node serves what is on IPFS itself, to anyone, by its CID.
-            const response = await fetcher(`${bases.node ?? ''}/api/v1/ipfs/text/${encodeURIComponent(cid)}`);
+            // The node serves what is on IPFS itself, to anyone, by its CID,
+            // and reads no more of it than it is asked for.
+            const response = await fetcher(`${bases.node ?? ''}/api/v1/ipfs/text/${encodeURIComponent(cid)}?limit=${BODY_LIMIT}`);
 
             return response.ok ? response.text() : undefined;
         },
