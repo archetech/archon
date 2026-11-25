@@ -42,6 +42,10 @@ export interface PageOptions {
     publicURL?: string;
     previews?: Previews;
     isDid: (did: string) => boolean;
+    // Milliseconds a page waits to know what to say of itself. What it says
+    // is for whatever shows a link; a person who opens one is not kept from
+    // the page by it.
+    wait?: number;
 }
 
 const TITLE = 90;
@@ -196,7 +200,7 @@ export function headOf(described: Described, site: string, address?: string, roo
     ].join('\n    ');
 }
 
-export function pageRoutes({ pagesDir, site, publicURL, previews, isDid }: PageOptions): express.Router {
+export function pageRoutes({ pagesDir, site, publicURL, previews, isDid, wait = 4000 }: PageOptions): express.Router {
     // A path with a slash after it is another address, from which the page's
     // files would be looked for a directory further down.
     const router = express.Router({ strict: true });
@@ -228,8 +232,18 @@ export function pageRoutes({ pagesDir, site, publicURL, previews, isDid }: PageO
         let described: Described | undefined;
 
         if (previews && isDid(did)) {
-            // What cannot be read is a page that says nothing of itself.
-            described = await describe(did, previews).catch(() => undefined);
+            // What cannot be read, or is not read in time, is a page that
+            // says nothing of itself.
+            const read = describe(did, previews).catch(() => undefined);
+
+            described = await Promise.race([
+                read,
+                new Promise<undefined>(resolve => {
+                    const timer = setTimeout(resolve, wait);
+
+                    read.finally(() => clearTimeout(timer));
+                }),
+            ]);
         }
         await page(res, up, described && headOf(described, site, root && `${root}${req.path}`, root));
     };

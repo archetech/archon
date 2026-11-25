@@ -201,6 +201,23 @@ describe('the page at the address of a publication', () => {
         expect((await request(app({})).get(`/p/${POST}`)).text).toContain('<title>Memepool</title>');
     });
 
+    it('is the page as it is where what it would say is not known in time', async () => {
+        const made = express();
+
+        made.use(pageRoutes({
+            pagesDir: dir, site: 'Memepool', isDid, wait: 50,
+            previews: { ...previews, body: () => new Promise(() => undefined) },
+        }));
+
+        const started = Date.now();
+        const answer = await request(made).get(`/p/${ARTICLE}`);
+
+        expect(answer.status).toBe(200);
+        expect(answer.text).toContain('<title>Memepool</title>');
+        expect(answer.text).toContain('src="../assets/index-abc.js"');
+        expect(Date.now() - started).toBeLessThan(2000);
+    });
+
     it('asks the indexer for nothing that has not the shape of a DID', async () => {
         for (const did of ['not-a-did', 'did:cid:x/../../api/v1/me', 'did:cid:']) {
             const answer = await request(app()).get(`/p/${encodeURIComponent(did)}`);
