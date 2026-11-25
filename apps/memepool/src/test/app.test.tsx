@@ -36,6 +36,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
         // The bodies the node has, by CID.
         bodies: {} as Record<string, string>,
+        // The last version of each object as the node has it, anchored or not, by DID.
+        unanchored: {} as Record<string, { versionId: string; memeplex: NonNullable<Publication['memeplex']> }>,
         // What the service says of each identity, by its DID.
         people: {} as Record<string, { name?: string; address?: string }>,
         // The publications the indexer has, by DID, beside those of a timeline.
@@ -65,6 +67,13 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         upload: vi.fn(async () => ({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' })),
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (cid: string) => state.bodies[cid]),
+        // The node has every object, at the version shown unless a test says it has a later one.
+        unanchored: vi.fn(async (did: string) => {
+            const shown = [...state.timeline, ...Object.values(state.known)].find(each => each.did === did);
+            const opid = shown?.versions[shown.current ?? 0]?.opid;
+
+            return state.unanchored[did] ?? (shown?.memeplex && opid ? { versionId: opid, memeplex: shown.memeplex } : undefined);
+        }),
         avatar: (did: string) => `/memepool/api/v1/avatars/${encodeURIComponent(did)}`,
         identity: vi.fn(async (did: string) => state.people[did] ?? {}),
         image: (did: string, version: string) => `/memepool/api/v1/images/${encodeURIComponent(did)}?versionId=${version}`,
@@ -2365,7 +2374,7 @@ describe('an article', () => {
         await user.click(screen.getByRole('button', { name: 'Save' }));
 
         // Not anchored: the version shown is the one before, with its body.
-        expect(await screen.findByText('Your edit is waiting to be anchored.')).toBeTruthy();
+        expect(await screen.findByText(/Your edit is waiting to be anchored/)).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
         expect(screen.getByText(/Every post is one\./)).toBeTruthy();
 
@@ -2377,7 +2386,7 @@ describe('an article', () => {
         await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
         expect(await screen.findByText('Rewritten.')).toBeTruthy();
-        await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
+        await waitFor(() => expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull());
         expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
     });
 
@@ -2450,7 +2459,7 @@ describe('editing', () => {
         await waitFor(() => expect(state.edited).toStrictEqual([
             { did: 'did:cid:1', object: { kind: 'reply', target: 'did:cid:0', targetVersion: 'op-0', text: 'A better reply.' } },
         ]));
-        expect(await screen.findByText('Your edit is waiting to be anchored.')).toBeTruthy();
+        expect(await screen.findByText(/Your edit is waiting to be anchored/)).toBeTruthy();
         // One edit at a time, and the post is as it was until the edit is anchored.
         expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
         expect(screen.getByText('A reply.')).toBeTruthy();
@@ -2459,9 +2468,259 @@ describe('editing', () => {
         await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
         expect(await screen.findByText('A better reply.')).toBeTruthy();
-        await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
+        await waitFor(() => expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull());
         await user.click(screen.getByRole('button', { name: 'Edit' }));
         expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A better reply.');
+    });
+
+    // The page may be read anew, or the post left and come back to, while an
+    // edit waits: only the node still knows of the edit.
+    it('shows an edit that waits, and offers no other, when the post is opened once the page has forgotten it', async () => {
+        const mine = under({ ...post('did:cid:1', ALICE, ''), memeplex: { kind: 'post', author: ALICE, title: 'On DIDs', content: { cid: 'bafyold', type: 'text/markdown', bytes: 9 } } }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        state.bodies.bafyold = 'The old text.';
+        state.bodies.bafynew = 'The new text, with an image.';
+        state.unanchored['did:cid:1'] = {
+            versionId: 'op-edit',
+            memeplex: { ...mine.memeplex!, title: 'On DIDs, again', content: { cid: 'bafynew', type: 'text/markdown', bytes: 28 } },
+        };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+
+        // The author is shown the post as their edit leaves it, marked as waiting.
+        expect(await screen.findByText(/Your edit is waiting to be anchored/)).toBeTruthy();
+        expect(await screen.findByText('The new text, with an image.')).toBeTruthy();
+        expect(screen.getByText('On DIDs, again')).toBeTruthy();
+        expect(screen.getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('The old text.')).toBeNull();
+        // An edit made over it would be of the old text, and would undo it.
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+
+        // Once the indexer shows that version, the edit waits no more.
+        vi.mocked(api.publication).mockResolvedValue({
+            ...mine, current: 1,
+            versions: [...mine.versions, { opid: 'op-edit', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } }],
+            memeplex: state.unanchored['did:cid:1'].memeplex,
+        });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        await waitFor(() => expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull());
+        expect(screen.queryByText('Edit waiting to be anchored')).toBeNull();
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+    });
+
+    it('takes for waiting a version the indexer says is pending, and not one it says will not be published', async () => {
+        const edit = { versionId: 'op-edit', memeplex: { kind: 'post', author: ALICE, text: 'As I left it.', grant: 'did:cid:grant' } };
+        const mine = under(post('did:cid:1', ALICE, 'As it was.'), 'did:cid:grant');
+        const read = (outcome: string) => ({ ...mine, versions: [...mine.versions, { opid: 'op-edit', type: 'update', outcome }] }) as Publication;
+        const { api, state } = services({ me: granted, timeline: [read('pending')] });
+        state.unanchored['did:cid:1'] = edit;
+        render(<App api={api} />);
+
+        expect(await screen.findByText('As I left it.')).toBeTruthy();
+        expect(screen.getByText('Edit waiting to be anchored')).toBeTruthy();
+
+        cleanup();
+        state.timeline = [read('unattributed')];
+        render(<App api={api} />);
+        expect(await screen.findByText('As it was.')).toBeTruthy();
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(2));
+        expect(screen.queryByText('Edit waiting to be anchored')).toBeNull();
+        expect(screen.queryByText('As I left it.')).toBeNull();
+    });
+
+    it('lists the reader\'s own post as an edit that waits leaves it, marked as waiting, and another\'s as it is', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'As it was.'), 'did:cid:grant');
+        const theirs = post('did:cid:2', BOB, 'From Bob.');
+        const { api, state } = services({ me: granted, timeline: [mine, theirs] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...mine.memeplex!, text: 'As I left it.' } };
+        // The node has more of another's post than the indexer shows, which is not the reader's to see.
+        state.unanchored['did:cid:2'] = { versionId: 'op-other', memeplex: { ...theirs.memeplex!, text: 'Not yet.' } };
+        render(<App api={api} />);
+
+        const article = (await screen.findByText('As I left it.')).closest('article')!;
+
+        expect(within(article).getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('As it was.')).toBeNull();
+        // An embed is of a version, and the one listed is the version before the edit.
+        expect(within(article).queryByRole('button', { name: 'Copy embed' })).toBeNull();
+        expect(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Copy embed' })).toBeTruthy();
+        expect(screen.getByText('From Bob.')).toBeTruthy();
+        expect(screen.queryByText('Not yet.')).toBeNull();
+        expect(api.unanchored).not.toHaveBeenCalledWith('did:cid:2');
+    });
+
+    it('asks the node for nothing of another\'s post, and shows no edit where the node has the version shown', async () => {
+        const theirs = post('did:cid:2', BOB, 'From Bob.');
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [theirs, mine] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        state.unanchored['did:cid:1'] = { versionId: 'op-did:cid:1', memeplex: mine.memeplex! };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        expect(api.unanchored).not.toHaveBeenCalledWith('did:cid:2');
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(within((await screen.findByText('A post.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+        expect(api.unanchored).toHaveBeenCalledWith('did:cid:1');
+        expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull();
+    });
+
+    it('opens the reader\'s post when the node cannot say what it has, and offers no edit until it can', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        vi.mocked(api.unanchored).mockRejectedValue(new Error('no node'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.getByText('A post.')).toBeTruthy();
+        expect(screen.queryByRole('alert')).toBeNull();
+        // An edit may be waiting that the node has not told of.
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+
+        state.unanchored['did:cid:1'] = { versionId: 'op-did:cid:1', memeplex: mine.memeplex! };
+        vi.mocked(api.unanchored).mockImplementation(async did => state.unanchored[did]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+    });
+
+    it('shows the thread, and offers the edit, though the node is slow to give a reply of the reader\'s', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const reply = under({ ...post('did:cid:3', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:1', targetVersion: 'op-did:cid:1' } }, 'did:cid:grant');
+        const { api } = services({ me: granted, timeline: [mine] });
+        const node = vi.mocked(api.unanchored).getMockImplementation()!;
+        vi.mocked(api.unanchored).mockImplementation(did => (did === 'did:cid:3' ? new Promise(() => undefined) : node(did)));
+        vi.mocked(api.thread).mockResolvedValue([{ publication: reply, depth: 1 }]);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect(await screen.findByText('A reply.')).toBeTruthy();
+        expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+        expect(screen.queryByText('Loading replies…')).toBeNull();
+    });
+
+    it('shows nothing the node gives that is not the same object, or that the pages cannot show, and offers no edit over it', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        // Another's, or another kind of object, at a version the indexer has not read.
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...mine.memeplex!, author: BOB, text: 'Not mine.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('A post.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledWith('did:cid:1'));
+        expect(screen.queryByText('Not mine.')).toBeNull();
+        expect(screen.queryByText('Edit waiting to be anchored')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.getByText('A post.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    });
+
+    it('asks the node about each of the reader\'s posts once as older ones are listed, and anew when the list is read from its start', async () => {
+        const posts = Array.from({ length: 60 }, (_, at) => under(post(`did:cid:${at + 1}`, ALICE, `Post ${at + 1}.`), 'did:cid:grant'));
+        const { api } = services({ me: granted, timeline: posts });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('Post 1.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(50));
+        await user.click(await screen.findByRole('button', { name: /older/i }));
+        await screen.findByText('Post 60.');
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(60));
+
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(api.unanchored).toHaveBeenCalledTimes(110));
+    });
+
+    it('lists each waiting edit as the node gives it, and opens the post as it is anchored where nothing more can be read', async () => {
+        const one = under(post('did:cid:1', ALICE, 'One, as it was.'), 'did:cid:grant');
+        const two = under(post('did:cid:2', ALICE, 'Two, as it was.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [one, two] });
+        const node = vi.mocked(api.unanchored).getMockImplementation()!;
+        state.unanchored['did:cid:2'] = { versionId: 'op-edit', memeplex: { ...two.memeplex!, text: 'Two, as I left it.' } };
+        // The node never answers for the first.
+        vi.mocked(api.unanchored).mockImplementation(did => (did === 'did:cid:1' ? new Promise(() => undefined) : node(did)));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const article = (await screen.findByText('Two, as I left it.')).closest('article')!;
+
+        expect(screen.getByText('One, as it was.')).toBeTruthy();
+
+        // Opened where the indexer and the node can say nothing more, it is what is anchored.
+        vi.mocked(api.publication).mockResolvedValue(undefined);
+        vi.mocked(api.unanchored).mockRejectedValue(new Error('no node'));
+        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+        expect(await screen.findByText('Two, as it was.')).toBeTruthy();
+        expect(screen.queryByText('Two, as I left it.')).toBeNull();
+    });
+
+    it('saves nothing from an editor that was open when an edit was found to be waiting', async () => {
+        const mine = under(post('did:cid:1', ALICE, 'A post.'), 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        state.unanchored['did:cid:1'] = { versionId: 'op-did:cid:1', memeplex: mine.memeplex! };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await user.type(screen.getByLabelText('Edit'), ' More.');
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+
+        // An edit made elsewhere is found, of the version this editor was opened on.
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...mine.memeplex!, text: 'Edited elsewhere.' } };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/another cannot be saved until it is/)).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+        // What was written is still there, to keep.
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A post. More.');
+        expect(state.edited).toStrictEqual([]);
+    });
+
+    it('shows the author their post as an edit leaves it though another client made the post, and their reply in another\'s thread', async () => {
+        // Under a grant that is not this service's, so the post is not theirs to change here.
+        const elsewhere = under(post('did:cid:1', ALICE, 'As it was.'), 'did:cid:other-grant');
+        const theirs = post('did:cid:2', BOB, 'From Bob.');
+        const reply = under({ ...post('did:cid:3', ALICE, 'A reply.'), memeplex: { kind: 'reply', author: ALICE, text: 'A reply.', target: 'did:cid:2', targetVersion: 'op-did:cid:2' } }, 'did:cid:grant');
+        const { api, state } = services({ me: granted, timeline: [elsewhere, theirs] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        state.unanchored['did:cid:1'] = { versionId: 'op-edit', memeplex: { ...elsewhere.memeplex!, text: 'As I left it.' } };
+        state.unanchored['did:cid:3'] = { versionId: 'op-reply-edit', memeplex: { ...reply.memeplex!, text: 'A better reply.' } };
+        vi.mocked(api.thread).mockImplementation(async did => (did === 'did:cid:2' ? [{ publication: reply, depth: 1 }] : []));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(within((await screen.findByText('As I left it.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:1'));
+        expect(await screen.findByText('As I left it.')).toBeTruthy();
+        expect(screen.getByText('Edit waiting to be anchored')).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        const answer = (await screen.findByText('A better reply.')).closest('article')!;
+
+        expect(within(answer).getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('A reply.')).toBeNull();
     });
 
     it('offers no edit of a post that a refresh shows was withdrawn', async () => {
@@ -2920,6 +3179,33 @@ describe('the services\' client', () => {
 
         expect(await api.publish({ kind: 'post', text: 'x' })).toBe('did:cid:new');
         expect(asked[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', body: '{"kind":"post","text":"x"}', headers: { 'Content-Type': 'application/json' } });
+    });
+
+    it('reads an object\'s last version from the node, anchored or not', async () => {
+        const asked: string[] = [];
+        const fetcher = (async (url: string) => {
+            asked.push(url);
+
+            return url.endsWith('did%3Acid%3A1')
+                ? new Response(JSON.stringify({ didDocumentMetadata: { versionId: 'op-edit' }, didDocumentData: { memeplex: { kind: 'post', author: ALICE, text: 'x' } } }), { status: 200 })
+                : url.endsWith('did%3Acid%3A2')
+                    ? new Response(JSON.stringify({ didDocumentMetadata: { versionId: 'op' }, didDocumentData: { other: 1 } }), { status: 200 })
+                    : new Response('no', { status: 502 });
+        }) as unknown as typeof fetch;
+        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex', node: 'https://node.example' }, fetcher);
+
+        expect(await api.unanchored('did:cid:1')).toStrictEqual({ versionId: 'op-edit', memeplex: { kind: 'post', author: ALICE, text: 'x' } });
+        expect(asked[0]).toBe('https://node.example/api/v1/did/did%3Acid%3A1');
+        // What is no Memeplex object, and what the node cannot give, are nothing.
+        expect(await api.unanchored('did:cid:2')).toBeUndefined();
+        expect(await api.unanchored('did:cid:3')).toBeUndefined();
+
+        // Nor is an object whose words are not words: it is shown before any verifier has read it.
+        for (const memeplex of [{ kind: 'post', author: ALICE, title: 42 }, { kind: 'post', text: 'x' }, { kind: 'post', author: ALICE, content: 'cid' }, ['post'], 'post']) {
+            const odd = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, (async () => new Response(JSON.stringify({ didDocumentMetadata: { versionId: 'op' }, didDocumentData: { memeplex } }), { status: 200 })) as unknown as typeof fetch);
+
+            expect([memeplex, await odd.unanchored('did:cid:1')]).toStrictEqual([memeplex, undefined]);
+        }
     });
 
     it('reads a body from the node by its CID, as text, and none when the node has none', async () => {

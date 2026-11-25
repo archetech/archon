@@ -79,6 +79,10 @@ export interface Api {
     // The body of an article, read from the node by the CID its entry gives,
     // or nothing when the node has none.
     content(cid: string): Promise<string | undefined>;
+    // An object as the node has it, which is its last version whether or not
+    // its chain has anchored that one: what an edit that waits says. Nothing
+    // when the node cannot say.
+    unanchored(did: string): Promise<{ versionId: string; memeplex: NonNullable<Publication['memeplex']> } | undefined>;
     // The address of an identity's avatar, which answers 404 when it has none.
     avatar(did: string): string;
     // The address of an image asset at a version, which answers 404 for what
@@ -220,6 +224,32 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
             const response = await fetcher(`${bases.node ?? ''}/api/v1/ipfs/text/${encodeURIComponent(cid)}?limit=${BODY_LIMIT}`);
 
             return response.ok ? response.text() : undefined;
+        },
+        async unanchored(did) {
+            // The node resolves a DID to its last version, anchored or not.
+            const response = await fetcher(`${bases.node ?? ''}/api/v1/did/${encodeURIComponent(did)}`);
+
+            if (!response.ok) {
+                return undefined;
+            }
+
+            const doc = await response.json() as {
+                didDocumentMetadata?: { versionId?: unknown }; didDocumentData?: { memeplex?: unknown };
+            };
+            const versionId = doc.didDocumentMetadata?.versionId;
+            const memeplex = doc.didDocumentData?.memeplex;
+
+            // It is shown before any verifier has read it, so it is taken only
+            // where what the pages show of it is what they can show.
+            const shape = memeplex && typeof memeplex === 'object' && !Array.isArray(memeplex) ? memeplex as Record<string, unknown> : undefined;
+            const worded = shape !== undefined
+                && typeof shape.kind === 'string' && typeof shape.author === 'string'
+                && ['text', 'title', 'subtitle', 'summary', 'target', 'targetVersion'].every(field => shape[field] === undefined || typeof shape[field] === 'string')
+                && (shape.content === undefined || (typeof shape.content === 'object' && shape.content !== null && !Array.isArray(shape.content)));
+
+            return typeof versionId === 'string' && worded
+                ? { versionId, memeplex: shape as NonNullable<Publication['memeplex']> }
+                : undefined;
         },
         avatar: did => `${bases.memepool}/api/v1/avatars/${encodeURIComponent(did)}`,
         image: (did, versionId) => `${bases.memepool}/api/v1/images/${encodeURIComponent(did)}?versionId=${encodeURIComponent(versionId)}`,
