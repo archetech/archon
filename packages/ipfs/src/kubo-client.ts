@@ -3,6 +3,7 @@ import { create, KuboRPCClient } from 'kubo-rpc-client'
 import { CID } from 'multiformats/cid';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as sha256 from 'multiformats/hashes/sha2';
+import { ContentTooLargeError } from '@didcid/common/errors';
 import { isPrivateHostname } from '@didcid/common/net';
 import { encodeJSON } from './utils.js';
 import { IPFSClient, JSONEncodingOptions } from './types.js';
@@ -136,13 +137,25 @@ class KuboClient implements IPFSClient {
         return cid.toString(); // CID v1 default: base32 encoding
     }
 
-    async getText(cid: string): Promise<string> {
+    // Reads what a CID names, and no more than `limit` bytes of it. Leaving
+    // the loop ends the read: the rest is not fetched.
+    private async read(cid: string, limit?: number): Promise<Buffer> {
         const chunks = [];
+        let size = 0;
+
         for await (const chunk of this.ipfs.cat(cid, { timeout: 10000 })) {
+            size += chunk.length;
+            if (limit !== undefined && size > limit) {
+                throw new ContentTooLargeError(limit);
+            }
             chunks.push(chunk);
         }
-        const data = Buffer.concat(chunks);
-        return data.toString();
+
+        return Buffer.concat(chunks);
+    }
+
+    async getText(cid: string, limit?: number): Promise<string> {
+        return (await this.read(cid, limit)).toString();
     }
 
     async addData(data: Buffer): Promise<string> {
@@ -150,12 +163,8 @@ class KuboClient implements IPFSClient {
         return cid.toString(); // CID v1 default: base32 encoding
     }
 
-    async getData(cid: string): Promise<Buffer> {
-        const chunks = [];
-        for await (const chunk of this.ipfs.cat(cid, { timeout: 10000 })) {
-            chunks.push(chunk);
-        }
-        return Buffer.concat(chunks);
+    async getData(cid: string, limit?: number): Promise<Buffer> {
+        return this.read(cid, limit);
     }
 
     async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {

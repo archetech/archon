@@ -18,6 +18,7 @@ const config = {
     registriesPin: csvEnv('ARCHON_GATEKEEPER_REGISTRIES_PIN') || [],
     jsonLimit: process.env.ARCHON_GATEKEEPER_JSON_LIMIT || '4mb',
     uploadLimit: process.env.ARCHON_GATEKEEPER_UPLOAD_LIMIT || '10mb',
+    downloadLimit: process.env.ARCHON_GATEKEEPER_DOWNLOAD_LIMIT || '10mb',
     gcInterval: process.env.ARCHON_GATEKEEPER_GC_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_GC_INTERVAL) : 60,
     statusInterval: process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL) : 1,
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',

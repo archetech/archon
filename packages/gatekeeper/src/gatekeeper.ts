@@ -2619,16 +2619,16 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.ipfs.addText(text);
     }
 
-    async getText(cid: string): Promise<string | null> {
-        return this.ipfs.getText(cid);
+    async getText(cid: string, limit?: number): Promise<string | null> {
+        return this.ipfs.getText(cid, limit);
     }
 
     async addData(data: Buffer): Promise<string> {
         return this.ipfs.addData(data);
     }
 
-    async getData(cid: string): Promise<Buffer | null> {
-        return this.ipfs.getData(cid);
+    async getData(cid: string, limit?: number): Promise<Buffer | null> {
+        return this.ipfs.getData(cid, limit);
     }
 
     async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {

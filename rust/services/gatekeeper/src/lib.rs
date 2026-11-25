@@ -87,6 +87,7 @@ mod tests {
             pin_registries: vec![],
             json_limit: 4 * 1024 * 1024,
             upload_limit: 10 * 1024 * 1024,
+            download_limit: 10 * 1024 * 1024,
             gc_interval_minutes: 60,
             status_interval_minutes: 60,
             admin_api_key: String::new(),

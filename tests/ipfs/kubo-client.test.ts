@@ -1,3 +1,4 @@
+import { ContentTooLargeError } from '@didcid/common/errors';
 import { readFileSync } from 'node:fs';
 import { jest } from '@jest/globals';
 
@@ -184,6 +185,44 @@ describe('KuboClient content', () => {
 
         await expect(client.getText('bafy-x')).resolves.toBe('hello');
         expect(rpc.cat).toHaveBeenCalledWith('bafy-x', { timeout: 10000 });
+    });
+
+    it('reads no more than the limit, and stops the read where it is passed', async () => {
+        let given = 0;
+        let ended = false;
+        const endless = () => (async function* () {
+            try {
+                for (;;) {
+                    given += 1;
+                    yield Buffer.alloc(100, 1);
+                }
+            }
+            finally {
+                ended = true;
+            }
+        })();
+        const { client } = await connected({ cat: jest.fn<any>(endless) });
+
+        await expect(client.getData('bafy-x', 250)).rejects.toThrow(ContentTooLargeError);
+        // Three chunks pass 250 bytes, and no fourth is asked for.
+        expect(given).toBe(3);
+        expect(ended).toBe(true);
+
+        given = 0;
+        await expect(client.getText('bafy-x', 250)).rejects.toMatchObject({ type: 'Content too large', limit: 250 });
+        expect(given).toBe(3);
+    });
+
+    it('reads what is no more than the limit whole, and anything where there is no limit', async () => {
+        const chunks = () => (async function* () {
+            yield Buffer.from('hel');
+            yield Buffer.from('lo');
+        })();
+        const { client } = await connected({ cat: jest.fn<any>(chunks) });
+
+        await expect(client.getText('bafy-x', 5)).resolves.toBe('hello');
+        await expect(client.getText('bafy-x', 4)).rejects.toThrow(ContentTooLargeError);
+        await expect(client.getData('bafy-x')).resolves.toStrictEqual(Buffer.from('hello'));
     });
 
     it('returns binary reads as a Buffer', async () => {

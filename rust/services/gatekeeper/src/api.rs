@@ -2235,6 +2235,7 @@ pub(crate) async fn ipfs_add_text(State(state): State<AppState>, request: Reques
 pub(crate) async fn ipfs_get_text(
     State(state): State<AppState>,
     Path(cid): Path<String>,
+    Query(pairs): Query<Vec<(String, String)>>,
 ) -> Response {
     let start = Instant::now();
     proxy_ipfs_cat(
@@ -2243,6 +2244,7 @@ pub(crate) async fn ipfs_get_text(
         "text/plain; charset=utf-8",
         "/ipfs/text/:cid",
         start,
+        read_limit(&pairs, state.config.download_limit),
     )
     .await
 }
@@ -2275,6 +2277,7 @@ pub(crate) async fn ipfs_add_data(State(state): State<AppState>, request: Reques
 pub(crate) async fn ipfs_get_data(
     State(state): State<AppState>,
     Path(cid): Path<String>,
+    Query(pairs): Query<Vec<(String, String)>>,
 ) -> Response {
     let start = Instant::now();
     proxy_ipfs_cat(
@@ -2283,6 +2286,7 @@ pub(crate) async fn ipfs_get_data(
         "application/octet-stream",
         "/ipfs/data/:cid",
         start,
+        read_limit(&pairs, state.config.download_limit),
     )
     .await
 }
@@ -2532,19 +2536,59 @@ async fn proxy_ipfs_add(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
+// The most bytes of a CID's content that are read for a request, or nothing
+// where the request asks for a limit that is none. What a CID names may be any
+// size and is whatever whoever made it chose, so a read is bounded as an
+// upload is: by the node's limit, or by a lower one the caller asks for with
+// `limit`. A caller cannot ask for more than the node reads.
+fn read_limit(pairs: &[(String, String)], node: usize) -> Option<usize> {
+    let mut asked = pairs
+        .iter()
+        .filter(|(name, _)| name == "limit")
+        .map(|(_, value)| value.as_str());
+
+    match (asked.next(), asked.next()) {
+        (None, _) => Some(node),
+        (Some(value), None)
+            if !value.is_empty()
+                && value.len() <= 15
+                && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            value.parse::<usize>().ok().map(|limit| limit.min(node))
+        }
+        _ => None,
+    }
+}
+
 async fn proxy_ipfs_cat(
     state: &AppState,
     cid: &str,
     content_type: &str,
     route: &str,
     start: Instant,
+    limit: Option<usize>,
 ) -> Response {
-    let response = proxy_ipfs_cat_raw(state, cid).await;
+    let Some(limit) = limit else {
+        record_metrics(state, "GET", route, 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            error_json("limit is a number of bytes"),
+        )
+            .into_response();
+    };
+
+    let response = proxy_ipfs_cat_raw(state, cid, limit).await;
 
     let (status, body) = match response {
         Ok(value) => value,
         Err(response) => {
-            record_metrics(state, "GET", route, 502, start.elapsed().as_secs_f64());
+            record_metrics(
+                state,
+                "GET",
+                route,
+                response.status().as_u16(),
+                start.elapsed().as_secs_f64(),
+            );
             return response;
         }
     };
@@ -2563,9 +2607,20 @@ async fn proxy_ipfs_cat(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
-async fn proxy_ipfs_cat_raw(state: &AppState, cid: &str) -> Result<(StatusCode, Bytes), Response> {
+// The most that is passed on of what IPFS says when a read fails.
+const IPFS_ERROR_LIMIT: usize = 64 * 1024;
+
+// Reads what a CID names, and no more than `limit` bytes of it. The read is
+// taken a piece at a time, so that content past the limit is refused without
+// being held, and the request to IPFS is dropped, which ends it. That refusal
+// is told apart from content the node does not have.
+async fn proxy_ipfs_cat_raw(
+    state: &AppState,
+    cid: &str,
+    limit: usize,
+) -> Result<(StatusCode, Bytes), Response> {
     let url = format!("{}/cat", state.config.ipfs_url.trim_end_matches('/'));
-    let response = state
+    let mut response = state
         .client
         .post(url)
         .query(&[("arg", cid)])
@@ -2576,17 +2631,42 @@ async fn proxy_ipfs_cat_raw(state: &AppState, cid: &str) -> Result<(StatusCode, 
             (StatusCode::BAD_GATEWAY, error_json("IPFS cat failed")).into_response()
         })?;
 
+    // What IPFS says of a read that failed is its own error, and is not the
+    // content: it is passed on as it was, up to a size of its own, whatever
+    // limit the caller asked for. Only content is refused for its size.
     let status = response.status();
-    let body = response.bytes().await.map_err(|error| {
-        error!("ipfs cat body read failed: {error}");
-        (
-            StatusCode::BAD_GATEWAY,
-            error_json("IPFS cat response failed"),
-        )
-            .into_response()
-    })?;
+    let found = status.is_success();
+    let most = if found { limit } else { IPFS_ERROR_LIMIT };
+    let mut body: Vec<u8> = Vec::new();
 
-    Ok((status, body))
+    loop {
+        let chunk = response.chunk().await.map_err(|error| {
+            error!("ipfs cat body read failed: {error}");
+            (
+                StatusCode::BAD_GATEWAY,
+                error_json("IPFS cat response failed"),
+            )
+                .into_response()
+        })?;
+
+        let Some(chunk) = chunk else {
+            break;
+        };
+
+        if body.len().saturating_add(chunk.len()) > most {
+            if found {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    Json(json!({ "error": "Content too large", "limit": limit })),
+                )
+                    .into_response());
+            }
+            break;
+        }
+        body.extend_from_slice(&chunk);
+    }
+
+    Ok((status, Bytes::from(body)))
 }
 
 fn error_json(message: &str) -> Json<Value> {
@@ -2811,6 +2891,42 @@ fn confirm_fallback_url(base_url: &str, did: &str, options: &ResolveOptions) -> 
         url_encode_component(did),
         params.join("&")
     )
+}
+
+#[cfg(test)]
+mod read_limit_tests {
+    use super::read_limit;
+
+    fn asked(values: &[&str]) -> Vec<(String, String)> {
+        values
+            .iter()
+            .map(|value| ("limit".to_string(), value.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn is_the_nodes_where_none_is_asked_for() {
+        assert_eq!(read_limit(&[], 1000), Some(1000));
+        assert_eq!(
+            read_limit(&[("other".to_string(), "5".to_string())], 1000),
+            Some(1000)
+        );
+    }
+
+    #[test]
+    fn is_what_is_asked_for_and_never_more_than_the_nodes() {
+        assert_eq!(read_limit(&asked(&["500"]), 1000), Some(500));
+        assert_eq!(read_limit(&asked(&["5000"]), 1000), Some(1000));
+        assert_eq!(read_limit(&asked(&["0"]), 1000), Some(0));
+    }
+
+    #[test]
+    fn is_none_for_what_is_no_number_of_bytes() {
+        for value in ["-1", "1.5", "1mb", "ten", "", "1e3", "9999999999999999"] {
+            assert_eq!(read_limit(&asked(&[value]), 1000), None, "{value}");
+        }
+        assert_eq!(read_limit(&asked(&["1", "2"]), 1000), None);
+    }
 }
 
 #[cfg(test)]

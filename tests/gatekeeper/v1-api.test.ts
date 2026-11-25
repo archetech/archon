@@ -4,6 +4,8 @@ import request from 'supertest';
 import { createV1Router } from '../../services/gatekeeper/server/src/v1-router.ts';
 import { checkAdminApiKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/gatekeeper/server/src/v1-admin.ts';
 import defaultConfig from '../../services/gatekeeper/server/src/config.js';
+import { sizeOf } from '../../services/gatekeeper/server/src/v1-ipfs-router.ts';
+import { ContentTooLargeError } from '@didcid/common/errors';
 
 const adminKey = 'test-admin-key';
 const testConfig = {
@@ -13,6 +15,7 @@ const testConfig = {
     confirmFallbackURL: '',
     jsonLimit: '1mb',
     uploadLimit: '1mb',
+    downloadLimit: '1mb',
 };
 
 function streamChunks(chunks: Array<Buffer | string>) {
@@ -611,15 +614,67 @@ describe('/api/v1 IPFS routes', () => {
 
         const text = await request(app).get('/api/v1/ipfs/text/cid-text');
         expect(text.status).toBe(200);
-        expect(gatekeeper.getText).toHaveBeenCalledWith('cid-text');
+        expect(gatekeeper.getText).toHaveBeenCalledWith('cid-text', 1024 * 1024);
 
         const data = await request(app).get('/api/v1/ipfs/data/cid-data');
         expect(data.status).toBe(200);
-        expect(gatekeeper.getData).toHaveBeenCalledWith('cid-data');
+        expect(gatekeeper.getData).toHaveBeenCalledWith('cid-data', 1024 * 1024);
 
         const streamed = await request(app).post('/api/v1/ipfs/stream').send(Buffer.from('bytes'));
         expect(streamed.status).toBe(200);
         expect(gatekeeper.addDataStream).toHaveBeenCalled();
+    });
+
+    // What a CID names may be any size, and is whatever whoever made it chose.
+    it('reads no more of a CID\'s content than the node\'s limit, or than the caller asks for where that is less', async () => {
+        const { app, gatekeeper } = mount();
+
+        for (const path of ['/api/v1/ipfs/text/cid', '/api/v1/ipfs/data/cid']) {
+            const read = path.includes('text') ? gatekeeper.getText : gatekeeper.getData;
+
+            await request(app).get(path).query({ limit: 500 });
+            expect(read).toHaveBeenLastCalledWith('cid', 500);
+            // A caller may ask for less than the node reads, and never for more.
+            await request(app).get(path).query({ limit: 5 * 1024 * 1024 });
+            expect(read).toHaveBeenLastCalledWith('cid', 1024 * 1024);
+            await request(app).get(path).query({ limit: 0 });
+            expect(read).toHaveBeenLastCalledWith('cid', 0);
+        }
+    });
+
+    it('answers 413 for content past the limit, which is not content the node does not have', async () => {
+        const { app, gatekeeper } = mount();
+        gatekeeper.getText = jest.fn<any>().mockRejectedValue(new ContentTooLargeError(500));
+        gatekeeper.getData = jest.fn<any>().mockRejectedValue(new ContentTooLargeError(500));
+
+        for (const path of ['/api/v1/ipfs/text/cid', '/api/v1/ipfs/data/cid']) {
+            const response = await request(app).get(path).query({ limit: 500 });
+
+            expect(response.status).toBe(413);
+            expect(response.body).toStrictEqual({ error: 'Content too large', limit: 500 });
+        }
+    });
+
+    it('refuses a limit that is no number of bytes, and reads nothing for it', async () => {
+        const { app, gatekeeper } = mount();
+
+        for (const limit of ['-1', '1.5', '1mb', 'ten', '', '1e3', '9999999999999999']) {
+            for (const path of ['/api/v1/ipfs/text/cid', '/api/v1/ipfs/data/cid']) {
+                expect([limit, (await request(app).get(path).query({ limit })).status]).toStrictEqual([limit, 400]);
+            }
+        }
+        expect((await request(app).get('/api/v1/ipfs/text/cid?limit=1&limit=2')).status).toBe(400);
+        expect(gatekeeper.getText).not.toHaveBeenCalled();
+        expect(gatekeeper.getData).not.toHaveBeenCalled();
+    });
+
+    it('reads a size as it is written for the limits', () => {
+        expect(sizeOf('10mb')).toBe(10 * 1024 * 1024);
+        expect(sizeOf('64KB')).toBe(64 * 1024);
+        expect(sizeOf('512b')).toBe(512);
+        expect(sizeOf(' 2048 ')).toBe(2048);
+        expect(() => sizeOf('lots')).toThrow('invalid size');
+        expect(() => sizeOf('1gb')).toThrow('invalid size');
     });
 
     it('reports gatekeeper failures on IPFS routes as 500', async () => {

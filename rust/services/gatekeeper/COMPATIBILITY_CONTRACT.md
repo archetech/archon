@@ -86,6 +86,7 @@ must continue to honor them:
 | `ARCHON_GATEKEEPER_REGISTRIES` | unset | Optional comma-separated registry allowlist. |
 | `ARCHON_GATEKEEPER_JSON_LIMIT` | `4mb` | JSON request-body size limit. |
 | `ARCHON_GATEKEEPER_UPLOAD_LIMIT` | `10mb` | Binary/text upload body limit. |
+| `ARCHON_GATEKEEPER_DOWNLOAD_LIMIT` | `10mb` | The most bytes read for a CID's text or data. |
 | `ARCHON_GATEKEEPER_GC_INTERVAL` | `60` | DID verification/GC interval in minutes. |
 | `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `1` | Periodic DID status refresh interval in minutes. |
 | `ARCHON_ADMIN_API_KEY` | empty string (**required**) | Admin API protection. Both services refuse to start without it. |

@@ -443,12 +443,13 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getText(cid: string): Promise<string> {
+    async getText(cid: string, limit?: number): Promise<string> {
         try {
             // Text is returned as it was stored. Left to itself the HTTP
             // client reads a body that looks like JSON as JSON, so that `123`
             // would come back a number and `"a"` without its quotes.
             const response = await this.axios.get(`${this.API}/ipfs/text/${cid}`, {
+                params: limit === undefined ? undefined : { limit },
                 responseType: 'text',
                 transformResponse: [(data: unknown) => data],
             });
@@ -483,9 +484,10 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getData(cid: string): Promise<Buffer> {
+    async getData(cid: string, limit?: number): Promise<Buffer> {
         try {
             const response = await this.axios.get(`${this.API}/ipfs/data/${cid}`, {
+                params: limit === undefined ? undefined : { limit },
                 responseType: 'arraybuffer'
             });
             return Buffer.from(response.data);

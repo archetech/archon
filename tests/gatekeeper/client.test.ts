@@ -1001,6 +1001,27 @@ describe('getData', () => {
     const mockData = Buffer.from('mockData');
     const mockCID = 'mockCID';
 
+    it('asks the node to read no more than a limit, and throws its refusal of more', async () => {
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.data}/${mockCID}`)
+            .query({ limit: 8 })
+            .reply(200, mockData);
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.data}/${mockCID}`)
+            .query({ limit: 7 })
+            .reply(413, { error: 'Content too large', limit: 7 });
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.text}/${mockCID}`)
+            .query({ limit: 7 })
+            .reply(413, { error: 'Content too large', limit: 7 });
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        expect(await gatekeeper.getData(mockCID, 8)).toStrictEqual(mockData);
+        await expect(gatekeeper.getData(mockCID, 7)).rejects.toStrictEqual({ error: 'Content too large', limit: 7 });
+        await expect(gatekeeper.getText(mockCID, 7)).rejects.toStrictEqual({ error: 'Content too large', limit: 7 });
+    });
+
     it('should return text', async () => {
         nock(GatekeeperURL)
             .get(`${Endpoints.ipfs.data}/${mockCID}`)

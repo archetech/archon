@@ -1,5 +1,5 @@
 import * as jsonCodec from 'multiformats/codecs/json';
-import { ArchonError } from '@didcid/common/errors';
+import { ArchonError, ContentTooLargeError } from '@didcid/common/errors';
 import { IPFSClient, JSONEncodingOptions } from './types.js';
 import { generateCID, encodeJSON } from './utils.js';
 
@@ -51,6 +51,17 @@ export default class MemoryClient implements IPFSClient {
         return bytes;
     }
 
+    // As `require`, for a read that takes no more than `limit` bytes.
+    private within(cid: string, limit?: number): Uint8Array {
+        const bytes = this.require(cid);
+
+        if (limit !== undefined && bytes.length > limit) {
+            throw new ContentTooLargeError(limit);
+        }
+
+        return bytes;
+    }
+
     private async put(bytes: Uint8Array, key: any): Promise<string> {
         const cid = await generateCID(key);
         this.blocks.set(cid, Uint8Array.from(bytes));
@@ -62,16 +73,16 @@ export default class MemoryClient implements IPFSClient {
         return this.put(new TextEncoder().encode(text), text);
     }
 
-    async getText(cid: string): Promise<string> {
-        return new TextDecoder().decode(this.require(cid));
+    async getText(cid: string, limit?: number): Promise<string> {
+        return new TextDecoder().decode(this.within(cid, limit));
     }
 
     async addData(data: Buffer): Promise<string> {
         return this.put(data, data);
     }
 
-    async getData(cid: string): Promise<Buffer> {
-        return Buffer.from(this.require(cid));
+    async getData(cid: string, limit?: number): Promise<Buffer> {
+        return Buffer.from(this.within(cid, limit));
     }
 
     async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {

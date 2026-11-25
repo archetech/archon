@@ -1,4 +1,5 @@
 import MemoryClient, { BlockNotFoundError } from '@didcid/ipfs/memory';
+import { ContentTooLargeError } from '@didcid/common/errors';
 import { generateCID } from '@didcid/ipfs/utils';
 
 describe('MemoryClient', () => {
@@ -11,6 +12,17 @@ describe('MemoryClient', () => {
         const ipfs = new MemoryClient();
 
         expect(await ipfs.addJSON(operation)).toBe(await generateCID(operation));
+    });
+
+    it('reads no more than a limit it is given, as a node does', async () => {
+        const ipfs = new MemoryClient();
+        const text = await ipfs.addText('some text');
+        const data = await ipfs.addData(Buffer.from([1, 2, 3]));
+
+        expect(await ipfs.getText(text, 9)).toBe('some text');
+        await expect(ipfs.getText(text, 8)).rejects.toThrow(ContentTooLargeError);
+        expect(await ipfs.getData(data, 3)).toStrictEqual(Buffer.from([1, 2, 3]));
+        await expect(ipfs.getData(data, 2)).rejects.toMatchObject({ limit: 2 });
     });
 
     it('reads back what it stored', async () => {

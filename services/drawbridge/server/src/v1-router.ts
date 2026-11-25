@@ -228,11 +228,35 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
         }
     });
 
+    // The most bytes a caller would have read of what a CID names, passed on
+    // for the Gatekeeper to hold to. The Gatekeeper refuses one that is no
+    // number of bytes, so what is no such number is not passed on as one.
+    const limitOf = (req: express.Request): number | undefined =>
+        (typeof req.query.limit === 'string' && /^[0-9]{1,15}$/.test(req.query.limit) ? Number(req.query.limit) : undefined);
+
+    // The Gatekeeper's refusal of content past the limit is the caller's to
+    // know, and is not a failure of the node.
+    const tooLarge = (res: express.Response, error: any): boolean => {
+        if (error?.error !== 'Content too large') {
+            return false;
+        }
+        res.status(413).json({ error: error.error, ...(typeof error.limit === 'number' ? { limit: error.limit } : {}) });
+
+        return true;
+    };
+
     v1router.get('/ipfs/text/:cid', ...authMiddleware, async (req, res) => {
+        if (req.query.limit !== undefined && limitOf(req) === undefined) {
+            res.status(400).json({ error: 'limit is a number of bytes' });
+            return;
+        }
         try {
-            const result = await gatekeeper.getText(req.params.cid as string);
+            const result = await gatekeeper.getText(req.params.cid as string, limitOf(req));
             res.send(result);
         } catch (error: any) {
+            if (tooLarge(res, error)) {
+                return;
+            }
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
@@ -249,8 +273,12 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
     });
 
     v1router.get('/ipfs/data/:cid', ...authMiddleware, async (req, res) => {
+        if (req.query.limit !== undefined && limitOf(req) === undefined) {
+            res.status(400).json({ error: 'limit is a number of bytes' });
+            return;
+        }
         try {
-            const result = await gatekeeper.getData(req.params.cid as string);
+            const result = await gatekeeper.getData(req.params.cid as string, limitOf(req));
             if (result) {
                 res.set('Content-Type', 'application/octet-stream');
                 res.send(result);
@@ -258,6 +286,9 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
                 res.status(404).send('Not found');
             }
         } catch (error: any) {
+            if (tooLarge(res, error)) {
+                return;
+            }
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
