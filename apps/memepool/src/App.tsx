@@ -723,10 +723,13 @@ function Heading({ title, summary }: { title: string; summary: string }) {
 // The two views are tabs: one of them is in the order the Tab key follows, and
 // the arrow keys move between them. A panel is named for the text it is of, as
 // a page can hold more than one of these.
-function Draft({ label, value, onChange, disabled, rows, before, published = value }: {
+function Draft({ label, value, onChange, disabled, rows, before, published = value, onStoring }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
+    // Told while an image is being stored for this text: what is written is
+    // not whole until its embed is in it, so it is not yet to be published.
+    onStoring?: (storing: boolean) => void;
     disabled?: boolean;
     rows: number;
     before?: ReactNode;
@@ -744,6 +747,16 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
     const latest = useRef(value);
 
     latest.current = value;
+
+    // A text that has been put away takes no image that was still being stored for it.
+    const here = useRef(true);
+
+    useEffect(() => {
+        here.current = true;
+
+        return () => { here.current = false; };
+    }, []);
+    useEffect(() => { onStoring?.(storing); }, [onStoring, storing]);
 
     // Has the service store the image chosen, and puts its embed where the
     // reader was writing. The words of the embed are the file's name, for the
@@ -764,6 +777,11 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
         setStoring(true);
         try {
             const { did, versionId } = await upload!(image);
+
+            if (!here.current) {
+                return;
+            }
+
             const words = image.name.replace(/\.[^.]*$/, '').replace(/[[\]\\\n]/g, ' ').trim() || 'image';
             const text = latest.current;
             const place = Math.min(at, text.length);
@@ -779,10 +797,14 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
             ].join(''));
         }
         catch (failure) {
-            setProblem(`The image was not stored: ${message(failure)}`);
+            if (here.current) {
+                setProblem(`The image was not stored: ${message(failure)}`);
+            }
         }
         finally {
-            setStoring(false);
+            if (here.current) {
+                setStoring(false);
+            }
         }
     };
 
@@ -860,6 +882,8 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
 }
 
 function Composer({ label, onPublish }: { label: string; onPublish: (text: string) => Promise<void> }) {
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [text, setText] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -881,9 +905,9 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 
     return (
         <div className="composer">
-            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} />
+            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !text.trim()} onClick={publish}>Publish</button>
+            <button disabled={busy || storing || !text.trim()} onClick={publish}>Publish</button>
         </div>
     );
 }
@@ -898,6 +922,8 @@ function ArticleComposer({ onPublish, onCancel }: {
     const [summary, setSummary] = useState('');
     const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [error, setError] = useState('');
 
     const publish = async () => {
@@ -929,9 +955,10 @@ function ArticleComposer({ onPublish, onCancel }: {
                 disabled={busy}
                 rows={14}
                 before={<Heading title={title} summary={summary} />}
+                onStoring={setStoring}
             />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
+            <button disabled={busy || storing || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
             <button className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
         </div>
     );
@@ -1191,6 +1218,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     const [held, setHeld] = useState<string | undefined>(undefined);
     const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -1273,9 +1302,10 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                     disabled={busy || held === undefined}
                     rows={14}
                     before={<Heading title={title} summary={summary} />}
+                    onStoring={setStoring}
                 />
                 {error && <p role="alert" className="error">{error}</p>}
-                <button disabled={busy || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
+                <button disabled={busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
                 <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
             </div>
         );
@@ -1283,9 +1313,9 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
     return (
         <div className="composer">
-            <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} />
+            <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
+            <button disabled={busy || storing || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
             <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
         </div>
     );

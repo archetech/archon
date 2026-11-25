@@ -1659,6 +1659,46 @@ describe('adding an image to what is written', () => {
         expect((screen.getByRole('button', { name: 'Add image' }) as HTMLButtonElement).disabled).toBe(false);
     });
 
+    it('holds back what is written until the image is in it, and takes no image for a text that was put away', async () => {
+        const { api, state } = services({ me: granted });
+        // Each image being stored, for the test to say when it has been.
+        const storing: ((image: { did: string; versionId: string }) => void)[] = [];
+        const stored = () => storing.shift()?.({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' });
+        vi.mocked(api.upload).mockImplementation(() => new Promise(resolve => { storing.push(resolve); }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const area = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+
+        await user.type(area, 'See this.');
+        await user.upload(chooser('Post'), file('a chart.png', 'image/png'));
+
+        // While it is being stored the post is not whole, and is not to be published.
+        expect(await screen.findByRole('button', { name: 'Storing the image…' })).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Publish' }) as HTMLButtonElement).disabled).toBe(true);
+        expect(state.published).toStrictEqual([]);
+
+        stored();
+        await waitFor(() => expect(area.value).toBe('See this.\n\n' + EMBED));
+        await waitFor(() => expect((screen.getByRole('button', { name: 'Publish' }) as HTMLButtonElement).disabled).toBe(false));
+
+        // An article that is cancelled while its image is stored takes none.
+        await user.click(screen.getByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), 'A title');
+        await user.type(screen.getByLabelText('Article'), 'A body.');
+        await user.upload(chooser('Article'), file('a chart.png', 'image/png'));
+        await screen.findByRole('button', { name: 'Storing the image…' });
+        expect((screen.getByRole('button', { name: 'Publish article' }) as HTMLButtonElement).disabled).toBe(true);
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        stored();
+
+        // The article is gone, and its image is put into nothing that is there.
+        const post = await screen.findByLabelText('Post') as HTMLTextAreaElement;
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(post.value).not.toContain('bagaaieraimage');
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(state.published).toStrictEqual([]);
+    });
+
     it('is offered for an article and a reply as well, and to nobody who has not granted the service', async () => {
         const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'From Alice.')] });
         const view = render(<App api={api} />);
