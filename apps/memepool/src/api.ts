@@ -85,6 +85,9 @@ export interface Api {
     // The address of an image asset at a version, which answers 404 for what
     // is not an image the service serves.
     image(did: string, versionId: string): string;
+    // Has the service store an image and make an asset of it, and gives the
+    // asset's DID and the version to embed it at.
+    upload(image: Blob): Promise<{ did: string; versionId: string }>;
     // What an identity says of itself: the name it gives itself, which is a
     // claim, and the address its domain confirms is its own.
     identity(did: string): Promise<Person>;
@@ -141,6 +144,18 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
         },
         async withdraw(did) {
             await json(await post(`/objects/${encodeURIComponent(did)}`, undefined, 'DELETE'));
+        },
+        async upload(image) {
+            // Sent as bytes of no stated kind: the service says what an image
+            // is from the bytes, and the node's proxy passes on no other body whole.
+            const response = await fetcher(`${bases.memepool}/api/v1/images`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: image,
+            });
+
+            return json(response);
         },
         async state(did) {
             const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/state`).catch(() => undefined);

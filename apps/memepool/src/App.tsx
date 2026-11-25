@@ -396,15 +396,25 @@ const asItIs = async (read: Reading | undefined, did: string): Promise<Publicati
     return now?.state === 'published' && now.memeplex ? now : undefined;
 };
 
+// How a reader has the service store an image to embed, where they may.
+const Uploads = createContext<((image: Blob) => Promise<{ did: string; versionId: string }>) | undefined>(undefined);
+
+// The images text may embed, as Text formatting bounds them.
+const IMAGE_KINDS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const IMAGE_BYTES = 10_000_000;
+
 // What a reader's pages are given to go by: the way to an author's posts, the
 // way to open a publication, and how an embed is shown.
-function Ways({ visit, open, embedding, children }: {
-    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding; children: ReactNode;
+function Ways({ visit, open, embedding, upload, children }: {
+    visit: (did: string) => void; open: (publication: Publication) => void; embedding: Embedding;
+    upload?: (image: Blob) => Promise<{ did: string; versionId: string }>; children: ReactNode;
 }) {
     return (
         <Visits.Provider value={visit}>
             <Opens.Provider value={open}>
-                <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+                <Uploads.Provider value={upload}>
+                    <Embeds.Provider value={embedding}>{children}</Embeds.Provider>
+                </Uploads.Provider>
             </Opens.Provider>
         </Visits.Provider>
     );
@@ -713,10 +723,13 @@ function Heading({ title, summary }: { title: string; summary: string }) {
 // The two views are tabs: one of them is in the order the Tab key follows, and
 // the arrow keys move between them. A panel is named for the text it is of, as
 // a page can hold more than one of these.
-function Draft({ label, value, onChange, disabled, rows, before, published = value }: {
+function Draft({ label, value, onChange, disabled, rows, before, published = value, onStoring }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
+    // Told while an image is being stored for this text: what is written is
+    // not whole until its embed is in it, so it is not yet to be published.
+    onStoring?: (storing: boolean) => void;
     disabled?: boolean;
     rows: number;
     before?: ReactNode;
@@ -725,6 +738,86 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
     const [showing, setShowing] = useState<'write' | 'preview'>('write');
     const id = useId();
     const tabs = useRef<Partial<Record<'write' | 'preview', HTMLButtonElement | null>>>({});
+    const upload = useContext(Uploads);
+    const area = useRef<HTMLTextAreaElement | null>(null);
+    const chooser = useRef<HTMLInputElement | null>(null);
+    // Where the reader was writing, kept apart from the text box: the box is
+    // gone while the preview is shown, and comes back without its place.
+    const caret = useRef<number | undefined>(undefined);
+    // Called when the text box comes and when it goes, and at no other time:
+    // the box as it comes back is given the place the reader left.
+    const placed = useCallback((element: HTMLTextAreaElement | null) => {
+        if (element && caret.current !== undefined) {
+            element.setSelectionRange(caret.current, caret.current);
+        }
+        area.current = element;
+    }, []);
+    const [storing, setStoring] = useState(false);
+    const [problem, setProblem] = useState('');
+    // The text as it is when an image has been stored, which may be later than when it was chosen.
+    const latest = useRef(value);
+
+    latest.current = value;
+
+    // A text that has been put away takes no image that was still being stored for it.
+    const here = useRef(true);
+
+    useEffect(() => {
+        here.current = true;
+
+        return () => { here.current = false; };
+    }, []);
+    useEffect(() => { onStoring?.(storing); }, [onStoring, storing]);
+
+    // Has the service store the image chosen, and puts its embed where the
+    // reader was writing. The words of the embed are the file's name, for the
+    // reader to change to what the image shows.
+    const add = async (image: File) => {
+        setProblem('');
+        if (!IMAGE_KINDS.includes(image.type)) {
+            setProblem('An image is PNG, JPEG, WebP or GIF.');
+            return;
+        }
+        if (image.size > IMAGE_BYTES) {
+            setProblem('An image may be 10 MB at most.');
+            return;
+        }
+
+        setStoring(true);
+        try {
+            const { did, versionId } = await upload!(image);
+
+            if (!here.current) {
+                return;
+            }
+
+            const words = image.name.replace(/\.[^.]*$/, '').replace(/[[\]\\\n]/g, ' ').trim() || 'image';
+            // Where the reader is writing when the image has been stored, in
+            // the text as it then is: they may have gone on writing meanwhile.
+            const text = latest.current;
+            const place = Math.min(area.current?.selectionStart ?? caret.current ?? text.length, text.length);
+            const before = text.slice(0, place);
+            const after = text.slice(place);
+
+            onChange([
+                before,
+                before.trim() && !/\n\s*$/.test(before) ? '\n\n' : '',
+                `![${words}](${did}?versionId=${versionId})`,
+                after.trim() && !/^\s*\n/.test(after) ? '\n\n' : '',
+                after,
+            ].join(''));
+        }
+        catch (failure) {
+            if (here.current) {
+                setProblem(`The image was not stored: ${message(failure)}`);
+            }
+        }
+        finally {
+            if (here.current) {
+                setStoring(false);
+            }
+        }
+    };
 
     const tab = (view: 'write' | 'preview', name: string) => (
         <button
@@ -760,8 +853,42 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
                 <div role="tabpanel" id={`${id}-write`} aria-label={`${label}: write`}>
                     <label>
                         {label}
-                        <textarea value={value} disabled={disabled} onChange={event => onChange(event.target.value)} rows={rows} />
+                        <textarea
+                            ref={placed}
+                            value={value}
+                            disabled={disabled}
+                            rows={rows}
+                            onSelect={event => { caret.current = event.currentTarget.selectionStart; }}
+                            onChange={event => {
+                                caret.current = event.target.selectionStart;
+                                onChange(event.target.value);
+                            }}
+                        />
                     </label>
+                    {upload && (
+                        <p className="adding">
+                            <input
+                                ref={chooser}
+                                type="file"
+                                hidden
+                                accept={IMAGE_KINDS.join(',')}
+                                aria-label={`An image to add to ${label}`}
+                                onChange={event => {
+                                    const [image] = event.target.files ?? [];
+
+                                    // The same image may be chosen once more.
+                                    event.target.value = '';
+                                    if (image) {
+                                        add(image);
+                                    }
+                                }}
+                            />
+                            <button type="button" className="quiet" disabled={disabled || storing} onClick={() => chooser.current?.click()}>
+                                {storing ? 'Storing the image…' : 'Add image'}
+                            </button>
+                            {problem && <span role="alert" className="error"> {problem}</span>}
+                        </p>
+                    )}
                 </div>
             ) : (
                 <div role="tabpanel" id={`${id}-preview`} aria-label={`${label} preview`} className="post preview">
@@ -776,6 +903,8 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
 }
 
 function Composer({ label, onPublish }: { label: string; onPublish: (text: string) => Promise<void> }) {
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [text, setText] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -797,9 +926,9 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 
     return (
         <div className="composer">
-            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} />
+            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !text.trim()} onClick={publish}>Publish</button>
+            <button disabled={busy || storing || !text.trim()} onClick={publish}>Publish</button>
         </div>
     );
 }
@@ -814,6 +943,8 @@ function ArticleComposer({ onPublish, onCancel }: {
     const [summary, setSummary] = useState('');
     const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [error, setError] = useState('');
 
     const publish = async () => {
@@ -845,9 +976,10 @@ function ArticleComposer({ onPublish, onCancel }: {
                 disabled={busy}
                 rows={14}
                 before={<Heading title={title} summary={summary} />}
+                onStoring={setStoring}
             />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
+            <button disabled={busy || storing || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
             <button className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
         </div>
     );
@@ -1107,6 +1239,8 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
     const [held, setHeld] = useState<string | undefined>(undefined);
     const [body, setBody] = useState('');
     const [busy, setBusy] = useState(false);
+    // Whether an image is being stored for what is written.
+    const [storing, setStoring] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -1189,9 +1323,10 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
                     disabled={busy || held === undefined}
                     rows={14}
                     before={<Heading title={title} summary={summary} />}
+                    onStoring={setStoring}
                 />
                 {error && <p role="alert" className="error">{error}</p>}
-                <button disabled={busy || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
+                <button disabled={busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
                 <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
             </div>
         );
@@ -1199,9 +1334,9 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
     return (
         <div className="composer">
-            <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} />
+            <Draft label="Edit" value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
+            <button disabled={busy || storing || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
             <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
         </div>
     );
@@ -1549,7 +1684,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     };
 
     return (
-        <Ways visit={visit} open={setOpen} embedding={embedding}>
+        <Ways visit={visit} open={setOpen} embedding={embedding} upload={me.grant ? api.upload : undefined}>
             <main>
                 <header className="top">
                     <h1>Memepool</h1>

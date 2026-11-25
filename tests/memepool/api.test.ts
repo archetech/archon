@@ -1099,6 +1099,101 @@ describe('an author\'s avatar', () => {
     }, 120_000);
 });
 
+// An image a user means to embed is stored by the service, as an image asset.
+describe('storing an image', () => {
+    const picture = (width = 8, height = 8) => sharp({ create: { width, height, channels: 3, background: { r: 0, g: 128, b: 0 } } });
+    const send = (by: { post: (path: string) => request.Test }, bytes: Buffer, type = 'application/octet-stream') =>
+        by.post('/api/v1/images').set('Content-Type', type).send(bytes);
+
+    it('makes an image asset of what a user who has granted it sends, which is then embedded and served', async () => {
+        const { agent } = await granted(alice);
+        const image = await picture().png().toBuffer();
+        const made = await send(agent, image);
+
+        expect(made.status).toBe(200);
+        expect(made.body).toMatchObject({ type: 'image/png', bytes: image.length, width: 8, height: 8 });
+
+        // The asset is the service's own, pinned on its node, and at the version given.
+        const asset = await gatekeeper.resolveDID(made.body.did);
+        expect(asset.didDocument?.controller).toBe(serviceDid);
+        expect(asset.didDocumentRegistration?.registry).toBe('hyperswarm');
+        expect(asset.didDocumentMetadata?.versionId).toBe(made.body.versionId);
+        expect((asset.didDocumentData as { file: { cid: string } }).file.cid).toBe(await gatekeeper.addData(image));
+
+        const served = await agent.get(`/api/v1/images/${encodeURIComponent(made.body.did)}`).query({ versionId: made.body.versionId }).buffer(true).parse((res, done) => {
+            const parts: Buffer[] = [];
+
+            res.on('data', (part: Buffer) => parts.push(part));
+            res.on('end', () => done(null, Buffer.concat(parts)));
+        });
+        expect(served.headers['content-type']).toBe('image/png');
+        expect(Buffer.compare(served.body, image)).toBe(0);
+    }, 120_000);
+
+    it('takes each kind of image that text may embed, and says what it is from the bytes', async () => {
+        const { agent } = await granted(alice);
+
+        expect((await send(agent, await picture().jpeg().toBuffer())).body.type).toBe('image/jpeg');
+        expect((await send(agent, await picture().webp().toBuffer())).body.type).toBe('image/webp');
+        expect((await send(agent, await picture().gif().toBuffer())).body.type).toBe('image/gif');
+    }, 120_000);
+
+    it('stores nothing that is not such an image', async () => {
+        const { agent } = await granted(alice);
+        const added = jest.spyOn(gatekeeper, 'addData');
+        const refused = async (bytes: Buffer, status = 400, type?: string) => expect((await send(agent, bytes, type)).status).toBe(status);
+
+        await refused(Buffer.from('not an image at all'));
+        await refused(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>'));
+        await refused(await picture().avif().toBuffer());
+        await refused(await picture().tiff().toBuffer());
+        // More pixels than text may embed, in few bytes.
+        await refused(await picture(8000, 5001).png({ compressionLevel: 9 }).toBuffer());
+        // Nothing sent, and bytes sent as something else, which the service does not read.
+        await refused(Buffer.alloc(0));
+        await refused(await picture().png().toBuffer(), 400, 'image/png');
+        // More bytes than an image may have.
+        await refused(Buffer.alloc(IMAGE_LIMIT + 1, 1), 413);
+
+        expect(added).not.toHaveBeenCalled();
+        added.mockRestore();
+    }, 120_000);
+
+    it('stores an image only for a user who has granted the service, and only so many in an hour', async () => {
+        const image = await picture().png().toBuffer();
+        const stranger = await signIn(bob);
+
+        expect((await send(request(app), image)).status).toBe(401);
+        expect((await send(stranger, image)).status).toBe(403);
+
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, imagesPerHour: 2,
+        });
+        const { agent } = await granted(alice);
+
+        expect((await send(agent, image)).status).toBe(200);
+        expect((await send(agent, image)).status).toBe(200);
+        const third = await send(agent, image);
+        expect(third.status).toBe(429);
+        expect(third.body.error).toMatch(/within the hour/);
+
+        // An hour on, there is room again.
+        clock += 61 * 60_000;
+        expect((await send(agent, image)).status).toBe(200);
+    }, 120_000);
+
+    it('takes none when it has nowhere to serve them from', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,
+            sessionLifetime: 60_000, challengeLifetime: 60_000,
+        });
+        const { agent } = await granted(alice);
+
+        expect((await send(agent, await picture().png().toBuffer())).status).toBe(501);
+    }, 120_000);
+});
+
 // An image embedded in text is an image asset at one version.
 describe('an embedded image', () => {
     let reader: Awaited<ReturnType<typeof signIn>>;

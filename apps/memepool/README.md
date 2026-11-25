@@ -107,6 +107,11 @@ An embed is an image whose address is a DID and a version of it,
   words of a link or inside emphasis, is shown by its words. So is every embed past the twentieth in
   one text.
 
+Wherever a reader who has granted the service writes text there is **Add image**:
+the service stores the image chosen, makes an asset of it, and the pages put its
+embed where the reader was writing, named by the file for the reader to change to
+what the image shows.
+
 A version that is no longer in an object's history is said to be, and no other is
 shown in its place. Each post has **Copy embed**, which gives the Markdown that
 embeds the version shown; pasted into a post, the preview shows the card.

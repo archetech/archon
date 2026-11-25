@@ -113,6 +113,7 @@ button.identity.visit:hover strong, button.identity.visit:hover .mono, button.id
 .markdown input[type="checkbox"] { display: inline; width: auto; margin: 0 0.35rem 0 0; }
 .post .article { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .post.waiting { border-style: dashed; }
+.draft .adding { margin: 0.25rem 0 0; font-size: 0.9rem; }
 /* Math set apart scrolls where it is wider than the page. */
 .markdown .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; margin: 0.5rem 0; }
 .markdown .katex-error { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; color: inherit; }
