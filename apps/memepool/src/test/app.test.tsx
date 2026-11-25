@@ -2465,7 +2465,8 @@ describe('the services\' client', () => {
         const fetcher = (async (url: string, init?: RequestInit) => {
             asked.push({ url, init });
 
-            return url === 'https://node.example/api/v1/ipfs/text/bafkreibody'
+            // The node is asked to read no more than the most a body may be.
+            return url === 'https://node.example/api/v1/ipfs/text/bafkreibody?limit=1000000'
                 ? new Response('# On DIDs\n', { status: 200 })
                 : new Response('no such content', { status: 500 });
         }) as unknown as typeof fetch;
@@ -2479,7 +2480,7 @@ describe('the services\' client', () => {
         // With no node named, it is the host the pages are on.
         const here = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
         await here.content('bafkreibody');
-        expect(asked[2].url).toBe('/api/v1/ipfs/text/bafkreibody');
+        expect(asked[2].url).toBe('/api/v1/ipfs/text/bafkreibody?limit=1000000');
     });
 
     it('reads a publication at a version, and takes no other version for it', async () => {

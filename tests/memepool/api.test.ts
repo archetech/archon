@@ -106,9 +106,9 @@ let limits: number[] = [];
 const images = {
     get: async (cid: string, limit: number) => {
         limits.push(limit);
-        const data = await gatekeeper.getData(cid);
 
-        return data && data.length <= limit ? data : null;
+        // The node holds to the limit it is asked for, as the service asks it.
+        return gatekeeper.getData(cid, limit).catch(() => null);
     },
 };
 // Whose each address is, as its domain would say, and what was asked.
