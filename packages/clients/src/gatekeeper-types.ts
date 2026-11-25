@@ -214,13 +214,15 @@ export interface GatekeeperInterface {
     getQueue(registry: string): Promise<Operation[]>;
     clearQueue(registry: string, events: Operation[]): Promise<boolean>;
     addData(data: Buffer): Promise<string>;
-    getData(cid: string): Promise<Buffer | null>;
+    // `limit` is the most bytes the node is to read for this: it reads no
+    // further, and refuses what is larger. With none, the node's own limit holds.
+    getData(cid: string, limit?: number): Promise<Buffer | null>;
     addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string>;
     getDataStream(cid: string): AsyncIterable<Uint8Array>;
     addJSON(json: object): Promise<string>;
     getJSON(cid: string): Promise<object | null>;
     addText(text: string): Promise<string>;
-    getText(cid: string): Promise<string | null>;
+    getText(cid: string, limit?: number): Promise<string | null>;
     getBlock(registry: string, block?: BlockId): Promise<BlockInfo | null>;
     addBlock(registry: string, block: BlockInfo): Promise<boolean>;
     rewindRegistry(registry: string, fromHeight: number): Promise<boolean>;

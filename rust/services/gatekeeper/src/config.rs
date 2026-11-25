@@ -14,6 +14,7 @@ pub(crate) struct Config {
     pub(crate) pin_registries: Vec<String>,
     pub(crate) json_limit: usize,
     pub(crate) upload_limit: usize,
+    pub(crate) download_limit: usize,
     pub(crate) gc_interval_minutes: u64,
     pub(crate) status_interval_minutes: u64,
     pub(crate) admin_api_key: String,
@@ -51,6 +52,10 @@ impl Config {
             ))?,
             upload_limit: parse_size_string(&env_var_or_default(
                 "ARCHON_GATEKEEPER_UPLOAD_LIMIT",
+                "10mb",
+            ))?,
+            download_limit: parse_size_string(&env_var_or_default(
+                "ARCHON_GATEKEEPER_DOWNLOAD_LIMIT",
                 "10mb",
             ))?,
             gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 60)?,

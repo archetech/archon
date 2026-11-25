@@ -411,6 +411,34 @@
     "compareMode": "text"
   },
   {
+    "name": "ipfs-text-fetch-within-limit",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/text/{{textCid}}?limit=27",
+    "expectedStatus": 200,
+    "compareMode": "text"
+  },
+  {
+    "name": "ipfs-text-fetch-past-limit",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/text/{{textCid}}?limit=26",
+    "expectedStatus": 413,
+    "compareMode": "json"
+  },
+  {
+    "name": "ipfs-data-fetch-past-limit",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/data/{{textCid}}?limit=0",
+    "expectedStatus": 413,
+    "compareMode": "json"
+  },
+  {
+    "name": "ipfs-text-fetch-limit-not-a-number",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/text/{{textCid}}?limit=1mb",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
     "name": "did-resolve-fallback-resolver",
     "method": "GET",
     "path": "/api/v1/did/did:example:phase6-fallback",

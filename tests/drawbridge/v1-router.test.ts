@@ -284,6 +284,43 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
         expect(gatekeeper.addJSON).toHaveBeenCalled();
     });
 
+    it('passes on the most a caller would have read of a CID, and the Gatekeeper\'s refusal of more', async () => {
+        const { app, gatekeeper } = mount();
+
+        await request(app).get('/api/v1/ipfs/text/cid').query({ limit: 500 });
+        expect(gatekeeper.getText).toHaveBeenLastCalledWith('cid', 500);
+        await request(app).get('/api/v1/ipfs/data/cid').query({ limit: 500 });
+        expect(gatekeeper.getData).toHaveBeenLastCalledWith('cid', 500);
+        // With none asked for, the Gatekeeper's own limit holds.
+        await request(app).get('/api/v1/ipfs/text/cid');
+        expect(gatekeeper.getText).toHaveBeenLastCalledWith('cid', undefined);
+
+        // What the Gatekeeper refuses for its size is the caller's to know.
+        gatekeeper.getText.mockRejectedValue({ error: 'Content too large', limit: 500 });
+        gatekeeper.getData.mockRejectedValue({ error: 'Content too large', limit: 500 });
+        for (const path of ['/api/v1/ipfs/text/cid', '/api/v1/ipfs/data/cid']) {
+            const refused = await request(app).get(path).query({ limit: 500 });
+
+            expect(refused.status).toBe(413);
+            expect(refused.body).toStrictEqual({ error: 'Content too large', limit: 500 });
+        }
+
+        // Any other failure is the node's, as before.
+        gatekeeper.getText.mockRejectedValue(new Error('boom'));
+        expect((await request(app).get('/api/v1/ipfs/text/cid')).status).toBe(502);
+    });
+
+    it('refuses a limit that is no number of bytes, and asks the Gatekeeper nothing', async () => {
+        const { app, gatekeeper } = mount();
+
+        for (const limit of ['-1', '1mb', 'ten', '']) {
+            expect((await request(app).get('/api/v1/ipfs/text/cid').query({ limit })).status).toBe(400);
+            expect((await request(app).get('/api/v1/ipfs/data/cid').query({ limit })).status).toBe(400);
+        }
+        expect(gatekeeper.getText).not.toHaveBeenCalled();
+        expect(gatekeeper.getData).not.toHaveBeenCalled();
+    });
+
     // Gatekeeper answers with the bare CID. A client reading the body as text, as the
     // Python Keymaster does, would otherwise store the quotes as part of the CID.
     it('answers IPFS writes with the bare CID, as Gatekeeper does', async () => {

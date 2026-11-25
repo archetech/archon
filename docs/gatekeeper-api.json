@@ -2080,6 +2080,16 @@
               "type": "string"
             },
             "description": "The CID (Content Identifier) of the text to retrieve"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "The most bytes to read. The node reads no more than its own limit (ARCHON_GATEKEEPER_DOWNLOAD_LIMIT), and a caller may ask for less.\n"
           }
         ],
         "responses": {
@@ -2093,6 +2103,9 @@
               }
             }
           },
+          "400": {
+            "description": "The limit is not a number of bytes."
+          },
           "404": {
             "description": "Text not found",
             "content": {
@@ -2100,6 +2113,25 @@
                 "schema": {
                   "type": "string",
                   "example": "Not Found"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The content is larger than the limit, and is not read past it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Content too large"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
                 }
               }
             }
@@ -2169,6 +2201,16 @@
               "type": "string"
             },
             "description": "The CID (Content Identifier) of the data to retrieve"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "The most bytes to read. The node reads no more than its own limit (ARCHON_GATEKEEPER_DOWNLOAD_LIMIT), and a caller may ask for less.\n"
           }
         ],
         "responses": {
@@ -2183,6 +2225,9 @@
               }
             }
           },
+          "400": {
+            "description": "The limit is not a number of bytes."
+          },
           "404": {
             "description": "Data not found",
             "content": {
@@ -2190,6 +2235,25 @@
                 "schema": {
                   "type": "string",
                   "example": "Not Found"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The content is larger than the limit, and is not read past it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Content too large"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
                 }
               }
             }

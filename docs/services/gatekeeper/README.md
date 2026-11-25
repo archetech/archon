@@ -104,9 +104,9 @@ unhandled paths.
 | `POST` | `/api/v1/ipfs/json` | no | Body: any JSON. Returns the CID as `text/plain`. Bounded by `ARCHON_GATEKEEPER_JSON_LIMIT`. |
 | `GET` | `/api/v1/ipfs/json/:cid` | no | Returns the JSON payload. |
 | `POST` | `/api/v1/ipfs/text` | no | Body: `text/plain` up to `ARCHON_GATEKEEPER_UPLOAD_LIMIT`. Returns CID. |
-| `GET` | `/api/v1/ipfs/text/:cid` | no | Returns text. |
+| `GET` | `/api/v1/ipfs/text/:cid` | no | Returns text, of at most `ARCHON_GATEKEEPER_DOWNLOAD_LIMIT` bytes or of `?limit=` bytes where that is less. `413` for more. |
 | `POST` | `/api/v1/ipfs/data` | no | Body: `application/octet-stream` up to `ARCHON_GATEKEEPER_UPLOAD_LIMIT`. Returns CID. |
-| `GET` | `/api/v1/ipfs/data/:cid` | no | Returns binary. |
+| `GET` | `/api/v1/ipfs/data/:cid` | no | Returns binary, under the same limit. |
 | `POST` | `/api/v1/ipfs/stream` | no | Body: streamed; **no server-side size cap**. Returns CID. |
 | `GET` | `/api/v1/ipfs/stream/:cid` | no | Streams the content. Query `type` overrides Content-Type (default `application/octet-stream`); `filename` adds `Content-Disposition: attachment; filename="..."`. |
 | `GET` | `/api/v1/block/:registry/latest` | no | Latest known block for the registry. |
@@ -157,6 +157,22 @@ Preflight `OPTIONS` requests MUST succeed.
   (default `10mb`).
 - `/ipfs/stream` (POST): **unbounded**; the body is piped directly to the
   IPFS node.
+
+**Response size limits.** What a CID names may be any size, and is whatever whoever
+made it chose. A read of one is bounded as an upload is.
+
+- `GET /ipfs/text/:cid` and `GET /ipfs/data/:cid` read at most
+  `ARCHON_GATEKEEPER_DOWNLOAD_LIMIT` bytes (default `10mb`).
+- A caller may ask for less with `?limit=<bytes>`, a whole number of bytes. It
+  cannot ask for more: a limit above the node's is the node's. A limit that is no
+  such number, or is given twice, is `400` with
+  `{ "error": "limit is a number of bytes" }`.
+- Content past the limit is `413` with
+  `{ "error": "Content too large", "limit": <bytes> }`, where `limit` is the limit
+  that held. The read stops there: the rest is neither fetched nor held. This is
+  told apart from content the node does not have, which is a `5xx`.
+- `GET /ipfs/json/:cid` reads one block, which IPFS bounds, and takes no limit.
+- `GET /ipfs/stream/:cid` is **unbounded**; it is piped from the IPFS node.
 
 Limit strings parse case-insensitively as `<digits>(b|kb|mb)?`.
 
@@ -1763,6 +1779,7 @@ or under neither, is labelled `/:unrouted`.
 | `ARCHON_GATEKEEPER_REGISTRIES` | unset | Comma-separated allowlist; empty/unset means `local,hyperswarm`. |
 | `ARCHON_GATEKEEPER_JSON_LIMIT` | `4mb` | JSON request-body size cap. |
 | `ARCHON_GATEKEEPER_UPLOAD_LIMIT` | `10mb` | Raw/text body cap on `/ipfs/text` and `/ipfs/data`. |
+| `ARCHON_GATEKEEPER_DOWNLOAD_LIMIT` | `10mb` | The most bytes read for `GET /ipfs/text/:cid` and `GET /ipfs/data/:cid`. A caller may ask for less with `?limit=`. |
 | `ARCHON_GATEKEEPER_GC_INTERVAL` | `60` | GC loop interval in minutes (`0` disables). |
 | `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `1` | Status loop interval in minutes (`0` disables). |
 | `ARCHON_ADMIN_API_KEY` | empty (**required**) | Admin API key. The service refuses to start without it; admin routes return 403 when unset. A warning is logged if it is shorter than 32 characters. Generate with `openssl rand -hex 32`. |

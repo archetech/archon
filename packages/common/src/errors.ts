@@ -34,6 +34,18 @@ export class InvalidOperationError extends ArchonError {
     }
 }
 
+// What a CID names is larger than the reader would take. `limit` is the most
+// that would have been read, in bytes.
+export class ContentTooLargeError extends ArchonError {
+    static type = 'Content too large';
+    public limit: number;
+
+    constructor(limit: number) {
+        super(ContentTooLargeError.type, `more than ${limit} bytes`);
+        this.limit = limit;
+    }
+}
+
 export class KeymasterError extends ArchonError {
     static type = 'Keymaster';
 

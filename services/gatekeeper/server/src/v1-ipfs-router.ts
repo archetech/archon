@@ -1,9 +1,49 @@
 import express from 'express';
+import { ContentTooLargeError } from '@didcid/common/errors';
 import type { CreateV1RouterOptions } from './v1-router-types.js';
+
+// A size as the limits are written: a number of bytes, or of `kb` or `mb`, in
+// either case. It is read as the Rust port reads one.
+export function sizeOf(size: string): number {
+    const found = /^\s*([0-9]+)\s*(mb|kb|b)?\s*$/i.exec(size);
+
+    if (!found) {
+        throw new Error(`invalid size \`${size}\``);
+    }
+
+    return Number(found[1]) * ({ mb: 1024 * 1024, kb: 1024, b: 1 }[(found[2] ?? 'b').toLowerCase()] ?? 1);
+}
 
 export function createIpfsRouter(options: CreateV1RouterOptions): express.Router {
     const { gatekeeper, config } = options;
     const router = express.Router();
+
+    // The most bytes of a CID's content this node reads for one request. What
+    // a CID names may be any size and is whatever whoever made it chose, so a
+    // read is bounded as an upload is. A caller may ask for less with `limit`,
+    // and never for more.
+    const downloadLimit = sizeOf(config.downloadLimit ?? '10mb');
+
+    // The limit for a request, or nothing where it asks for one that is none.
+    const limitOf = (req: express.Request): number | undefined => {
+        const asked = req.query.limit;
+
+        if (asked === undefined) {
+            return downloadLimit;
+        }
+
+        return typeof asked === 'string' && /^[0-9]{1,15}$/.test(asked) ? Math.min(Number(asked), downloadLimit) : undefined;
+    };
+
+    // Answers a read that failed. Content past the limit is told apart from
+    // content the node does not have, so that a caller can tell them apart.
+    const failed = (res: express.Response, error: unknown): void => {
+        if (error instanceof ContentTooLargeError) {
+            res.status(413).json({ error: ContentTooLargeError.type, limit: error.limit });
+            return;
+        }
+        res.status(500).send(String(error));
+    };
 
     /**
      * @swagger
@@ -137,7 +177,30 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
      *         schema:
      *           type: string
      *         description: The CID (Content Identifier) of the text to retrieve
+     *       - in: query
+     *         name: limit
+     *         required: false
+     *         schema:
+     *           type: integer
+     *           minimum: 0
+     *         description: >
+     *           The most bytes to read. The node reads no more than its own limit
+     *           (ARCHON_GATEKEEPER_DOWNLOAD_LIMIT), and a caller may ask for less.
      *     responses:
+     *       413:
+     *         description: The content is larger than the limit, and is not read past it.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     *                   example: Content too large
+     *                 limit:
+     *                   type: integer
+     *       400:
+     *         description: The limit is not a number of bytes.
      *       200:
      *         description: Successfully retrieved the text
      *         content:
@@ -159,11 +222,17 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
      *               type: string
      */
     router.get('/ipfs/text/:cid', async (req, res) => {
+        const limit = limitOf(req);
+
+        if (limit === undefined) {
+            res.status(400).json({ error: 'limit is a number of bytes' });
+            return;
+        }
         try {
-            const response = await gatekeeper.getText(req.params.cid);
+            const response = await gatekeeper.getText(req.params.cid, limit);
             res.send(response);
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            failed(res, error);
         }
     });
     
@@ -220,7 +289,30 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
      *         schema:
      *           type: string
      *         description: The CID (Content Identifier) of the data to retrieve
+     *       - in: query
+     *         name: limit
+     *         required: false
+     *         schema:
+     *           type: integer
+     *           minimum: 0
+     *         description: >
+     *           The most bytes to read. The node reads no more than its own limit
+     *           (ARCHON_GATEKEEPER_DOWNLOAD_LIMIT), and a caller may ask for less.
      *     responses:
+     *       413:
+     *         description: The content is larger than the limit, and is not read past it.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     *                   example: Content too large
+     *                 limit:
+     *                   type: integer
+     *       400:
+     *         description: The limit is not a number of bytes.
      *       200:
      *         description: Successfully retrieved the data
      *         content:
@@ -243,12 +335,18 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
      *               type: string
      */
     router.get('/ipfs/data/:cid', async (req, res) => {
+        const limit = limitOf(req);
+
+        if (limit === undefined) {
+            res.status(400).json({ error: 'limit is a number of bytes' });
+            return;
+        }
         try {
-            const response = await gatekeeper.getData(req.params.cid);
+            const response = await gatekeeper.getData(req.params.cid, limit);
             res.set('Content-Type', 'application/octet-stream');
             res.send(response);
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            failed(res, error);
         }
     });
     
