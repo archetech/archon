@@ -177,4 +177,5 @@ button {
 button.quiet { background: transparent; color: var(--accent); border-color: transparent; padding: 0.2rem 0.4rem; }
 button:disabled { opacity: 0.5; cursor: default; }
 a { color: var(--accent); }
-svg { background: #fff; padding: 0.5rem; border-radius: 0.375rem; }
+/* A code to scan is dark on white whatever the page's colours, with room around it. */
+svg.qr { background: #fff; padding: 0.5rem; border-radius: 0.375rem; }

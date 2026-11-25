@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import Markdown, { Embeds, MATH_LIMIT, settleDollars } from '../Markdown';
 import type { Embedding } from '../Markdown';
@@ -12,6 +14,34 @@ const math = (page: HTMLElement) => [...page.querySelectorAll('.katex')];
 // What was written, which KaTeX keeps beside what it renders.
 const latex = (element: Element) => element.querySelector('annotation')?.textContent?.trim();
 const apart = (element: Element) => element.closest('.katex-display') !== null;
+
+// The markup is made by the KaTeX that `rehype-katex` renders with, and laid
+// out by the stylesheet of the KaTeX the pages depend on. They have to be one
+// KaTeX: another's stylesheet names other classes, and math is then shown with
+// its scripts full size and out of place and its roots empty.
+describe('the KaTeX that renders math', () => {
+    const modules = join(process.cwd(), 'node_modules');
+    const version = (path: string) => JSON.parse(readFileSync(join(path, 'package.json'), 'utf8')).version as string;
+
+    it('is the one whose stylesheet the pages carry', () => {
+        const nested = join(modules, 'rehype-katex', 'node_modules', 'katex');
+        const renders = existsSync(nested) ? version(nested) : version(join(modules, 'katex'));
+
+        expect(renders).toBe(version(join(modules, 'katex')));
+    });
+
+    it('lays out with classes that stylesheet has', () => {
+        const page = shown(String.raw`$x_0^2 + \sqrt{y}$`.replace(String.fromCharCode(92, 92), String.fromCharCode(92)));
+        const styles = readFileSync(join(modules, 'katex', 'dist', 'katex.min.css'), 'utf8');
+        const sized = page.querySelector('.msupsub [class*="reset-size"]');
+
+        expect(sized).not.toBeNull();
+        // Each class that sizes a script is one the stylesheet styles.
+        for (const name of [...sized!.classList].filter(each => each !== 'mtight')) {
+            expect(styles).toContain('.' + name);
+        }
+    });
+});
 
 describe('math', () => {
     it('is rendered in a line between single dollars', () => {
