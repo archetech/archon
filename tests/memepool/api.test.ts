@@ -1274,6 +1274,28 @@ describe('an author\'s name and address', () => {
         expect((await request(app).get(`/api/v1/identities/${encodeURIComponent(aliceDid)}`)).body).toStrictEqual({ did: aliceDid, name: 'Alice A.', address: 'alice@example.org' });
     }, 120_000);
 
+    // The node's client puts a DID in the path of its request.
+    it('asks the node for nothing that has not the shape of a DID, from a request or from a document', async () => {
+        const cid = await gatekeeper.addJSON({ didDocument: { id: aliceDid }, didDocumentData: { name: 'Not Alice' } });
+        const resolved = jest.spyOn(service, 'resolveDID');
+
+        for (const path of ['identities', 'avatars', 'images']) {
+            for (const did of [`did:cid:x/../../ipfs/json/${cid}`, 'did:cid:x/..', 'did:cid:x?y=1', 'did:cid:x#y', 'did:cid:', 'did::x', 'DID:cid:x']) {
+                const answer = await request(app).get(`/api/v1/${path}/${encodeURIComponent(did)}`).query({ versionId: 'bafyversion' });
+
+                expect([path, did, [400, 404].includes(answer.status)]).toStrictEqual([path, did, true]);
+            }
+        }
+        expect(resolved).not.toHaveBeenCalled();
+
+        // An avatar named by a document is a stranger's string as well.
+        await say(alice, aliceDid, { avatar: `did:cid:x/../../ipfs/json/${cid}` });
+        resolved.mockClear();
+        expect((await request(app).get(`/api/v1/avatars/${encodeURIComponent(aliceDid)}`)).status).toBe(404);
+        expect(resolved.mock.calls.map(call => call[0])).toStrictEqual([aliceDid]);
+        resolved.mockRestore();
+    }, 120_000);
+
     it('gives no address that its domain does not say is this identity\'s', async () => {
         const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;
 

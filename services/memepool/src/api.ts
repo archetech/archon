@@ -729,7 +729,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const none = () => { res.status(404).json({ error: 'no object of yours that this service published' }); };
         const did = String(req.params.did);
 
-        if (!did.startsWith('did:')) {
+        if (!isDid(did)) {
             none();
             return;
         }
@@ -806,7 +806,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.get('/identities/:did', async (req, res) => {
         const did = String(req.params.did);
 
-        if (!did.startsWith('did:')) {
+        if (!isDid(did)) {
             res.status(404).json({ error: 'no such identity' });
             return;
         }
@@ -828,7 +828,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // not store it. What it says of its own size is its owner's claim, used to
     // refuse early, and no more than the limit is read whatever it says.
     const imageOf = async (did: string, serves: { types: Set<string>; limit: number; pixels?: number; versionId?: string }): Promise<{ type: string; data: Buffer } | null> => {
-        if (!images || !did.startsWith('did:')) {
+        if (!images || !isDid(did)) {
             return null;
         }
 
@@ -860,7 +860,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
         // Only a DID is resolved: a name would have the wallet look it up, and
         // an address would have it ask the address's domain.
-        if (!images || !String(req.params.did).startsWith('did:')) {
+        if (!images || !isDid(String(req.params.did))) {
             none();
             return;
         }
@@ -975,7 +975,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
 
         try {
-            const image = versionId && String(req.params.did).startsWith('did:')
+            const image = versionId && isDid(String(req.params.did))
                 ? await imageOf(String(req.params.did), { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS, versionId })
                 : null;
 
@@ -1000,6 +1000,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     return router;
 }
+
+// Whether a string has the shape of a DID. One from a request or from a
+// stranger's document is asked of the node only where it has: the node's
+// client puts it in the path of its request, where anything else would name
+// something other than a DID.
+const isDid = (did: string): boolean => /^did:[a-z0-9]+:[A-Za-z0-9._%-]{1,200}$/.test(did);
 
 export function createMemepoolApp(options: MemepoolOptions): express.Express {
     const app = express();
