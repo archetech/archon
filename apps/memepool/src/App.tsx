@@ -1537,12 +1537,21 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // on the page and the browser's back button goes to what was shown before.
     const address = open?.did ? hashOf({ publication: open.did }) : hashOf(author ? { author, replies } : null);
     const addressed = useRef(address);
+    // Counts the times the reader has gone somewhere, by an address or within
+    // the pages, so that a publication an earlier address named is not shown
+    // once the reader has gone elsewhere.
+    const arrivals = useRef(0);
+    // Why an address the reader followed shows nothing. It is apart from a
+    // failure to read the list, which a later read of the list clears.
+    const [lost, setLost] = useState('');
 
     useEffect(() => {
         if (address === addressed.current) {
             return;
         }
         addressed.current = address;
+        arrivals.current += 1;
+        setLost('');
         if (address !== window.location.hash) {
             window.history.pushState(null, '', address || `${window.location.pathname}${window.location.search}`);
         }
@@ -1552,61 +1561,55 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
     // someone else is followed, and whenever the reader goes back or forward
     // or follows a link within the pages. A publication is read from the
     // indexer first, and what is shown stays until it has answered.
-    const sought = useRef('');
     const arrive = useCallback(async () => {
+        const mine = arrivals.current += 1;
         const route = routeOf(window.location.hash);
+        // Shows a list: an author's, or the reader's timeline.
+        const list = (to: string | null, listed: boolean) => {
+            if (to !== author || listed !== replies) {
+                setTimeline(null);
+                setFetched(0);
+                setTotal(0);
+                setWriting(false);
+                setAuthor(to);
+                setReplies(listed);
+            }
+            else if (open) {
+                loadTimeline();
+            }
+            setOpen(null);
+        };
 
-        if (route && 'publication' in route) {
-            const did = route.publication;
-
-            if (open?.did === did || sought.current === did) {
-                return;
-            }
-            sought.current = did;
-            try {
-                const found = await api.publication(did);
-
-                if (sought.current !== did) {
-                    return;
-                }
-                if (found) {
-                    setOpen(found);
-                    setError('');
-                }
-                else {
-                    setError('Nothing is published at that link, or not yet.');
-                }
-            }
-            catch (failure) {
-                if (sought.current === did) {
-                    setError(message(failure));
-                }
-            }
-            finally {
-                if (sought.current === did) {
-                    sought.current = '';
-                }
-            }
+        setLost('');
+        if (!route || !('publication' in route)) {
+            list(route ? route.author : null, route ? route.replies === true : false);
+            return;
+        }
+        if (open?.did === route.publication) {
             return;
         }
 
-        sought.current = '';
+        let found: Publication | undefined;
+        let said = 'Nothing is published at that link, or not yet.';
 
-        const to = route ? route.author : null;
-        const listed = route ? route.replies === true : false;
-
-        if (to !== author || listed !== replies) {
-            setTimeline(null);
-            setFetched(0);
-            setTotal(0);
-            setWriting(false);
-            setAuthor(to);
-            setReplies(listed);
+        try {
+            found = await api.publication(route.publication);
         }
-        else if (open) {
-            loadTimeline();
+        catch (failure) {
+            said = message(failure);
         }
-        setOpen(null);
+        if (mine !== arrivals.current) {
+            return;
+        }
+        if (found) {
+            setOpen(found);
+            return;
+        }
+        // The address stays the one followed, over the reader's timeline, so
+        // that what it says is of that address.
+        addressed.current = '';
+        list(null, false);
+        setLost(said);
     }, [api, open, author, replies, loadTimeline]);
 
     const arrived = useRef(false);
@@ -1815,6 +1818,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                 {!me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
                 {error && <p role="alert" className="error">{error}</p>}
+                {lost && <p role="alert" className="error">{lost}</p>}
 
                 {open ? (
                     <Thread

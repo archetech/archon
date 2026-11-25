@@ -2551,7 +2551,57 @@ describe('the address of what is shown', () => {
         render(<App api={api} />);
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        // The timeline is read after, and what it says of the link stays.
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published at that link/);
+    });
+
+    it('shows the reader\'s timeline for a link to nothing, whatever was shown, until the reader goes elsewhere', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: both() });
+        state.known['did:cid:2'] = post('did:cid:2', BOB, 'From Bob.');
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByRole('button', { name: 'Back' });
+        go('#/p/did:cid:none');
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/Nothing is published at that link/);
+        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(window.location.hash).toBe('#/p/did:cid:none');
+
+        // From an author's list as well, and it is said no longer once the reader has gone on.
+        go(`#/a/${BOB}`);
+        await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
+        expect(screen.queryByRole('alert')).toBeNull();
+        go('#/p/did:cid:none');
+        expect(await screen.findByText('From Alice.')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published/);
+        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:2'));
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('does not show a publication an address named once the reader has gone elsewhere', async () => {
+        const { api, state } = services({ me: granted, timeline: both() });
+        let answer!: (found: Publication) => void;
+        vi.mocked(api.publication).mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+        at('#/p/did:cid:2');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The reader opens another post while the link's is still being read.
+        state.known['did:cid:1'] = post('did:cid:1', ALICE, 'From Alice.');
+        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await waitFor(() => expect(window.location.hash).toBe('#/p/did:cid:1'));
+        answer(post('did:cid:2', BOB, 'From Bob.'));
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(window.location.hash).toBe('#/p/did:cid:1');
         expect(screen.getByText('From Alice.')).toBeTruthy();
+        expect(screen.queryByText('From Bob.')).toBeNull();
     });
 
     it('is where a reader who has yet to sign in arrives once they have', async () => {
