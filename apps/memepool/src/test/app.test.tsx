@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { coauthorsIn, responsesAt, tagWord } from '../App';
 import { ApiError, createApi } from '../api';
@@ -711,14 +711,14 @@ describe('reading and publishing', () => {
     });
 
     it('shows the reader the grant it publishes under: what it allows, its registry and when it expires', async () => {
-        const { api } = services({ me: { ...granted, others: ['did:cid:second'] } });
-        const view = render(<App api={api} />);
+        const { api } = services({ me: { ...granted, held: [{ did: 'did:cid:grant', registry: 'BTC:mainnet' }] } });
+        render(<App api={api} />);
 
         const shown = (await screen.findByText(/^Publishing on BTC:mainnet/)).closest('details') as HTMLElement;
 
         // Put away until looked at, with nothing said of an expiry there is none of.
         expect((shown as HTMLDetailsElement).open).toBe(false);
-        expect(within(shown).queryByText('Grant expires soon')).toBeNull();
+        expect(within(shown).queryByRole('status')).toBeNull();
         expect([...shown.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual([
             'Post, boost, and write articles and papers', 'Reply and review', 'Rate', 'Tag and like',
         ]);
@@ -726,23 +726,85 @@ describe('reading and publishing', () => {
 
         expect(said('Expires')).toBe('Never');
         expect(said('Registry')).toMatch(/^BTC:mainnet/);
-        expect(said('Other grants in force')).toMatch(/^1\./);
         expect(within(shown).getByTitle('did:cid:grant')).toBeTruthy();
-        expect(within(shown).getByText(/Change or revoke it in your wallet/)).toBeTruthy();
+        expect(within(shown).getByText('Change or revoke it in your wallet, under Auth, in Grants.')).toBeTruthy();
+        expect(within(shown).queryByText(/not allow is not offered/)).toBeNull();
         // Nothing here changes the grant.
         expect(within(shown).getAllByRole('button').map(each => each.textContent)).toStrictEqual(['Copy grant DID']);
-        view.unmount();
+    });
 
-        // A narrowed grant lists what it allows, with an action the pages have no words for as it is written.
+    it('shows each of several grants with what it allows, its own registry and its own end', async () => {
         const soon = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-        const narrowed = services({ me: { ...granted, actions: ['memeplex:post', 'did:cid:schema?versionId=bafy'], expiresAt: soon } });
-        render(<App api={narrowed.api} />);
-        const narrow = (await screen.findByText(/^Publishing on BTC:mainnet/)).closest('details') as HTMLElement;
+        const { api } = services({ me: {
+            ...granted, others: ['did:cid:second'], actions: ['memeplex:post', 'did:cid:a?versionId=b', 'did:cid:c?versionId=d', 'did:cid:e?versionId=f', 'memeplex:rate'],
+            held: [
+                { did: 'did:cid:grant', registry: 'BTC:mainnet', actions: ['memeplex:post', 'did:cid:a?versionId=b', 'did:cid:c?versionId=d', 'did:cid:e?versionId=f'] },
+                { did: 'did:cid:second', registry: 'ETH:mainnet', actions: ['memeplex:rate'], expiresAt: soon },
+            ],
+        } });
+        render(<App api={api} />);
 
-        expect([...narrow.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual(['Post, boost, and write articles and papers', 'did:cid:schema?versionId=bafy']);
-        expect(within(narrow).getByText('What your grant does not allow is not offered here.')).toBeTruthy();
-        expect(within(narrow).getByRole('status').textContent).toBe('Grant expires soon');
-        expect([...narrow.querySelectorAll('dt')].find(each => each.textContent === 'Expires')?.nextElementSibling?.textContent).toMatch(/Change it in your wallet/);
+        const shown = (await screen.findByText(/^Publishing on BTC:mainnet and ETH:mainnet/)).closest('details') as HTMLElement;
+        const [first, second] = ['Grant 1', 'Grant 2'].map(name => within(shown).getByRole('region', { name, hidden: true }));
+        const said = (of: HTMLElement, term: string) => [...of.querySelectorAll('dt')].find(each => each.textContent === term)?.nextElementSibling?.textContent;
+
+        // An action the pages have no words for is shown as it is written.
+        expect([...first.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual([
+            'Post, boost, and write articles and papers', 'did:cid:a?versionId=b', 'did:cid:c?versionId=d', 'did:cid:e?versionId=f',
+        ]);
+        expect(said(first, 'Registry')).toMatch(/^BTC:mainnet/);
+        expect(said(first, 'Expires')).toBe('Never');
+        expect([...second.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual(['Rate']);
+        expect(said(second, 'Registry')).toMatch(/^ETH:mainnet/);
+        expect(said(second, 'Expires')).toMatch(/Change it in your wallet/);
+        // The one that ends soon is said without the panel being opened.
+        expect(within(shown).getByRole('status', { hidden: true }).textContent).toBe('A grant expires soon');
+        // Replying and tagging are in neither, however many actions there are.
+        expect(within(shown).getByText('What your grants do not allow is not offered here.')).toBeTruthy();
+        expect(within(shown).getByText(/by 2 grants/)).toBeTruthy();
+    });
+
+    it('asks for the grants anew when the reader comes back to the page, and says of one that has ended that it has', async () => {
+        const ended = new Date(Date.now() - 60_000).toISOString();
+        const { api, state } = services({ me: { ...granted, held: [{ did: 'did:cid:grant', registry: 'BTC:mainnet', expiresAt: ended }] } });
+        render(<App api={api} />);
+
+        const shown = (await screen.findByText(/^Publishing on BTC:mainnet/)).closest('details') as HTMLElement;
+
+        expect(within(shown).getByRole('status', { hidden: true }).textContent).toBe('A grant has expired');
+        expect(within(shown).getByText(/It has expired, and nothing more is published under it/)).toBeTruthy();
+
+        // Narrowed in the wallet while the page was out of sight.
+        const asked = vi.mocked(api.me).mock.calls.length;
+
+        state.me = { ...granted, actions: ['memeplex:post'], held: [{ did: 'did:cid:grant', registry: 'BTC:mainnet', actions: ['memeplex:post'] }] };
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        await waitFor(() => expect(vi.mocked(api.me).mock.calls.length).toBe(asked + 1));
+        await waitFor(() => expect([...shown.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual(['Post, boost, and write articles and papers']));
+        expect(within(shown).queryByRole('status', { hidden: true })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Thumb up' })).toBeNull();
+    });
+
+    it('asks for the grants anew when one comes to within a week of its end', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+        try {
+            const week = 7 * 24 * 60 * 60 * 1000;
+            const { api } = services({ me: { ...granted, held: [{ did: 'did:cid:grant', registry: 'BTC:mainnet', expiresAt: new Date(Date.now() + week + 60_000).toISOString() }] } });
+            render(<App api={api} />);
+
+            const shown = await vi.waitFor(() => screen.getByText(/^Publishing on BTC:mainnet/).closest('details') as HTMLElement);
+            const asked = vi.mocked(api.me).mock.calls.length;
+
+            expect(within(shown).queryByRole('status', { hidden: true })).toBeNull();
+            await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+
+            expect(vi.mocked(api.me).mock.calls.length).toBe(asked + 1);
+            expect(within(shown).getByRole('status', { hidden: true }).textContent).toBe('A grant expires soon');
+        }
+        finally {
+            vi.useRealTimers();
+        }
     });
 
     it('shows no grant to someone who has none, or who has not signed in', async () => {

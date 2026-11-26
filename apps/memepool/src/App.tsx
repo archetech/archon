@@ -365,8 +365,6 @@ const copying = (text: string, unable: string) => async () => {
     }
 };
 
-// `onChecked` asks the service anew, and answers whether the service said how
-// the reader stands: it did not where the request failed, which is said elsewhere.
 // What each action a grant may list lets Memepool do, in the reader's words.
 const ACTIONS: Record<string, string> = {
     'memeplex:post': 'Post, boost, and write articles and papers',
@@ -378,46 +376,99 @@ const ACTIONS: Record<string, string> = {
 // How long before a grant expires the reader is told that it is about to.
 const EXPIRES_SOON = 7 * 24 * 60 * 60 * 1000;
 
-// The grant Memepool publishes under for the reader: what it allows, the
-// chain what they publish is anchored on, and when it ends. It is shown and
-// not changed here: a grant is the reader's, made and changed in their wallet,
-// which holds their key.
-function Granted({ me }: { me: Me }) {
-    const allowed = me.actions ?? Object.keys(ACTIONS);
-    const expires = me.expiresAt ? new Date(me.expiresAt) : undefined;
-    const known = expires && !Number.isNaN(expires.getTime()) ? expires : undefined;
-    const soon = known !== undefined && known.getTime() - Date.now() < EXPIRES_SOON;
+// The grants Memepool publishes under for the reader: what each allows, the
+// chain what is published under it is anchored on, and when it ends. They are
+// shown and not changed here: a grant is the reader's, made and changed in
+// their wallet, which holds their key.
+//
+// `onChange` asks the service for them anew: when the reader comes back to
+// the page, which they left to change one, and when one comes to within a
+// week of its end or to its end.
+function Granted({ me, onChange }: { me: Me; onChange: () => void }) {
+    const held = me.held ?? [{ did: me.grant!, registry: me.registry ?? '', ...(me.actions ? { actions: me.actions } : {}) }];
+    const [now, setNow] = useState(() => Date.now());
+    const ends = held.map(each => (each.expiresAt ? Date.parse(each.expiresAt) : NaN));
+    const state = (end: number) => {
+        if (Number.isNaN(end)) {
+            return 'lasting';
+        }
+        if (end <= now) {
+            return 'expired';
+        }
+
+        // At the week itself it is soon: the moment that is waited for is the one that says so.
+        return end - now <= EXPIRES_SOON ? 'soon' : 'lasting';
+    };
+    const states = ends.map(state);
+    const said = (states.includes('expired') && 'A grant has expired') || (states.includes('soon') && 'A grant expires soon') || '';
+    // The next moment at which what is said of a grant's end changes.
+    const next = Math.min(...ends.flatMap(end => [end - EXPIRES_SOON, end]).filter(at => at > now));
+
+    useEffect(() => {
+        const back = () => {
+            if (document.visibilityState === 'visible') {
+                setNow(Date.now());
+                onChange();
+            }
+        };
+
+        document.addEventListener('visibilitychange', back);
+
+        return () => document.removeEventListener('visibilitychange', back);
+    }, [onChange]);
+
+    useEffect(() => {
+        if (!Number.isFinite(next)) {
+            return undefined;
+        }
+
+        // A timer takes no wait longer than this, and one that long is taken up again when it ends.
+        const timer = setTimeout(() => { setNow(Date.now()); onChange(); }, Math.min(next - now, 2 ** 31 - 1));
+
+        return () => clearTimeout(timer);
+    }, [next, now, onChange]);
+
+    const registries = [...new Set(held.map(each => each.registry))];
+    const all = [...new Set(held.flatMap(each => each.actions ?? Object.keys(ACTIONS)))];
+    const missing = Object.keys(ACTIONS).some(action => !all.includes(action));
+    const several = held.length > 1;
 
     return (
         <details className="granted">
             <summary>
-                Publishing on {me.registry}
-                {soon && <span className="badge" role="status">Grant expires soon</span>}
+                Publishing on {registries.join(' and ')}
+                {said && <span className="badge" role="status">{said}</span>}
             </summary>
-            <p className="muted">You have let Memepool publish in your name. What it may do:</p>
-            <ul>
-                {allowed.map(action => <li key={action}>{ACTIONS[action] ?? <span className="mono">{action}</span>}</li>)}
-            </ul>
-            {allowed.length < Object.keys(ACTIONS).length && <p className="muted">What your grant does not allow is not offered here.</p>}
-            <dl>
-                <dt>Registry</dt>
-                <dd>{me.registry}: what you publish is anchored there</dd>
-                <dt>Expires</dt>
-                <dd>{known ? known.toLocaleString() : 'Never'}{soon && '. Change it in your wallet to go on publishing after that.'}</dd>
-                {me.others && me.others.length > 0 && (
-                    <>
-                        <dt>Other grants in force</dt>
-                        <dd>{me.others.length}. New posts go under the earliest of your grants.</dd>
-                    </>
-                )}
-                <dt>Grant</dt>
-                <dd><span className="mono" title={me.grant}>{short(me.grant!)}</span> <Copy text={me.grant!} label="Copy grant DID" unable={`Could not copy. The DID is ${me.grant}`} /></dd>
-            </dl>
-            <p className="muted">Change or revoke it in your wallet, under Auth, in Grants.</p>
+            <p className="muted">
+                You have let Memepool publish in your name{several ? `, by ${held.length} grants. New posts go under the first that allows them.` : '.'}
+            </p>
+            {held.map((each, index) => (
+                <section key={each.did} aria-label={several ? `Grant ${index + 1}` : 'Grant'}>
+                    <ul>
+                        {(each.actions ?? Object.keys(ACTIONS)).map(action => <li key={action}>{ACTIONS[action] ?? <span className="mono">{action}</span>}</li>)}
+                    </ul>
+                    <dl>
+                        <dt>Registry</dt>
+                        <dd>{each.registry}: what is published under it is anchored there</dd>
+                        <dt>Expires</dt>
+                        <dd>
+                            {Number.isNaN(ends[index]) ? 'Never' : new Date(ends[index]).toLocaleString()}
+                            {states[index] === 'soon' && '. Change it in your wallet to go on publishing under it after that.'}
+                            {states[index] === 'expired' && '. It has expired, and nothing more is published under it.'}
+                        </dd>
+                        <dt>Grant</dt>
+                        <dd><span className="mono" title={each.did}>{short(each.did)}</span> <Copy text={each.did} label="Copy grant DID" unable={`Could not copy. The DID is ${each.did}`} /></dd>
+                    </dl>
+                </section>
+            ))}
+            {missing && <p className="muted">What your {several ? 'grants do' : 'grant does'} not allow is not offered here.</p>}
+            <p className="muted">Change or revoke {several ? 'them' : 'it'} in your wallet, under Auth, in Grants.</p>
         </details>
     );
 }
 
+// `onChecked` asks the service anew, and answers whether the service said how
+// the reader stands: it did not where the request failed, which is said elsewhere.
 function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<boolean> }) {
     const [checking, setChecking] = useState(false);
     // When the service was last asked and still had no grant to publish under.
@@ -3003,7 +3054,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                 {visitor && onSignedIn && (signing || (nowhere && !arriving)) && <SignIn api={api} onSignedIn={onSignedIn} onStarted={started} pollMs={pollMs ?? 3000} />}
                 {nowhere && arriving && <p className="muted">Loading…</p>}
                 {!visitor && !me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
-                {!visitor && me.grant && <Granted me={me} />}
+                {!visitor && me.grant && <Granted me={me} onChange={onCheck} />}
                 {error && <p role="alert" className="error">{error}</p>}
                 {lost && <p role="alert" className="error">{lost}</p>}
 

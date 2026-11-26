@@ -515,7 +515,7 @@ describe('the user\'s grant', () => {
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Still too soon.' })).status).toBe(403);
 
         await anchor();
-        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: grantDid, registry: REGISTRY });
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: grantDid, registry: REGISTRY, held: [{ did: grantDid, registry: REGISTRY }] });
     }, 120_000);
 
     it('does not publish for one user under another\'s grant', async () => {
@@ -545,11 +545,13 @@ describe('a user with more than one grant', () => {
 
         const second = await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid } }, { registry: REGISTRY });
         await anchor();
-        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: first, registry: REGISTRY, others: [second] });
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({
+            did: aliceDid, grant: first, registry: REGISTRY, others: [second], held: [{ did: first, registry: REGISTRY }, { did: second, registry: REGISTRY }],
+        });
 
         expect(await alice.revokeDID(first)).toBe(true);
         await anchor();
-        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: second, registry: REGISTRY });
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: second, registry: REGISTRY, held: [{ did: second, registry: REGISTRY }] });
 
         const { did: late } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Under the second.' })).body;
         await anchor();
@@ -577,6 +579,7 @@ describe('a grant that allows some kinds', () => {
 
         expect((await agent.get('/api/v1/me')).body).toStrictEqual({
             did: aliceDid, grant: grantDid, registry: REGISTRY, actions: ['memeplex:post', 'memeplex:tag'],
+            held: [{ did: grantDid, registry: REGISTRY, actions: ['memeplex:post', 'memeplex:tag'] }],
         });
 
         const posted = await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Allowed.' });
@@ -595,12 +598,14 @@ describe('a grant that allows some kinds', () => {
         expect((await agent.post('/api/v1/objects').send({ kind: ['rating'], target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 })).status).toBe(400);
     }, 120_000);
 
-    it('says when the grant it publishes under expires, where it does', async () => {
+    it('says of each grant in force when it expires, where it does', async () => {
         const agent = await signIn(alice);
         const expiring = await grant(alice, (await agent.get('/api/v1/me')).body.link, { expiresAt: '2099-01-01T00:00:00Z' });
         await anchor();
 
-        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: expiring, registry: REGISTRY, expiresAt: '2099-01-01T00:00:00Z' });
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({
+            did: aliceDid, grant: expiring, registry: REGISTRY, held: [{ did: expiring, registry: REGISTRY, expiresAt: '2099-01-01T00:00:00Z' }],
+        });
     }, 120_000);
 
     it('publishes under whichever of the reader\'s grants allows the kind, and lists what they allow between them', async () => {
@@ -608,7 +613,10 @@ describe('a grant that allows some kinds', () => {
         const ratings = await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid, actions: ['memeplex:rate'] } }, { registry: REGISTRY });
         await anchor();
 
-        expect((await agent.get('/api/v1/me')).body).toMatchObject({ grant: posts, others: [ratings], actions: ['memeplex:post', 'memeplex:rate'] });
+        expect((await agent.get('/api/v1/me')).body).toMatchObject({
+            grant: posts, others: [ratings], actions: ['memeplex:post', 'memeplex:rate'],
+            held: [{ did: posts, actions: ['memeplex:post'] }, { did: ratings, actions: ['memeplex:rate'] }],
+        });
 
         const posted = await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.' });
         await anchor();

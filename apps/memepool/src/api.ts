@@ -36,8 +36,9 @@ export interface Me {
     // What their grants let the service publish. Absent means every core kind.
     actions?: string[];
     registry?: string;
-    // When the grant new objects go under expires, where it does.
-    expiresAt?: string;
+    // Each grant in force as it is: what it allows where it is narrowed, the
+    // registry it is on, and when it expires where it does.
+    held?: { did: string; registry: string; actions?: string[]; expiresAt?: string }[];
     link?: string;
     pending?: string[];
     // Why the service can ask for no grant, when it cannot.

@@ -226,6 +226,7 @@ button {
 .granted[open] > summary { margin-bottom: 0.5rem; }
 .granted .badge { margin-left: 0.5rem; border: 1px solid var(--warn); color: var(--warn); border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.8rem; }
 .granted ul { margin: 0.25rem 0 0.5rem; padding-left: 1.25rem; }
+.granted section + section { border-top: 1px solid var(--line); margin-top: 0.75rem; padding-top: 0.5rem; }
 .granted dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.75rem; margin: 0.5rem 0; }
 .granted dt { color: var(--soft); }
 .granted dd { margin: 0; overflow-wrap: anywhere; }
