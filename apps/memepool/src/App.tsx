@@ -758,6 +758,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader 
             {answers && object.kind === 'reply' && typeof object.target === 'string' && (
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
             )}
+            {object.kind === 'reply' && typeof object.verdict === 'string' && object.verdict.trim() && <Verdict verdict={object.verdict.trim()} />}
             <Titled object={object} />
             {/* Of one revision: another's standings, and what the reader did about it, are not this one's. */}
             {object.kind === 'paper' && (
@@ -1101,10 +1102,24 @@ function Draft({ label, value, onChange, disabled, rows, before, published = val
     );
 }
 
-function Composer({ label, onPublish }: { label: string; onPublish: (text: string) => Promise<void> }) {
+// A reply that gives a verdict is a review. The verdict is a few words of the
+// reviewer's own, which a venue words as it likes, and is asked for where what
+// is answered is something reviewed.
+const VERDICT = 300;
+
+function Verdict({ verdict }: { verdict: string }) {
+    return <p className="verdict"><span className="badge">Review</span> {verdict}</p>;
+}
+
+function Composer({ label, onPublish, reviewing = false }: {
+    label: string; onPublish: (text: string, verdict?: string) => Promise<void>;
+    // Whether a verdict may be given with what is written.
+    reviewing?: boolean;
+}) {
     // Whether an image is being stored for what is written.
     const [storing, setStoring] = useState(false);
     const [text, setText] = useState('');
+    const [verdict, setVerdict] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
@@ -1112,8 +1127,9 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
         setBusy(true);
         setError('');
         try {
-            await onPublish(text.trim());
+            await onPublish(text.trim(), ...(reviewing && verdict.trim() ? [verdict.trim()] : []));
             setText('');
+            setVerdict('');
         }
         catch (failure) {
             setError(message(failure));
@@ -1125,9 +1141,30 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 
     return (
         <div className="composer">
-            <Draft label={label} value={text} onChange={setText} disabled={busy} rows={3} published={text.trim()} onStoring={setStoring} />
+            {reviewing && (
+                <label>
+                    Verdict
+                    <input
+                        value={verdict}
+                        disabled={busy}
+                        maxLength={VERDICT}
+                        placeholder="For a review: accept, minor revisions… Leave it empty for a reply."
+                        onChange={event => setVerdict(event.target.value)}
+                    />
+                </label>
+            )}
+            <Draft
+                label={label}
+                value={text}
+                onChange={setText}
+                disabled={busy}
+                rows={3}
+                published={text.trim()}
+                before={reviewing && verdict.trim() ? <Verdict verdict={verdict.trim()} /> : undefined}
+                onStoring={setStoring}
+            />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || storing || !text.trim()} onClick={publish}>Publish</button>
+            <button disabled={busy || storing || !text.trim()} onClick={publish}>{reviewing && verdict.trim() ? 'Publish review' : 'Publish'}</button>
         </div>
     );
 }
@@ -1243,6 +1280,8 @@ interface Waiting {
     did: string;
     // A post's or a reply's text, which is Markdown.
     text?: string;
+    // The verdict a review gives.
+    verdict?: string;
     // An article's title and subtitle, which are shown as they were written.
     title?: string;
     subtitle?: string;
@@ -1267,6 +1306,7 @@ function readWaiting(reader: string): Waiting[] {
             ? stored.filter(each => each && typeof each === 'object' && typeof each.did === 'string').map(each => ({
                 did: each.did,
                 ...(typeof each.text === 'string' ? { text: each.text } : {}),
+                ...(typeof each.verdict === 'string' ? { verdict: each.verdict } : {}),
                 ...(typeof each.title === 'string' ? { title: each.title } : {}),
                 ...(typeof each.subtitle === 'string' ? { subtitle: each.subtitle } : {}),
                 ...(typeof each.target === 'string' ? { target: each.target } : {}),
@@ -1292,6 +1332,7 @@ function Awaited({ entry, author, onDismiss }: { entry: Waiting; author: string;
                 </span>
             </header>
             {entry.title !== undefined && <Heading title={entry.title} subtitle={entry.subtitle} />}
+            {entry.verdict !== undefined && <Verdict verdict={entry.verdict} />}
             {entry.text !== undefined && <Markdown text={entry.text} />}
             {entry.failed && (
                 <footer>
@@ -1811,11 +1852,12 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     // A reply the indexer shows is a publication, and no longer waits.
     const shown = new Set(replies?.map(each => each.publication.did));
 
-    const reply = async (text: string) => {
+    // A reply that gives a verdict is a review of the revision it answers.
+    const reply = async (text: string, verdict?: string) => {
         const targetVersion = root.versions[root.current ?? 0]?.opid;
-        const did = await api.publish({ kind: 'reply', target: root.did, targetVersion, text });
+        const did = await api.publish({ kind: 'reply', target: root.did, targetVersion, text, ...(verdict ? { verdict } : {}) });
 
-        onPublished({ did, text, target: root.did });
+        onPublished({ did, text, target: root.did, ...(verdict ? { verdict } : {}) });
     };
 
     return (
@@ -1848,7 +1890,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
             {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
                 <Awaited key={each.did} entry={each} author={me.did} onDismiss={onDismiss} />
             ))}
-            {may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} />}
+            {may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} reviewing={root.memeplex?.kind === 'paper'} />}
         </section>
     );
 }
