@@ -3188,6 +3188,69 @@ describe('the earlier versions of a post', () => {
         expect((await screen.findByRole('alert')).textContent).toBe('That version could not be read.');
     });
 
+    it('say of a version an answer names that is not in the history that it is not, and show no other in its place', async () => {
+        const { api, user } = await opened();
+
+        vi.mocked(api.thread).mockResolvedValue([answer('did:cid:r9', 'To one that is gone.', 'vgone')]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        const gone = (await screen.findByText('To one that is gone.')).closest('article')!.parentElement!;
+
+        await user.click(within(gone).getByRole('button', { name: 'See that version' }));
+        expect(await screen.findByText('That version is no longer in its history.')).toBeTruthy();
+        // The latest is not shown as though it were that version, and nothing is made of it from here.
+        expect(screen.queryByText('As it is.')).toBeNull();
+        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect((screen.getByLabelText('Version') as HTMLSelectElement).value).toBe('vgone');
+    });
+
+    it('keep what the reader made of the latest while an earlier one is looked at', async () => {
+        const { api, state, user } = await opened();
+
+        // A rating of the latest, which waits to be anchored.
+        await user.click(await screen.findByRole('button', { name: 'Thumb up' }));
+        await waitFor(() => expect(state.published).toHaveLength(1));
+        expect(await screen.findByText('Your thumb up is waiting to be anchored.')).toBeTruthy();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+        await screen.findByText('As it is.');
+
+        // It is still the reader's rating: another thumb changes it, and makes no second.
+        expect(screen.getByText('Your thumb up is waiting to be anchored.')).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+        await waitFor(() => expect(api.edit).toHaveBeenCalledWith('did:cid:new1', expect.objectContaining({ kind: 'rating', rating: 0 })));
+        expect(state.published).toHaveLength(1);
+    });
+
+    it('say nothing of how a paper\'s coauthors stand on an earlier revision, which is known of its latest', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const authored = (text: string, current: number): Publication => ({
+            ...edited(), current,
+            memeplex: { kind: 'paper', author: BOB, title: text, summary: 'About it.', authors: [BOB, ALICE], content: { cid: 'bafypaper', type: 'text/markdown', bytes: 3 } },
+        });
+        const { api, state } = services({ me: granted, timeline: [authored('The paper', 2)] });
+
+        state.known['did:cid:1'] = authored('The paper', 2);
+        state.revisions['did:cid:1 v1'] = authored('The paper, first', 0);
+        state.coauthors['did:cid:1'] = [{ did: ALICE, status: 'confirmed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText('confirmed')).toBeTruthy();
+        const asked = vi.mocked(api.coauthors).mock.calls.length;
+
+        await user.selectOptions(await screen.findByLabelText('Version'), 'v1');
+        expect(await screen.findByText('The paper, first')).toBeTruthy();
+        // Its authors are named, and nothing is said or asked of what they confirmed.
+        expect(document.querySelectorAll('.authors li')).toHaveLength(2);
+        expect(screen.queryByText('confirmed')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+        expect(api.coauthors).toHaveBeenCalledTimes(asked);
+    });
+
     it('are not offered for a post that was never edited, which is not marked as edited', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const { api } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'A post.'), edited()] });
