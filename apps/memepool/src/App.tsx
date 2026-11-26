@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { linkTo, pathOf, routeOf } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Api, Me, Person, Publication, Reply, Responses } from './api';
+import type { Api, Coauthor, Me, Person, Publication, Reply, Responses } from './api';
 import Markdown, { Embeds } from './Markdown';
 import type { Embedding } from './Markdown';
 
@@ -724,8 +724,11 @@ function Answered({ did, version }: { did: string; version?: string }) {
 
 // `answers` says whether a reply is shown with what it answers: it is where a
 // reply is read apart from its thread, and not in the thread itself.
-function Post({ publication, onOpen, onWithdraw, full, answers, waiting }: {
+function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader }: {
     publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api; answers?: boolean;
+    // Who is reading, where the post is open to them: a paper that lists them
+    // is theirs to confirm.
+    reader?: Me;
     // Whether what is shown is an edit of the reader's own that its chain has
     // not anchored, which nobody else is shown yet.
     waiting?: boolean;
@@ -756,6 +759,10 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting }: {
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
             )}
             <Titled object={object} />
+            {/* Of one revision: another's standings, and what the reader did about it, are not this one's. */}
+            {object.kind === 'paper' && (
+                <Authors key={`${publication.did} ${shownVersion(publication)}`} publication={publication} api={full} reader={waiting ? undefined : reader} />
+            )}
             <Body object={object} full={full} />
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
@@ -770,6 +777,95 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting }: {
                 )}
             </footer>
         </article>
+    );
+}
+
+// Who wrote a paper. Its publisher lists them, which is the publisher's claim:
+// each of the others is shown as having confirmed it, of this revision or of
+// an earlier one, or as listed by the publisher. Where the paper is open, how
+// each stands is read from the indexer, and a reader it lists can confirm it.
+const LISTED = 5;
+
+function Authors({ publication, api, reader }: { publication: Publication; api?: Api; reader?: Me }) {
+    const object = publication.memeplex!;
+    const authors = Array.isArray(object.authors) ? (object.authors as unknown[]).filter((each): each is string => typeof each === 'string') : [];
+    const others = authors.filter(each => each !== object.author);
+    const revision = shownVersion(publication);
+    const [stands, setStands] = useState<Coauthor[] | null>(null);
+    // Read anew whenever what the paper is shown in is: a confirmation is
+    // anchored, or taken back, without the paper changing.
+    const reads = useContext(Reads);
+    const [confirming, setConfirming] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!api || !publication.did || others.length === 0) {
+            return undefined;
+        }
+
+        let stale = false;
+
+        api.coauthors(publication.did).then(read => { if (!stale) setStands(read); }, () => undefined);
+
+        return () => { stale = true; };
+        // How each stands is of the revision shown.
+    }, [api, publication.did, revision, others.length, reads]);
+
+    const standing = (did: string) => stands?.find(each => each.did === did)?.status;
+    const mine = reader && others.includes(reader.did) ? standing(reader.did) : undefined;
+
+    // Once the indexer shows the reader's confirmation it waits no more, and
+    // one they take back after that is theirs to make once more.
+    useEffect(() => {
+        if (mine === 'confirmed') {
+            setConfirmed(false);
+        }
+    }, [mine]);
+    const confirm = async () => {
+        setConfirming(true);
+        setError('');
+        try {
+            await api!.publish({ kind: 'tag', target: publication.did, targetVersion: revision, tag: 'coauthor' });
+            setConfirmed(true);
+        }
+        catch (failure) {
+            setError(message(failure));
+        }
+        finally {
+            setConfirming(false);
+        }
+    };
+
+    return (
+        <div className="authors">
+            <ul>
+                <li><Identity did={object.author} /></li>
+                {(api ? others : others.slice(0, LISTED - 1)).map(did => (
+                    <li key={did}>
+                        <Identity did={did} />
+                        {api && stands && (
+                            <span className="muted">
+                                {' '}
+                                {standing(did) === 'confirmed'
+                                    ? 'confirmed'
+                                    : standing(did) === 'confirmed-other' ? 'confirmed an earlier revision' : 'listed by the publisher'}
+                            </span>
+                        )}
+                    </li>
+                ))}
+            </ul>
+            {!api && others.length > LISTED - 1 && <p className="muted">and {others.length - (LISTED - 1)} more</p>}
+            {/* A reader the paper lists says so themselves, of the revision they have read. */}
+            {api && reader && stands && mine !== undefined && mine !== 'confirmed' && !confirmed && may(reader, 'memeplex:tag') && revision && (
+                <p>
+                    {mine === 'confirmed-other' ? 'You confirmed an earlier revision of this paper. ' : 'This paper lists you as a coauthor. '}
+                    <button className="quiet" disabled={confirming} onClick={confirm}>Confirm this revision</button>
+                </p>
+            )}
+            {confirmed && mine !== 'confirmed' && <p className="muted">Your confirmation is waiting to be anchored.</p>}
+            {error && <p role="alert" className="error">{error}</p>}
+        </div>
     );
 }
 
@@ -1038,13 +1134,32 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
 
 // An article: a post with a title, whose body the service stores apart from
 // the entry. A timeline shows its title, and the subtitle where it has one.
-function ArticleComposer({ onPublish, onCancel }: {
-    onPublish: (article: { title: string; subtitle?: string; body: string }) => Promise<void>;
+// The DIDs written in a list of coauthors, one to a line or with commas
+// between, and whatever in it is no DID.
+export function coauthorsIn(written: string): { dids: string[]; others: string[] } {
+    const parts = written.split(/[\s,]+/).filter(Boolean);
+    const dids = [...new Set(parts.filter(part => /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/.test(part)))];
+
+    return { dids, others: parts.filter(part => !dids.includes(part)) };
+}
+
+// The most authors a paper lists, its publisher among them.
+const AUTHORS = 100;
+
+// An article, or a paper: a paper has an abstract, and lists who wrote it with
+// its publisher. Listing someone is the publisher's claim, which each of them
+// confirms for themselves.
+function ArticleComposer({ onPublish, onCancel, paper = false }: {
+    onPublish: (article: { title: string; subtitle?: string; body: string; summary?: string; coauthors?: string[] }) => Promise<void>;
     onCancel: () => void;
+    paper?: boolean;
 }) {
     const [title, setTitle] = useState('');
     const [subtitle, setSubtitle] = useState('');
+    const [summary, setSummary] = useState('');
+    const [listed, setListed] = useState('');
     const [body, setBody] = useState('');
+    const others = coauthorsIn(listed);
     const [busy, setBusy] = useState(false);
     // Whether an image is being stored for what is written.
     const [storing, setStoring] = useState(false);
@@ -1054,7 +1169,12 @@ function ArticleComposer({ onPublish, onCancel }: {
         setBusy(true);
         setError('');
         try {
-            await onPublish({ title: title.trim(), ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}), body });
+            await onPublish({
+                title: title.trim(),
+                ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
+                body,
+                ...(paper ? { summary: summary.trim(), coauthors: others.dids } : {}),
+            });
         }
         catch (failure) {
             setError(message(failure));
@@ -1072,17 +1192,46 @@ function ArticleComposer({ onPublish, onCancel }: {
                 Subtitle
                 <input value={subtitle} disabled={busy} maxLength={300} onChange={event => setSubtitle(event.target.value)} />
             </label>
+            {paper && (
+                <>
+                    <label>
+                        Abstract
+                        <textarea value={summary} disabled={busy} rows={4} maxLength={5000} onChange={event => setSummary(event.target.value)} />
+                    </label>
+                    <label>
+                        Coauthors
+                        <textarea
+                            value={listed}
+                            disabled={busy}
+                            rows={2}
+                            placeholder="Their DIDs, one to a line. You are the first author."
+                            onChange={event => setListed(event.target.value)}
+                        />
+                    </label>
+                    {others.others.length > 0 && <p role="alert" className="error">Not a DID: {others.others.join(', ')}</p>}
+                    {others.dids.length >= AUTHORS && <p role="alert" className="error">A paper lists {AUTHORS} authors at most.</p>}
+                    {others.dids.length > 0 && (
+                        <p className="muted">Each is listed by you until they confirm it, which they do from the paper.</p>
+                    )}
+                </>
+            )}
             <Draft
-                label="Article"
+                label={paper ? 'Paper' : 'Article'}
                 value={body}
                 onChange={setBody}
                 disabled={busy}
                 rows={14}
-                before={<Heading title={title} subtitle={subtitle} />}
+                before={<Heading title={title} subtitle={subtitle} summary={paper ? summary : ''} />}
                 onStoring={setStoring}
             />
             {error && <p role="alert" className="error">{error}</p>}
-            <button disabled={busy || storing || !title.trim() || !body.trim()} onClick={publish}>Publish article</button>{' '}
+            <button
+                disabled={busy || storing || !title.trim() || !body.trim()
+                    || (paper && (!summary.trim() || others.others.length > 0 || others.dids.length >= AUTHORS))}
+                onClick={publish}
+            >
+                {paper ? 'Publish paper' : 'Publish article'}
+            </button>{' '}
             <button className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
         </div>
     );
@@ -1596,11 +1745,15 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     // known until the node has said. A post is another's to edit, or nobody's,
     // until then.
     const [waits, setWaits] = useState<NonNullable<Publication['memeplex']> | null | undefined>(undefined);
+    // How many times the thread has been read, for what is read with it.
+    const [loads, setLoads] = useState(0);
     // The same for each reply of the reader's own that the thread shows.
     const [answers, setAnswers] = useState<Record<string, NonNullable<Publication['memeplex']>>>({});
 
     const load = useCallback(async () => {
         const asked = reads.current += 1;
+
+        setLoads(asked);
 
         try {
             // What the node has of what the reader wrote, which is ahead of the
@@ -1670,7 +1823,9 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             <button className="quiet" onClick={load}>Refresh</button>
             {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
-            <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} />
+            <Reads.Provider value={loads}>
+                <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} reader={me} />
+            </Reads.Provider>
             {/* One edit at a time: the next is of the post as the last one left it. */}
             {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
@@ -1733,7 +1888,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     const [waiting, setWaiting] = useState<Waiting[]>(() => readWaiting(me.did));
     const dismiss = useCallback((did: string) => setWaiting(current => current.filter(each => each.did !== did)), []);
     // Whether the reader is writing an article, which has a form of its own.
-    const [writing, setWriting] = useState(false);
+    const [writing, setWriting] = useState<false | 'article' | 'paper'>(false);
     const [open, setOpen] = useState<Publication | null>(null);
     // The author whose posts alone are shown, where the reader went to one,
     // and whether it is the author's replies that are shown in their place. A
@@ -2210,14 +2365,22 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                         setWaiting(current => [...current, { did, text }]);
                                     }}
                                 />
-                                <p><button className="quiet" onClick={() => setWriting(true)}>Write an article</button></p>
+                                <p>
+                                    <button className="quiet" onClick={() => setWriting('article')}>Write an article</button>{' '}
+                                    <button className="quiet" onClick={() => setWriting('paper')}>Write a paper</button>
+                                </p>
                             </>
                         )}
                         {!author && may(me, 'memeplex:post') && writing && (
                             <ArticleComposer
+                                key={writing}
+                                paper={writing === 'paper'}
                                 onCancel={() => setWriting(false)}
-                                onPublish={async article => {
-                                    const did = await api.publish({ kind: 'post', ...article });
+                                onPublish={async ({ coauthors, ...article }) => {
+                                    // A paper lists its authors, its publisher first.
+                                    const did = await api.publish(writing === 'paper'
+                                        ? { kind: 'paper', ...article, authors: [me.did, ...(coauthors ?? []).filter(each => each !== me.did)] }
+                                        : { kind: 'post', ...article });
 
                                     setWaiting(current => [...current, { did, title: article.title, ...(article.subtitle ? { subtitle: article.subtitle } : {}) }]);
                                     setWriting(false);

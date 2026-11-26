@@ -72,6 +72,8 @@ export interface Api {
     // than are returned: the next page starts after them.
     timeline(authors: string[], offset?: number, kinds?: string[]): Promise<{ total: number; publications: Publication[]; read?: number }>;
     thread(did: string): Promise<Reply[]>;
+    // How each coauthor a paper lists stands towards the revision shown.
+    coauthors(did: string): Promise<Coauthor[]>;
     responses(did: string): Promise<Responses>;
     publication(did: string): Promise<Publication | undefined>;
     // A publication as it was at one of its versions, which is what a response
@@ -96,6 +98,14 @@ export interface Api {
     // What an identity says of itself: the name it gives itself, which is a
     // claim, and the address its domain confirms is its own.
     identity(did: string): Promise<Person>;
+}
+
+// A coauthor a paper lists, and whether they have said so themselves: of the
+// revision shown, of an earlier one, or not at all. A paper's publisher lists
+// its authors, which is the publisher's claim until each confirms it.
+export interface Coauthor {
+    did: string;
+    status: 'confirmed' | 'confirmed-other' | 'listed';
 }
 
 export interface Person {
@@ -193,6 +203,9 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
                 : page;
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),
+        async coauthors(did) {
+            return json(await call(bases.memeplex, `/coauthors/${encodeURIComponent(did)}`));
+        },
         async responses(did) {
             const [boosts, ratings, tags] = await Promise.all(['boosts', 'ratings', 'tags'].map(
                 async view => json(await call(bases.memeplex, `/${view}/${encodeURIComponent(did)}`)),

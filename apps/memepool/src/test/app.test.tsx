@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { tagWord } from '../App';
+import App, { coauthorsIn, tagWord } from '../App';
 import { ApiError, createApi } from '../api';
-import type { Api, Me, Publication, Responses } from '../api';
+import type { Api, Coauthor, Me, Publication, Responses } from '../api';
 import { linkTo, pathOf, routeOf, setRoot } from '../route';
 
 const ALICE = 'did:cid:bagaaieraalicealicealicealicealicealicealicealicealicealice';
@@ -36,6 +36,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         responses: { boosts: [], ratings: { ratings: [] }, tags: [] } as Responses,
         // The bodies the node has, by CID.
         bodies: {} as Record<string, string>,
+        // How each coauthor a paper lists stands, by the paper's DID.
+        coauthors: {} as Record<string, Coauthor[]>,
         // The last version of each object as the node has it, anchored or not, by DID.
         unanchored: {} as Record<string, { versionId: string; memeplex: NonNullable<Publication['memeplex']> }>,
         // What the service says of each identity, by its DID.
@@ -61,6 +63,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
             return { total: all.length, publications: all.slice(offset, offset + PAGE) };
         }),
         thread: vi.fn(async () => []),
+        coauthors: vi.fn(async (did: string) => state.coauthors[did] ?? []),
         responses: vi.fn(async () => state.responses),
         publication: vi.fn(async (did: string) => state.known[did]),
         state: vi.fn(async (did: string) => state.states[did]),
@@ -2659,6 +2662,202 @@ describe('an article', () => {
         expect((await screen.findByRole('alert')).textContent).toMatch(/full text is not on this node/);
         expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
         expect(state.edited).toStrictEqual([]);
+    });
+});
+
+describe('a paper', () => {
+    const CAROL = 'did:cid:bagaaieracarolcarolcarolcarolcarolcarolcarolcarolcarolcarol';
+    const paper = (more: Partial<Publication> = {}): Publication => ({
+        ...post('did:cid:9', BOB, ''),
+        memeplex: {
+            kind: 'paper', author: BOB, title: 'Convergent Replay', summary: 'We show that nodes agree.',
+            authors: [BOB, ALICE, CAROL], content: { cid: 'bafypaper', type: 'text/markdown', bytes: 20 },
+        },
+        ...more,
+    });
+
+    it('reads the DIDs written as coauthors, and says what among them is none', () => {
+        expect(coauthorsIn(`${BOB}\n ${CAROL}, ${BOB}`)).toStrictEqual({ dids: [BOB, CAROL], others: [] });
+        expect(coauthorsIn(`${BOB} bob@example.org not-a-did`)).toStrictEqual({ dids: [BOB], others: ['bob@example.org', 'not-a-did'] });
+        expect(coauthorsIn('  \n ')).toStrictEqual({ dids: [], others: [] });
+    });
+
+    it('is written with an abstract and its coauthors, and published with the reader as its first author', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write a paper' }));
+        await user.type(screen.getByLabelText('Title'), 'Convergent Replay');
+        await user.type(screen.getByLabelText('Paper'), 'The full text.');
+        // A paper has an abstract.
+        expect((screen.getByRole('button', { name: 'Publish paper' }) as HTMLButtonElement).disabled).toBe(true);
+        await user.type(screen.getByLabelText('Abstract'), 'We show that nodes agree.');
+
+        // What is no DID is said, and nothing is published with it.
+        await user.type(screen.getByLabelText('Coauthors'), 'bob');
+        expect((await screen.findByRole('alert')).textContent).toBe('Not a DID: bob');
+        expect((screen.getByRole('button', { name: 'Publish paper' }) as HTMLButtonElement).disabled).toBe(true);
+        await user.clear(screen.getByLabelText('Coauthors'));
+        fireEvent.change(screen.getByLabelText('Coauthors'), { target: { value: `${BOB}\n${ALICE}\n${BOB}` } });
+        expect(screen.getByText(/listed by you until they confirm it/)).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Publish paper' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([{
+            kind: 'paper', title: 'Convergent Replay', body: 'The full text.', summary: 'We show that nodes agree.',
+            // The reader once, and first, however the list was written.
+            authors: [ALICE, BOB],
+        }]));
+        // It waits to be anchored as an article does, under its title.
+        expect(await screen.findByText('Convergent Replay')).toBeTruthy();
+        expect(screen.getByLabelText('Post')).toBeTruthy();
+    });
+
+    it('is not what an article is written as, which has no abstract and no coauthors', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        expect(screen.queryByLabelText('Abstract')).toBeNull();
+        expect(screen.queryByLabelText('Coauthors')).toBeNull();
+        await user.type(screen.getByLabelText('Title'), 'On DIDs');
+        await user.type(screen.getByLabelText('Article'), 'Words.');
+        await user.click(screen.getByRole('button', { name: 'Publish article' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'post', title: 'On DIDs', body: 'Words.' }]));
+    });
+
+    it('lists who wrote it, and how each coauthor stands once it is open', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: { did: CAROL }, timeline: [paper()] });
+        state.bodies.bafypaper = 'The full text.';
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }, { did: CAROL, status: 'listed' }];
+        state.people = { [BOB]: { name: 'Bob B.' }, [ALICE]: { name: 'Alice A.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // In a list its authors are named, and nothing is asked about how they stand.
+        const listed = (await screen.findByText('Convergent Replay')).closest('article')!;
+
+        expect(await within(listed).findByText('Alice A.')).toBeTruthy();
+        expect(within(listed).getByText('We show that nodes agree.')).toBeTruthy();
+        expect(api.coauthors).not.toHaveBeenCalled();
+        expect(within(listed).queryByText(/confirmed|listed by the publisher/)).toBeNull();
+
+        await user.click(within(listed).getByRole('button', { name: 'Open' }));
+        const authors = await waitFor(() => document.querySelector('.authors') as HTMLElement);
+
+        expect(await within(authors).findByText('confirmed')).toBeTruthy();
+        expect(within(authors).getByText('listed by the publisher')).toBeTruthy();
+        expect(api.coauthors).toHaveBeenCalledWith('did:cid:9');
+        // Its publisher is its author, and is not one who confirms.
+        expect(within(authors).getAllByRole('listitem')).toHaveLength(3);
+        expect(await screen.findByText('The full text.')).toBeTruthy();
+    });
+
+    it('is confirmed by a reader it lists, of the revision shown, and not by one it does not or who has', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [paper()] });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }, { did: CAROL, status: 'listed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/This paper lists you as a coauthor/)).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Confirm this revision' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([{ kind: 'tag', target: 'did:cid:9', targetVersion: 'op-did:cid:9', tag: 'coauthor' }]));
+        expect(await screen.findByText('Your confirmation is waiting to be anchored.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+
+        // One who confirmed an earlier revision is told so, and one who has confirmed this is asked nothing.
+        cleanup();
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed-other' }];
+        render(<App api={api} />);
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText(/You confirmed an earlier revision/)).toBeTruthy();
+
+        cleanup();
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }];
+        render(<App api={api} />);
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText('confirmed');
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+    });
+
+    it('reads how coauthors stand anew when the paper is, and asks of another revision what it asked of the last', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [paper()] });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        state.known['did:cid:9'] = paper();
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
+        expect(await screen.findByText('Your confirmation is waiting to be anchored.')).toBeTruthy();
+
+        // The confirmation is anchored, with the paper as it was: it waits no more.
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(screen.queryByText('Your confirmation is waiting to be anchored.')).toBeNull());
+        expect(await screen.findByText('confirmed')).toBeTruthy();
+
+        // The reader takes it back, and is asked once more, with nothing said to be waiting.
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByRole('button', { name: 'Confirm this revision' })).toBeTruthy();
+        expect(screen.queryByText('Your confirmation is waiting to be anchored.')).toBeNull();
+
+        // Its publisher revises it. What was confirmed was the revision before.
+        state.known['did:cid:9'] = paper({
+            current: 1,
+            versions: [...paper().versions, { opid: 'op-revised', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } }],
+        });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed-other' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/You confirmed an earlier revision/)).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Confirm this revision' }));
+        await waitFor(() => expect(state.published.slice(-1)[0]).toStrictEqual({ kind: 'tag', target: 'did:cid:9', targetVersion: 'op-revised', tag: 'coauthor' }));
+    });
+
+    it('asks no reader it does not list, nor one who is not signed in or whose grant allows no tag', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const unlisted = paper({ memeplex: { ...paper().memeplex!, authors: [BOB, CAROL] } });
+        const { api, state } = services({ me: granted, timeline: [unlisted] });
+        state.coauthors['did:cid:9'] = [{ did: CAROL, status: 'listed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText('listed by the publisher');
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+
+        cleanup();
+        const narrowed = services({ me: { ...granted, actions: ['memeplex:post'] }, timeline: [paper()] });
+        narrowed.state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        render(<App api={narrowed.api} />);
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findAllByText('listed by the publisher');
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+    });
+
+    it('says why a confirmation was refused, and asks once more', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [paper()] });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        vi.mocked(api.publish).mockRejectedValueOnce(new ApiError(403, 'no grant to publish under'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
+
+        expect((await screen.findByRole('alert')).textContent).toContain('no grant to publish under');
+        expect(screen.getByRole('button', { name: 'Confirm this revision' })).toBeTruthy();
     });
 });
 
