@@ -12,12 +12,15 @@ import {
     DialogContentText,
     DialogTitle,
     FormControlLabel,
+    IconButton,
+    InputAdornment,
     MenuItem,
     Paper,
     TextField,
+    Tooltip,
     Typography,
 } from "@mui/material";
-import { VerifiedUser } from "@mui/icons-material";
+import { CameraAlt, VerifiedUser } from "@mui/icons-material";
 import type { KeymasterInterface } from "@didcid/clients/keymaster-types";
 import { anchoredOn, grantIn, grantMember, grantRequestId, grantRequestOf, isDateTime } from "@didcid/keymaster/grant";
 import type { GrantRequestRefusal } from "@didcid/keymaster/grant";
@@ -58,6 +61,10 @@ type Props = {
     // up, so that the same request can arrive again.
     request?: string;
     onRequestTaken?: () => void;
+    // How a code is read with a camera, where the host has one: what the code
+    // holds, or nothing when none was read. A client shows its grant link as a
+    // code as well, and scanning it is offered beside pasting it.
+    scanQr?: () => Promise<string | null>;
 };
 
 type GrantData = {
@@ -267,7 +274,7 @@ const REVOCATION_TEXT: Record<RevocationState, string> = {
     displaced: "Revocation did not take effect",
 };
 
-export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000, request: arrived, onRequestTaken }: Props) {
+export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000, request: arrived, onRequestTaken, scanQr }: Props) {
     const notifyRef = useRef(hostNotify);
     notifyRef.current = hostNotify;
 
@@ -640,6 +647,20 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         }
     }
 
+    async function scanLink() {
+        const scanned = (await scanQr?.())?.trim();
+
+        if (!scanned) {
+            setLinkError("No code was read.");
+            return;
+        }
+
+        // What is read is reviewed as a link that was pasted is.
+        linkRef.current = scanned;
+        setLink(scanned);
+        await readLink(scanned);
+    }
+
     async function revoke(held: HeldGrant) {
         const mark = (state?: RevocationState, uncertain = false) => {
             track(sessionKey, held.did, () => state && { grant: held, state, ...(uncertain ? { uncertain } : {}) });
@@ -713,8 +734,24 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                             value={link}
                             onChange={event => setLink(event.target.value)}
                             error={linkError !== ""}
-                            helperText={linkError || "Paste the link the client shows."}
+                            helperText={linkError || (scanQr ? "Paste the link the client shows, or scan its code." : "Paste the link the client shows.")}
                             sx={{ flex: 1, minWidth: 240 }}
+                            slotProps={{
+                                input: {
+                                    // Only offered where there is a camera.
+                                    endAdornment: scanQr ? (
+                                        <InputAdornment position="end">
+                                            <Tooltip title="Scan QR" placement="top">
+                                                <span>
+                                                    <IconButton edge="end" aria-label="Scan the grant code" onClick={scanLink} disabled={busy}>
+                                                        <CameraAlt />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                        </InputAdornment>
+                                    ) : undefined,
+                                },
+                            }}
                         />
                         <Button variant="contained" onClick={() => readLink()} disabled={busy || !link.trim()}>
                             Review
