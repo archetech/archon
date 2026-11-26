@@ -323,7 +323,7 @@ it('does not take an expired grant as one to publish under', async () => {
     await anchor();
     const found = await client.findGrants(request);
 
-    expect(usable(found, new Date('2026-12-31T23:59:59Z'))).toBeDefined();
+    expect(usable(found, new Date('2026-12-31T23:59:59Z'))).toMatchObject({ expiresAt: '2027-01-01T00:00:00Z' });
     expect(usable(found, new Date('2027-01-01T00:00:00Z'))).toBeUndefined();
 }, 120_000);
 
@@ -339,6 +339,8 @@ it('orders the grants in force by when they were anchored, across chains', () =>
     ];
 
     expect(liveGrants(found).map(each => each.did)).toStrictEqual(['did:cid:a', 'did:cid:b', 'did:cid:c']);
+    // A grant that does not expire says nothing of when.
+    expect(liveGrants(found).some(each => 'expiresAt' in each)).toBe(false);
     expect(usable(found)).toBeUndefined();
 });
 

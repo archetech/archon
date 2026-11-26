@@ -219,6 +219,17 @@ button {
 }
 .more [role="menu"] button { text-align: left; white-space: nowrap; color: var(--ink); }
 .more [role="menu"] button:hover, .more [role="menu"] button:focus-visible { background: var(--ground); }
+/* The grant Memepool publishes under, put away until the reader looks. */
+.granted { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.granted > summary { cursor: pointer; color: var(--soft); }
+.granted[open] { background: var(--paper); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.75rem 1rem; }
+.granted[open] > summary { margin-bottom: 0.5rem; }
+.granted .badge { margin-left: 0.5rem; border: 1px solid var(--warn); color: var(--warn); border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.8rem; }
+.granted ul { margin: 0.25rem 0 0.5rem; padding-left: 1.25rem; }
+.granted section + section { border-top: 1px solid var(--line); margin-top: 0.75rem; padding-top: 0.5rem; }
+.granted dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.75rem; margin: 0.5rem 0; }
+.granted dt { color: var(--soft); }
+.granted dd { margin: 0; overflow-wrap: anywhere; }
 button.quiet { background: transparent; color: var(--accent); border-color: transparent; padding: 0.2rem 0.4rem; }
 button:disabled { opacity: 0.5; cursor: default; }
 a { color: var(--accent); }
