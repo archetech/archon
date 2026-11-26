@@ -54,9 +54,14 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: npm run android:build
 
+      # Gradle gives every debug build of every app the same name. The file is
+      # named for what it is, as a release's is.
+      - name: Name the APK
+        run: mv apps/react-wallet/android/app/build/outputs/apk/debug/app-debug.apk apps/react-wallet/android/app/build/outputs/apk/debug/archon-wallet.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: archon-android-debug-${{ github.sha }}
-          path: apps/react-wallet/android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/react-wallet/android/app/build/outputs/apk/debug/archon-wallet.apk
           if-no-files-found: error

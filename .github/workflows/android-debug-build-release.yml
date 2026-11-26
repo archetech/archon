@@ -66,11 +66,17 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: npm run android:build
 
+      # Gradle gives every debug build of every app the same name. The file is
+      # named for what it is, with no version in the name, so that a link to
+      # the latest release's file stays the same from one release to the next.
+      - name: Name the APK
+        run: mv apps/react-wallet/android/app/build/outputs/apk/debug/app-debug.apk apps/react-wallet/android/app/build/outputs/apk/debug/archon-wallet.apk
+
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: app-debug-artifact
-          path: apps/react-wallet/android/app/build/outputs/apk/debug/app-debug.apk
+          name: archon-wallet-apk
+          path: apps/react-wallet/android/app/build/outputs/apk/debug/archon-wallet.apk
           if-no-files-found: error
 
   create-release:
@@ -81,15 +87,9 @@ jobs:
       - name: Download debug APK artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
-          name: app-debug-artifact
+          name: archon-wallet-apk
 
-      # The downloaded artifact is in the working directory, under the name
-      # Gradle gives every debug build. A release names it for what it is, with
-      # no version in the name, so that a link to the latest release's file
-      # stays the same from one release to the next.
-      - name: Name the APK
-        run: mv app-debug.apk archon-wallet.apk
-
+      # The downloaded artifact is in the working directory.
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3
         with:
