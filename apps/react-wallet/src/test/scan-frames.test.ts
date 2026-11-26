@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { nativeScanQrFrames, scanQrFrames } from '../utils/utils';
+import { nativeScanQr, nativeScanQrFrames, scanQrFrames, scanQrText } from '../utils/utils';
 
 // The continuous scanner the wallet gives the shared UI on Android. The plugin
 // is replaced by one whose camera the test drives: it hands the listener the
@@ -121,5 +121,17 @@ describe('the continuous scanner as a capability', () => {
     it('is not offered in a browser, where the plugin has nothing to draw the camera into', () => {
         plugin.native = false;
         expect(nativeScanQrFrames()).toBeUndefined();
+    });
+});
+
+describe('the scanner of one code as a capability', () => {
+    it('is offered in the native app', () => {
+        plugin.native = true;
+        expect(nativeScanQr()).toBe(scanQrText);
+    });
+
+    it('is not offered in a browser, where the plugin opens no camera for it', () => {
+        plugin.native = false;
+        expect(nativeScanQr()).toBeUndefined();
     });
 });

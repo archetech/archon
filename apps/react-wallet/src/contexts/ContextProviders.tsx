@@ -7,7 +7,7 @@ import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
-import { nativeScanQrFrames, scanAliasQrCode, scanQrText } from "../utils/utils";
+import { nativeScanQr, nativeScanQrFrames, scanAliasQrCode } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
@@ -171,9 +171,10 @@ export function ContextProviders(
                                     <UIProvider>
                                         <Navigation>
                                             {/* This wallet is the Capacitor app, so it
-                                                is the one with a camera. */}
+                                                is the one with a camera, where it runs
+                                                as an app and not in a browser. */}
                                             <PlatformCapabilitiesProvider
-                                                scanQr={scanQrText}
+                                                scanQr={nativeScanQr()}
                                                 scanQrFrames={nativeScanQrFrames()}
                                                 scanAliasQr={scanAliasQrCode}
                                                 loadRefreshInterval={async () => loadRefreshIntervalSeconds()}
