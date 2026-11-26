@@ -48,6 +48,12 @@
         "pdf": {
             "$ref": "#/$defs/pdf"
         },
+        "firstPublished": {
+            "$ref": "#/$defs/date"
+        },
+        "original": {
+            "$ref": "#/$defs/link"
+        },
         "text": false,
         "target": false,
         "targetVersion": false,
@@ -153,6 +159,15 @@
             "items": {
                 "$ref": "#/$defs/tagValue"
             }
+        },
+        "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "link": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^https://[^\\s]+$"
         }
     }
 }

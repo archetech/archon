@@ -1960,6 +1960,393 @@
    }
   },
   {
+   "name": "post: when and where it first appeared",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "valid",
+   "did": "did:cid:bagaaieraknmw34yuveug5j33xugufdx426wvrftcyhu6j6pkcrztuzpeccsa",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "title": "A title",
+      "firstPublished": "2019-03-12",
+      "original": "https://example.org/2019/03/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "AVImlT0omuB5p2x2XJw9t3XQZxANQ-aEkVSKo3YmA-JsLomOiGJPLRMdRzwNms2GfB4dLGwEN568_PdPl26B6g"
+    }
+   }
+  },
+  {
+   "name": "post: when it first appeared, and not where",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "valid",
+   "did": "did:cid:bagaaieratssv33s3oeujeoojn3oiu7hlyuawenctrspmhljda2s5hs2tfsbq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "firstPublished": "2020-02-29"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "2-pgBJvfCcBb7Dwt18AQye2K4J7GZGj8NRvc_u966PpAFg6oIWOlrm4i9jF5YfGvftPz3TnYuGktUap3Gs1KDw"
+    }
+   }
+  },
+  {
+   "name": "post: where it first appeared, at 2,000 characters",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "valid",
+   "did": "did:cid:bagaaieraicgg57wikm2iyh5pg7wlpubw7gzzybkxpa56sxv4q6ean2ieqfra",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "original": "https://example.org/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "R38zHrTUHYpIS4eiXPD23mRAleTsQtGwSCRgDCIml6MYP348Pn6NcQt3f3-Bm8EuQwseDhAeCkgoN26ZVJIsAg"
+    }
+   }
+  },
+  {
+   "name": "post: first published on a day that is none",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "first-published",
+   "did": "did:cid:bagaaiera3i2cbfzerqwxcmb3sjihnokmme27ywlrpfdvmouldq4iepnvw37a",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "firstPublished": "2019-02-29"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "_HwfpghbnWT4-OhnkStdr7JmRsRg8fpDbeEEGSpjtd8cfIFaCVrsP_HB1y1gfl8O4oudv89tp_MTw6Z03916Vg"
+    }
+   }
+  },
+  {
+   "name": "post: first published in a month that is none",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "first-published",
+   "did": "did:cid:bagaaieramlkittdi2god2gp3owlkhc5p2htliyzzxbppgfzdorgjwyug4hsq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "firstPublished": "2019-13-01"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "kbkA6ckq9GLqrSFPqFW67HgavkZsndb09_SpolbW-f0v2BqfUVJfRCwGBG3YKtW44zlpF7TzxpO1d0dO1_SoEQ"
+    }
+   }
+  },
+  {
+   "name": "post: first published at a time of day",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieragu2fqa2fgtu4vhxtchbgveaccg5ohojgjdwqkgulq3d3cwfnzuna",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "firstPublished": "2019-03-12T00:00:00Z"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "EEHXybsiG2nC_NRiOMDC8wDtPYQhcuYVTPIS-kxJPU48G9LuTkmqaehrQhDwWKy9bkWcHUhP8wwBPEO2KSYvCQ"
+    }
+   }
+  },
+  {
+   "name": "post: first published without a day",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieranoeeayebes4ddeug4ubooushji5mqxw47bl6nrdwm3vwgv2a3ueq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "firstPublished": "2019-03"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "-sUUQOFLATmR4BQ48on4WqJ0rl4WyCjW7ZaPYJ1A1Mh6bccxBbBHNHDx0IT4fqL2fx821DaitxK0lTKVFpOxfQ"
+    }
+   }
+  },
+  {
+   "name": "post: an original that is not https",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieratemj6bhpl6eovveq3ol44nc65qoq6dsgbir5h7ejmsjyqzb4korq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "original": "http://example.org/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "rTDHXhQeTMNUEY0sv0TLGx1HNrzbJvKG5RgQEmFaELUq8Rb1vuLz7_CCRCMvndr2xK6Wqd6PqZ764f2Tz2sQ8g"
+    }
+   }
+  },
+  {
+   "name": "post: an original that is a script",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieraxrhu4krrscucht5whulxql7yg27r4g37niplvtwwjecpdcpi5a3q",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "original": "javascript:alert(1)"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "i5EPczrKbJsC_hoVbrQiufmGeDtYd3WBdko1G05cDd0NiyHfPw7qlKbD1Q9mbf4Dg3UFf5lI3jKNGoKWmDWFDA"
+    }
+   }
+  },
+  {
+   "name": "post: an original with a space in it",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaierapaqm5zkkat7abya25nqku5yurkufxbzorcmxuavmjm22pp5do6pq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "original": "https://example.org/a title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "sDXGpCpZHV-CQhOpH9FaVk1UuPWoMi01_6W2qsGLxZIvibnnbD_SfFi6-2QUz5cyKOw7UovlcfxVWkQ3MgQUaw"
+    }
+   }
+  },
+  {
+   "name": "post: an original of 2,001 characters",
+   "schema": "post",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaiera2ieoirn653qf3nx2sde23meuygp46ij7ze3nexrfvleqoktgdona",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaieraudqoko7exqb4bhhcd5rl6esqoqxqa4nqka2gjiep7jod5bzmreoq",
+      "kind": "post",
+      "text": "Every post on Memepool is a DID.",
+      "original": "https://example.org/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "0_9aSS0AZu-zaE9YxeEZbJV45Xwdspv5JGZEGJrPM0135TvKt5r6OdJJnvmQ0_IVkzTlj8rNMknbcgtToqG8bw"
+    }
+   }
+  },
+  {
    "name": "post: 21 tags",
    "schema": "post",
    "member": "memeplex",
@@ -2779,6 +3166,97 @@
      "verificationMethod": "did:cid:bagaaieraif4gsaf4bei2g2ctnxzij4ojyc3ka7skx3m7i4ou3yt5mkesyhsq#key-1",
      "proofPurpose": "capabilityInvocation",
      "proofValue": "tousU1YXyZkHDTI5oOptRPBXEwl_eIoAlwguboBiB8I9qH9RHm7HwN_8q8mQb9sP6etS_ldfiXUASd_3oMj1HQ"
+    }
+   }
+  },
+  {
+   "name": "paper: when and where it first appeared",
+   "schema": "paper",
+   "member": "memeplex",
+   "expect": "valid",
+   "did": "did:cid:bagaaierae4hi7aqtejhhsga3u3ff2h75vqfm4tobycdzxptj3vxz32g4xygq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieraif4gsaf4bei2g2ctnxzij4ojyc3ka7skx3m7i4ou3yt5mkesyhsq",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaierafvonphtjea6noeo5kau5thjkuqnhe4hc7fytxs4ja6esoxxug42q",
+      "kind": "paper",
+      "title": "Convergent Replay of Signed DID Histories",
+      "summary": "We show that nodes receiving the same signed operations reach the same histories.",
+      "authors": [
+       "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+       "did:cid:bagaaieracgsstmz7wsygolk3ax22cttqg367yoiympqn5hsq27nx7cd4x57a"
+      ],
+      "content": {
+       "cid": "bagaaierarn5m3z4mqo25ql2z5fy7xolljjqwtveioa7s5m7ltephkmncth7a",
+       "type": "text/markdown",
+       "bytes": 61207
+      },
+      "firstPublished": "2019-03-12",
+      "original": "https://example.org/2019/03/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieraif4gsaf4bei2g2ctnxzij4ojyc3ka7skx3m7i4ou3yt5mkesyhsq#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "0UKoPDxIssTbhkArtCb46qDyVprQGAb0T4p0GzL52aYDhw-O-Mqmv0AFfwzP5LGedTTIILCqOqyFp82oj95g4g"
+    }
+   }
+  },
+  {
+   "name": "paper: first published on a day that is none",
+   "schema": "paper",
+   "member": "memeplex",
+   "expect": "first-published",
+   "did": "did:cid:bagaaierawmqofcrn5l2l3kcorojlrbhyntyuxxnm4zbaixo2qkhadqbdt76a",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieraif4gsaf4bei2g2ctnxzij4ojyc3ka7skx3m7i4ou3yt5mkesyhsq",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+      "grant": "did:cid:bagaaierafvonphtjea6noeo5kau5thjkuqnhe4hc7fytxs4ja6esoxxug42q",
+      "kind": "paper",
+      "title": "Convergent Replay of Signed DID Histories",
+      "summary": "We show that nodes receiving the same signed operations reach the same histories.",
+      "authors": [
+       "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
+       "did:cid:bagaaieracgsstmz7wsygolk3ax22cttqg367yoiympqn5hsq27nx7cd4x57a"
+      ],
+      "content": {
+       "cid": "bagaaierarn5m3z4mqo25ql2z5fy7xolljjqwtveioa7s5m7ltephkmncth7a",
+       "type": "text/markdown",
+       "bytes": 61207
+      },
+      "firstPublished": "2021-04-31"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieraif4gsaf4bei2g2ctnxzij4ojyc3ka7skx3m7i4ou3yt5mkesyhsq#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "gztN92rExvmU4eNFv0_WjEBVxKJN1qIMQdaEOwhxrbsWvCx5_1IOabeFiUaJ1YmCuFgs4SHC1UMqPsBsmV0TLg"
     }
    }
   },
@@ -5514,6 +5992,80 @@
    }
   },
   {
+   "name": "reply: has firstPublished",
+   "schema": "reply",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieraf7ljvjotue2mnfhgfwpuqugdmv44ag32ftcyx7iqsg4p7evod6kq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieracgsstmz7wsygolk3ax22cttqg367yoiympqn5hsq27nx7cd4x57a",
+      "grant": "did:cid:bagaaieraj5becwgaju75d62iogf5fewus2l7tshyhsp2gqnxuoguly47sffq",
+      "kind": "reply",
+      "target": "did:cid:bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "targetVersion": "bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "text": "Including the reactions?",
+      "firstPublished": "2019-03-12"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "2A-7cmX95GJcdcuRPA_4XyPGUNxPNsF4dvitW260fSN4RnPICxxjwNUg9dwLTrzpz-PeN-0PNjTtonMaCYuRQw"
+    }
+   }
+  },
+  {
+   "name": "reply: has original",
+   "schema": "reply",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieraravws4ivgkevuzmrhj3vvqtuoc72xi32dmfjqfggwxnlc4klbwna",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaieracgsstmz7wsygolk3ax22cttqg367yoiympqn5hsq27nx7cd4x57a",
+      "grant": "did:cid:bagaaieraj5becwgaju75d62iogf5fewus2l7tshyhsp2gqnxuoguly47sffq",
+      "kind": "reply",
+      "target": "did:cid:bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "targetVersion": "bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "text": "Including the reactions?",
+      "original": "https://example.org/2019/03/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "jjGp3vOytpN31kQaqtyt6Qelu289W6iEk_D6VbIQX-sUcF-EU2oHU2GX8csp34Ip4AMccK1rHq7rxphEGvJt2w"
+    }
+   }
+  },
+  {
    "name": "reply: has rating",
    "schema": "reply",
    "member": "memeplex",
@@ -6325,6 +6877,84 @@
    }
   },
   {
+   "name": "rating: has firstPublished",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaiera67y4m62i6paoftr3tjezfgqe3n26hlfcetramrfhz3rqztn5jpyq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaieralbvsxrpw2jfje7no4hfz2ra3bmdxfsmtqzq7gf6qogl4dufdpt7a",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 3,
+      "min": 1,
+      "max": 5,
+      "firstPublished": "2019-03-12"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "dEJT2KEIwlyw-NZ4NlNnayVcxsSPknWgNWkOPyI3MnQ_4tmjH4bGHZ0N37T0xg296BAXq6au7C5GOB1kAbjGyw"
+    }
+   }
+  },
+  {
+   "name": "rating: has original",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaiera3gxxrjbyfq2tlfmgbmkv64dxatr3mh5uncmeaxtcsbpnb3qesgpq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaieralbvsxrpw2jfje7no4hfz2ra3bmdxfsmtqzq7gf6qogl4dufdpt7a",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 3,
+      "min": 1,
+      "max": 5,
+      "original": "https://example.org/2019/03/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "jcAJcgswegEl-oksA3PCwoBQx_J3tilAXwGjS4ne4GdGjXmZ0ucltS0r6nI5llwMtVT671f5TJcmYx78cdMQ0g"
+    }
+   }
+  },
+  {
    "name": "rating: has verdict",
    "schema": "rating",
    "member": "memeplex",
@@ -6962,6 +7592,80 @@
      "verificationMethod": "did:cid:bagaaieraljht6zoj2rqynnfc56rucawm6jwqk2t5wj3bxaglyxwsr36qyrjq#key-1",
      "proofPurpose": "capabilityInvocation",
      "proofValue": "f4kztb-BogwRvU95yL7FDlX75kQdw_eNRtEJdOFkrbozpaOZxekPdAtHTtOJlSdOAgK7cOwj22KS5s1p6kqmRQ"
+    }
+   }
+  },
+  {
+   "name": "tag: has firstPublished",
+   "schema": "tag",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaierasuzyrlpn6ncottmcpbbd2avu2dmihafcyhsfqvacz7bh2ucb2ura",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieraljht6zoj2rqynnfc56rucawm6jwqk2t5wj3bxaglyxwsr36qyrjq",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera4ugftayqhts6ohb3w7gqyx7geri7lpps3pqdrt7vmqh46sy76cba",
+      "grant": "did:cid:bagaaieraz42qwltywj7kh73nt64jxoctiyunlfiq5jym5xbihvqakfweqxwq",
+      "kind": "tag",
+      "target": "did:cid:bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "targetVersion": "bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "tag": "cryptography",
+      "firstPublished": "2019-03-12"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieraljht6zoj2rqynnfc56rucawm6jwqk2t5wj3bxaglyxwsr36qyrjq#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "cuC7dXwRtmXjsqpqzYmONbc01OeMrRXBDWCkHTCKBWUxFElDo38JChQCFmBeR1kMPRKcuviHCF-RgSZpdg9vOg"
+    }
+   }
+  },
+  {
+   "name": "tag: has original",
+   "schema": "tag",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaierasduxop7qe2k6kpe7uhha72cvemhxqc2nwdoqgd4nbra3adt2rysq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieraljht6zoj2rqynnfc56rucawm6jwqk2t5wj3bxaglyxwsr36qyrjq",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera4ugftayqhts6ohb3w7gqyx7geri7lpps3pqdrt7vmqh46sy76cba",
+      "grant": "did:cid:bagaaieraz42qwltywj7kh73nt64jxoctiyunlfiq5jym5xbihvqakfweqxwq",
+      "kind": "tag",
+      "target": "did:cid:bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "targetVersion": "bagaaiera36tz2hexv3axogicgtyu6uahjdyla2ztgk2rcgglxmq4n4jztsnq",
+      "tag": "cryptography",
+      "original": "https://example.org/2019/03/a-title"
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieraljht6zoj2rqynnfc56rucawm6jwqk2t5wj3bxaglyxwsr36qyrjq#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "y75PNuTLRZIT2uk7SvjFAd1oYD1x3GWDhNvDuXLZ1ZlWoeFTvRsrgVJuEIlGdHSeQTprccZk88D-kKrVkn1StQ"
     }
    }
   },

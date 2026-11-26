@@ -831,6 +831,19 @@ describe('an article', () => {
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', subtitle: 'Of nothing.', text: 'A post.' })).status).toBe(400);
     }, 120_000);
 
+    it('publishes an article with when and where it first appeared, and refuses a day that is none or an address that is not https', async () => {
+        const { agent } = await granted(alice);
+        const first = { firstPublished: '2019-03-12', original: 'https://example.org/2019/03/on-dids' };
+        const { did } = (await agent.post('/api/v1/objects').send({ kind: 'post', title: 'On DIDs', body: BODY, ...first })).body;
+
+        expect(await objectOf(did)).toMatchObject({ kind: 'post', title: 'On DIDs', ...first });
+        for (const wrong of [{ firstPublished: '2019-02-30' }, { firstPublished: '2019-03-12T00:00:00Z' }, { original: 'http://example.org/on-dids' }, { original: ['javascript', 'alert(1)'].join(':') }]) {
+            expect([wrong, (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.', ...wrong })).status]).toStrictEqual([wrong, 400]);
+        }
+        // Neither is a reply's to say.
+        expect((await agent.post('/api/v1/objects').send({ kind: 'reply', text: 'A reply.', target: did, targetVersion: 'bagaaieratn3qyhvyjd5nb2wa55knrb5zkx2sscb7hqgq6nxu5pwcd7ymuhpq', ...first })).status).toBe(400);
+    }, 120_000);
+
     it('takes no reference to content it has not stored', async () => {
         const { agent } = await granted(alice);
         const elsewhere = { cid: await gatekeeper.addText('kept by someone else'), type: 'text/markdown', bytes: 20 };

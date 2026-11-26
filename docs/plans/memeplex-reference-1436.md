@@ -31,6 +31,8 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `authors` | 1–100 distinct DIDs, including `author` | paper; required |
 | `source` | `{ cid, type, bytes }` | paper |
 | `pdf` | `{ cid, type, bytes }` | paper |
+| `firstPublished` | date, `YYYY-MM-DD`: when the work first appeared, where that was before it was published here | post, paper |
+| `original` | `https` URL, at most 2,000 characters: where the work first appeared | post, paper |
 | `verdict` | string, at most 300 code points | reply |
 | `rating`, `min`, `max` | integers from −100 to 100 (see Ratings) | rating; required |
 | `tag` | string, 1–64 code points (see Tags and reactions) | tag; required |
@@ -47,6 +49,15 @@ defined in the core. Examples below show asset data with abbreviated identifiers
   ignored. New fields arrive only with a new `v` (see Schemas: Evolution).
 - **Lengths** count Unicode code points. The whole operation must still fit
   Gatekeeper's 64 Ki limit.
+
+`firstPublished` and `original` are for work that appeared somewhere else first: an
+article brought over from a blog, a paper from a journal or a preprint server. Both
+are the author's claim, as a paper's `authors` are, and nothing checks either. They
+are shown as such, beside the time the version was anchored and never in its place:
+that time is the only one established. No order follows `firstPublished`; a timeline
+is ordered by anchoring, which an author cannot choose. `original` is an address a
+stranger wrote: a reader follows it only as a link in text is followed (see Text
+formatting).
 
 A verdict is free text so that venues can use their own wording ("accept", "minor
 revisions"). A venue that needs a fixed vocabulary defines an extension kind.
@@ -142,6 +153,8 @@ and grants, valid and invalid, each with the outcome these rules give it.
   "tagValue": {"type": "string", "minLength": 1, "maxLength": 64},
   "tags": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/tagValue"}},
   "text": {"type": "string", "maxLength": 10000},
+  "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+  "link": {"type": "string", "maxLength": 2000, "pattern": "^https://[^\\s]+$"},
   "action": {
     "anyOf": [
       {"enum": ["memeplex:post", "memeplex:reply", "memeplex:rate", "memeplex:tag"]},
@@ -181,6 +194,8 @@ ignored, as the strictness rule requires.
     "title": {"type": "string", "maxLength": 300},
     "subtitle": {"type": "string", "maxLength": 300},
     "summary": {"type": "string", "maxLength": 5000},
+    "firstPublished": {"$ref": "#/$defs/date"},
+    "original": {"$ref": "#/$defs/link"},
     "authors": false, "source": false, "pdf": false, "verdict": false,
     "rating": false, "min": false, "max": false, "tag": false, "image": false
   },
@@ -229,6 +244,8 @@ ignored, as the strictness rule requires.
     },
     "source": {"$ref": "#/$defs/source"},
     "pdf": {"$ref": "#/$defs/pdf"},
+    "firstPublished": {"$ref": "#/$defs/date"},
+    "original": {"$ref": "#/$defs/link"},
     "text": false, "target": false, "targetVersion": false, "verdict": false,
     "rating": false, "min": false, "max": false, "tag": false, "image": false
   },
@@ -254,6 +271,7 @@ ignored, as the strictness rule requires.
     "tags": {"$ref": "#/$defs/tags"},
     "verdict": {"type": "string", "maxLength": 300},
     "title": false, "subtitle": false, "summary": false, "authors": false,
+    "firstPublished": false, "original": false,
     "source": false, "pdf": false, "rating": false, "min": false, "max": false,
     "tag": false, "image": false
   },
@@ -288,6 +306,7 @@ ignored, as the strictness rule requires.
     "max": {"type": "integer", "minimum": -100, "maximum": 100},
     "text": false, "content": false, "tags": false, "title": false,
     "subtitle": false, "summary": false, "authors": false, "source": false,
+    "firstPublished": false, "original": false,
     "pdf": false, "verdict": false, "tag": false, "image": false
   },
   "required": ["v", "kind", "author", "grant", "target", "targetVersion", "rating", "min", "max"]
@@ -311,6 +330,7 @@ ignored, as the strictness rule requires.
     "image": {"$ref": "#/$defs/pinnedDidUrl"},
     "text": false, "content": false, "tags": false, "title": false,
     "subtitle": false, "summary": false, "authors": false, "source": false,
+    "firstPublished": false, "original": false,
     "pdf": false, "verdict": false, "rating": false, "min": false, "max": false
   },
   "required": ["v", "kind", "author", "grant", "target", "targetVersion", "tag"]
@@ -364,6 +384,9 @@ schema, and a version that fails one is invalid in the same way.
 3. **Expiry instant:** a grant's or grant request's `expiresAt` is a valid ISO 8601
    date-time in UTC, such as `2026-12-31T00:00:00Z`. The schema's pattern checks only
    the shape; a value that is not a real instant is invalid.
+
+4. **First publication date:** a `firstPublished` is a real calendar date, such as
+   `2019-03-12`. The schema's pattern checks only the shape.
 
 No check depends on Unicode data: tag values are validated structurally, and how
 they are normalized and classified is up to readers (see Tags and reactions).

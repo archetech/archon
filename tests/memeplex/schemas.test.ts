@@ -152,7 +152,7 @@ describe('the signed vectors', () => {
 
     it('show every outcome', () => {
         expect([...new Set(vectors.cases.map(each => each.expect))].sort()).toStrictEqual(
-            ['expiry-instant', 'kind', 'paper-authors', 'rating-bounds', 'schema', 'unsupported', 'valid', 'version']);
+            ['expiry-instant', 'first-published', 'kind', 'paper-authors', 'rating-bounds', 'schema', 'unsupported', 'valid', 'version']);
     });
 
     it('cover every required field and every field of another kind, for each kind', () => {

@@ -102,6 +102,10 @@ button.identity.visit:hover strong, button.identity.visit:hover .mono, button.id
 .avatar img.loaded { opacity: 1; background: var(--line); }
 
 .post .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; }
+/* When and where a work first appeared, as its author says. */
+.post .first { margin: 0 0 0.5rem; font-size: 0.85rem; }
+.first-fields { border: 1px solid var(--line); border-radius: 0.5rem; margin: 0.75rem 0; padding: 0.5rem 0.75rem; }
+.first-fields legend { color: var(--soft); font-size: 0.85rem; padding: 0 0.25rem; }
 .post .subtitle { margin: 0 0 0.5rem; color: var(--soft); font-size: 1.05rem; overflow-wrap: anywhere; }
 .post .summary { font-style: italic; }
 

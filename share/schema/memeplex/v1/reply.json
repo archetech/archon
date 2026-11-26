@@ -38,6 +38,8 @@
         "subtitle": false,
         "summary": false,
         "authors": false,
+        "firstPublished": false,
+        "original": false,
         "source": false,
         "pdf": false,
         "rating": false,

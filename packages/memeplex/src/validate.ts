@@ -25,6 +25,7 @@ export type Validity =
     | 'rating-bounds'
     // A paper's `authors` does not include its `author`.
     | 'paper-authors'
+    | 'first-published'
     // A grant's or a grant request's `expiresAt` is not a real instant.
     | 'expiry-instant';
 
@@ -64,6 +65,7 @@ export function validateObject(memeplex: unknown): Validity {
         return 'rating-bounds';
     }
     if (kind === 'paper' && !value.authors.includes(value.author)) return 'paper-authors';
+    if (value.firstPublished !== undefined && !isInstant(`${value.firstPublished}T00:00:00Z`)) return 'first-published';
 
     return 'valid';
 }

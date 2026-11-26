@@ -2904,6 +2904,86 @@ describe('an article', () => {
         localStorage.clear();
     });
 
+    it('is published with when and where it first appeared, where the writer says, and with an https address only', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write an article' }));
+        await user.type(screen.getByLabelText('Title'), 'A title');
+        await user.type(screen.getByLabelText('Article'), 'A body.');
+        const publish = screen.getByRole('button', { name: 'Publish article' }) as HTMLButtonElement;
+
+        // Both are left empty by a work that is new.
+        expect(publish.disabled).toBe(false);
+        fireEvent.change(screen.getByLabelText('First published'), { target: { value: '2019-03-12' } });
+        await user.type(screen.getByLabelText('Original'), 'http://example.org/a-title');
+        expect(screen.getByText('The original is an https address, with no spaces.')).toBeTruthy();
+        expect(publish.disabled).toBe(true);
+
+        await user.clear(screen.getByLabelText('Original'));
+        await user.type(screen.getByLabelText('Original'), ' https://example.org/a-title ');
+        expect(publish.disabled).toBe(false);
+        await user.click(publish);
+
+        await waitFor(() => expect(state.published).toStrictEqual([
+            { kind: 'post', title: 'A title', body: 'A body.', firstPublished: '2019-03-12', original: 'https://example.org/a-title' },
+        ]));
+    });
+
+    it('says when and where it first appeared as its author\'s claim, and follows no address but an https one', async () => {
+        const first = (did: string, more: Record<string, unknown>): Publication => ({ ...article(did), memeplex: { ...article(did).memeplex!, ...more } });
+        const { api } = services({ me: granted, timeline: [
+            first('did:cid:1', { title: 'Both', firstPublished: '2019-03-12', original: 'https://example.org/a-title' }),
+            first('did:cid:2', { title: 'A day', firstPublished: '2020-02-29' }),
+            first('did:cid:3', { title: 'A place', original: 'https://example.org/elsewhere' }),
+            first('did:cid:4', { title: 'A script', firstPublished: '2019-02-30x', original: ['javascript', 'alert(1)'].join(':') }),
+            first('did:cid:5', { title: 'Neither' }),
+        ] });
+        render(<App api={api} />);
+
+        const of = async (title: string) => (await screen.findByText(title)).closest('article')!.querySelector('.first');
+        const both = (await of('Both'))!;
+
+        expect(both.textContent).toMatch(/^First published .*2019.* · original$/);
+        expect(both.textContent).toMatch(/12/);
+        const link = both.querySelector('a')!;
+
+        expect(link.getAttribute('href')).toBe('https://example.org/a-title');
+        expect(link.getAttribute('rel')).toBe('noreferrer noopener');
+        // A day alone, and a place alone.
+        expect((await of('A day'))!.textContent).toMatch(/^First published .*29.*2020|^First published .*2020/);
+        expect((await of('A day'))!.querySelector('a')).toBeNull();
+        expect((await of('A place'))!.textContent).toBe('First published elsewhere · original');
+        // What is no date and no https address is not shown, and nothing is said of a work that says nothing.
+        expect(await of('A script')).toBeNull();
+        expect(await of('Neither')).toBeNull();
+        expect(document.querySelector('a[href^="javascript"]')).toBeNull();
+    });
+
+    it('has when and where it first appeared changed, and taken off, by an edit', async () => {
+        const was = { ...article('did:cid:1'), memeplex: { ...article('did:cid:1').memeplex!, firstPublished: '2019-03-12', original: 'https://example.org/a-title' } };
+        const { api, state } = services({ me: granted, timeline: [was] });
+        state.bodies.bafkreibody = BODY;
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await toOpen());
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
+        expect((screen.getByLabelText('First published') as HTMLInputElement).value).toBe('2019-03-12');
+        expect((screen.getByLabelText('Original') as HTMLInputElement).value).toBe('https://example.org/a-title');
+        expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.change(screen.getByLabelText('First published'), { target: { value: '2018-01-02' } });
+        await user.clear(screen.getByLabelText('Original'));
+        await user.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(state.edited).toHaveLength(1));
+        expect(state.edited[0].object.firstPublished).toBe('2018-01-02');
+        expect('original' in state.edited[0].object).toBe(false);
+    });
+
     it('is edited with its body, and sends the body only when it has changed', async () => {
         const { api, state } = services({ me: granted, timeline: [article('did:cid:1')] });
         state.bodies.bafkreibody = BODY;

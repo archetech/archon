@@ -45,6 +45,12 @@ export const schemas = {
                 "type": "string",
                 "maxLength": 5000
             },
+            "firstPublished": {
+                "$ref": "#/$defs/date"
+            },
+            "original": {
+                "$ref": "#/$defs/link"
+            },
             "authors": false,
             "source": false,
             "pdf": false,
@@ -156,6 +162,15 @@ export const schemas = {
             "text": {
                 "type": "string",
                 "maxLength": 10000
+            },
+            "date": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "link": {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^https://[^\\s]+$"
             }
         }
     },
@@ -208,6 +223,12 @@ export const schemas = {
             },
             "pdf": {
                 "$ref": "#/$defs/pdf"
+            },
+            "firstPublished": {
+                "$ref": "#/$defs/date"
+            },
+            "original": {
+                "$ref": "#/$defs/link"
             },
             "text": false,
             "target": false,
@@ -314,6 +335,15 @@ export const schemas = {
                 "items": {
                     "$ref": "#/$defs/tagValue"
                 }
+            },
+            "date": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "link": {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^https://[^\\s]+$"
             }
         }
     },
@@ -357,6 +387,8 @@ export const schemas = {
             "subtitle": false,
             "summary": false,
             "authors": false,
+            "firstPublished": false,
+            "original": false,
             "source": false,
             "pdf": false,
             "rating": false,
@@ -498,6 +530,8 @@ export const schemas = {
             "summary": false,
             "authors": false,
             "source": false,
+            "firstPublished": false,
+            "original": false,
             "pdf": false,
             "verdict": false,
             "tag": false,
@@ -564,6 +598,8 @@ export const schemas = {
             "summary": false,
             "authors": false,
             "source": false,
+            "firstPublished": false,
+            "original": false,
             "pdf": false,
             "verdict": false,
             "rating": false,

@@ -115,6 +115,8 @@ const FOREIGN: Record<string, unknown> = {
     authors: ['did:cid:bagaaieratn3qyhvyjd5nb2wa55knrb5zkx2sscb7hqgq6nxu5pwcd7ymuhpq'],
     source: { cid: 'bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy', type: 'application/x-tex', bytes: 1 },
     pdf: { cid: 'bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy', type: 'application/pdf', bytes: 1 },
+    firstPublished: '2019-03-12',
+    original: 'https://example.org/2019/03/a-title',
     verdict: 'accept',
     rating: 3,
     min: 1,
@@ -126,11 +128,11 @@ const FOREIGN: Record<string, unknown> = {
 // The fields each kind may carry and the ones it must, from the field table.
 export const KINDS: Record<string, { allowed: string[]; required: string[] }> = {
     post: {
-        allowed: ['text', 'content', 'target', 'targetVersion', 'tags', 'title', 'subtitle', 'summary'],
+        allowed: ['text', 'content', 'target', 'targetVersion', 'tags', 'title', 'subtitle', 'summary', 'firstPublished', 'original'],
         required: ['author', 'grant'],
     },
     paper: {
-        allowed: ['content', 'tags', 'title', 'subtitle', 'summary', 'authors', 'source', 'pdf'],
+        allowed: ['content', 'tags', 'title', 'subtitle', 'summary', 'authors', 'source', 'pdf', 'firstPublished', 'original'],
         required: ['author', 'grant', 'title', 'summary', 'authors', 'content'],
     },
     reply: {
@@ -280,6 +282,22 @@ export async function build(): Promise<Vectors> {
         ...post, title: 'A title', summary: codePoints(5001),
     });
     await objectCase('post: no tags listed', memepool, 'schema', { ...post, tags: [] });
+    const first = { firstPublished: '2019-03-12', original: 'https://example.org/2019/03/a-title' };
+    await objectCase('post: when and where it first appeared', memepool, 'valid', { ...post, title: 'A title', ...first });
+    await objectCase('post: when it first appeared, and not where', memepool, 'valid', { ...post, firstPublished: '2020-02-29' });
+    await objectCase('post: where it first appeared, at 2,000 characters', memepool, 'valid', {
+        ...post, original: `https://example.org/${'a'.repeat(1980)}`,
+    });
+    await objectCase('post: first published on a day that is none', memepool, 'first-published', { ...post, firstPublished: '2019-02-29' });
+    await objectCase('post: first published in a month that is none', memepool, 'first-published', { ...post, firstPublished: '2019-13-01' });
+    await objectCase('post: first published at a time of day', memepool, 'schema', { ...post, firstPublished: '2019-03-12T00:00:00Z' });
+    await objectCase('post: first published without a day', memepool, 'schema', { ...post, firstPublished: '2019-03' });
+    await objectCase('post: an original that is not https', memepool, 'schema', { ...post, original: 'http://example.org/a-title' });
+    await objectCase('post: an original that is a script', memepool, 'schema', { ...post, original: ['javascript', 'alert(1)'].join(':') });
+    await objectCase('post: an original with a space in it', memepool, 'schema', { ...post, original: 'https://example.org/a title' });
+    await objectCase('post: an original of 2,001 characters', memepool, 'schema', {
+        ...post, original: `https://example.org/${'a'.repeat(1981)}`,
+    });
     await objectCase('post: 21 tags', memepool, 'schema', { ...post, tags: Array.from({ length: 21 }, (_, i) => `tag-${i}`) });
     await objectCase('post: an empty tag', memepool, 'schema', { ...post, tags: [''] });
     await objectCase('post: a tag of 65 code points', memepool, 'schema', { ...post, tags: [codePoints(65)] });
@@ -329,6 +347,8 @@ export async function build(): Promise<Vectors> {
     await objectCase('paper: one author and a source archive', aliceClient, 'valid', {
         ...paper, authors: [alice.did], subtitle: 'A proof', source: { cid: await cid(5), type: 'application/gzip', bytes: 84112 },
     });
+    await objectCase('paper: when and where it first appeared', aliceClient, 'valid', { ...paper, ...first });
+    await objectCase('paper: first published on a day that is none', aliceClient, 'first-published', { ...paper, firstPublished: '2021-04-31' });
     await objectCase('paper: a source that is not LaTeX or an archive', aliceClient, 'schema', {
         ...paper, source: { cid: await cid(5), type: 'application/zip', bytes: 84112 },
     });
