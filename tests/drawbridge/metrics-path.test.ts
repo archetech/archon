@@ -48,6 +48,8 @@ describe('metrics route labels', () => {
         ['/memepool/p/did:cid:bagaaiera', '/memepool/p/:did'],
         ['/memepool/a/did:cid:bagaaiera', '/memepool/a/:did'],
         ['/memepool/a/did:cid:bagaaiera/replies', '/memepool/a/:did/replies'],
+        ['/memepool/a/did:cid:bagaaiera/articles', '/memepool/a/:did/articles'],
+        ['/memepool/a/did:cid:bagaaiera/papers', '/memepool/a/:did/papers'],
         ['/memepool/p/anything-a-caller-sends', '/memepool/p/:did'],
         ['/memepool/p/did:cid:bagaaiera/more', '/memepool/:other'],
         ['/memepool/a/did:cid:bagaaiera/posts', '/memepool/:other'],

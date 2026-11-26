@@ -70,7 +70,10 @@ export interface Api {
     //
     // `read` is how many publications the indexer gave, where that is more
     // than are returned: the next page starts after them.
-    timeline(authors: string[], offset?: number, kinds?: string[]): Promise<{ total: number; publications: Publication[]; read?: number }>;
+    //
+    // `titled` is of the posts among them: those that have a title, which are
+    // articles, or those that have none.
+    timeline(authors: string[], offset?: number, kinds?: string[], titled?: boolean): Promise<{ total: number; publications: Publication[]; read?: number }>;
     thread(did: string): Promise<Reply[]>;
     // How each coauthor a paper lists stands towards the revision shown.
     coauthors(did: string): Promise<Coauthor[]>;
@@ -206,7 +209,7 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
 
             return response?.ok ? response.json() : undefined;
         },
-        async timeline(authors, offset = 0, kinds) {
+        async timeline(authors, offset = 0, kinds, titled) {
             if (authors.length === 0) {
                 return { total: 0, publications: [] };
             }
@@ -216,16 +219,24 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
             for (const kind of kinds ?? []) {
                 query.append('kind', kind);
             }
+            if (titled !== undefined) {
+                query.set('titled', String(titled));
+            }
             if (offset > 0) {
                 query.set('offset', String(offset));
             }
 
             const page = await json(await call(bases.memeplex, `/timeline?${query}`)) as { total: number; publications: Publication[] };
 
-            // An indexer that does not know the question gives every kind. What
-            // it gave is still what the next page comes after.
-            return kinds
-                ? { ...page, publications: page.publications.filter(each => kinds.includes(String(each.memeplex?.kind))), read: page.publications.length }
+            // An indexer that does not know the question gives every kind, and
+            // posts with a title or none alike. What it gave is still what the
+            // next page comes after.
+            const article = (each: Publication) => typeof each.memeplex?.title === 'string' && each.memeplex.title.trim() !== '';
+            const wanted = (each: Publication) => (!kinds || kinds.includes(String(each.memeplex?.kind)))
+                && (titled === undefined || each.memeplex?.kind !== 'post' || article(each) === titled);
+
+            return kinds || titled !== undefined
+                ? { ...page, publications: page.publications.filter(wanted), read: page.publications.length }
                 : page;
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),

@@ -267,7 +267,8 @@ export function pageRoutes({ pagesDir, site, publicURL, previews, isDid, wait = 
 
     router.get('/p/:did', serve('../', (did, known) => publicationAt(did, site, known)));
     router.get('/a/:did', serve('../', (did, known) => authorAt(did, site, known)));
-    router.get('/a/:did/replies', serve('../../', (did, known) => authorAt(did, site, known)));
+    // An author's articles, papers and replies are each listed at an address of their own.
+    router.get(['/a/:did/articles', '/a/:did/papers', '/a/:did/replies'], serve('../../', (did, known) => authorAt(did, site, known)));
 
     return router;
 }
