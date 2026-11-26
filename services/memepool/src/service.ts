@@ -8,8 +8,8 @@ import { fetchPublicHttps } from '@didcid/common/net';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
-import { MemeplexClient } from '@didcid/memeplex/client';
-import { createMemepoolApp } from './api.js';
+import { IndexerClient, MemeplexClient } from '@didcid/memeplex/client';
+import { createMemepoolApp, EMBEDDED, imageFile } from './api.js';
 
 export interface MemepoolSettings {
     gatekeeperURL: string;
@@ -17,6 +17,7 @@ export interface MemepoolSettings {
     bindAddress: string;
     name: string;
     publicURL: string;
+    indexerURL?: string;
     pagesDir: string;
     dataDir: string;
     passphrase: string;
@@ -95,6 +96,9 @@ export async function addressOwner(address: string, signal: AbortSignal, fetcher
     }
 }
 
+// Milliseconds the indexer is given to say what a publication is.
+const INDEXER_WAIT = 3000;
+
 export async function startMemepool(
     settings: MemepoolSettings,
     version: { version: string; commit: string },
@@ -167,6 +171,11 @@ export async function startMemepool(
         throw new Error(`Memepool's identity ${settings.name} is registered on local, so nothing it publishes can be on a grant's registry. Give the service a wallet whose identity is on another registry.`);
     }
 
+    // The page at an address is not kept waiting on what it says of itself:
+    // an indexer that does not answer leaves the page as it is.
+    const indexer = settings.indexerURL
+        ? new IndexerClient(settings.indexerURL, (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(INDEXER_WAIT) }))
+        : undefined;
     const app = createMemepoolApp({
         client,
         keymaster,
@@ -181,6 +190,20 @@ export async function startMemepool(
         // only where it has the shape of one.
         images: { get: (cid, limit) => (/^[A-Za-z0-9]{1,128}$/.test(cid) ? gatekeeper.getData(cid, limit).catch(() => null) : Promise.resolve(null)) },
         addresses: { owner: (address, signal) => addressOwner(address, signal) },
+        previews: indexer && {
+            publication: did => indexer.publication(did),
+            // No more of a body than a line about it and its first image need.
+            body: cid => gatekeeper.getText(cid, 1_000_000),
+            image: async (did, versionId) => {
+                // One the service serves at the address the page gives for it.
+                return imageFile(await keymaster.resolveDID(did, { versionId }), EMBEDDED) !== null;
+            },
+            name: async did => {
+                const name = ((await keymaster.resolveDID(did)).didDocumentData as { name?: unknown } | undefined)?.name;
+
+                return typeof name === 'string' ? name : undefined;
+            },
+        },
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

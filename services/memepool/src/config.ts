@@ -29,6 +29,12 @@ const config = {
     // With it, a challenge names the service's callback and a wallet sends its
     // answer there.
     publicURL: env.ARCHON_MEMEPOOL_PUBLIC_URL || '',
+    // The node's Memeplex indexer, which says what a publication is for the
+    // page at its address. Empty, such a page says nothing of itself.
+    // Under Compose it is the indexer's container where the node runs one,
+    // which ARCHON_COMPOSE_PROFILES says, as Drawbridge finds it.
+    indexerURL: env.ARCHON_MEMEPLEX_INDEXER_URL
+        || ((env.ARCHON_COMPOSE_PROFILES ?? '').split(',').map(profile => profile.trim()).includes('memeplex') ? 'http://memeplex-indexer:4233' : ''),
     // The built pages, served beside the API. Empty serves none.
     pagesDir: env.ARCHON_MEMEPOOL_PAGES_DIR ?? 'public',
     // Where the wallet that holds the service's key is kept.

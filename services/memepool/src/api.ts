@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
+import { pageRoutes } from './pages.js';
+import type { Previews } from './pages.js';
 import { imageSize } from 'image-size';
 import type { Request, Response, NextFunction } from 'express';
 import { PERMITTED_REGISTRIES, actionFor } from '@didcid/memeplex';
@@ -88,6 +90,9 @@ export interface MemepoolOptions {
     // A directory of static files to serve beside the API: the built pages.
     // Without it the service is its API alone.
     pagesDir?: string;
+    // What the page at the address of a publication or an author says of it,
+    // for whatever shows a link to it. Without it such a page says nothing.
+    previews?: Previews;
     // Milliseconds a challenge may wait for its answer, and a session lasts.
     challengeLifetime?: number;
     sessionLifetime?: number;
@@ -832,23 +837,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return null;
         }
 
-        const asset = await keymaster.resolveDID(did, serves.versionId === undefined ? undefined : { versionId: serves.versionId });
-        const held = asset.didDocumentData as {
-            file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: { width?: unknown; height?: unknown };
-        } | undefined;
-        const file = held?.file;
-        const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
-        const { width, height } = held?.image && typeof held.image === 'object' ? held.image : {} as { width?: unknown; height?: unknown };
+        const file = imageFile(await keymaster.resolveDID(did, serves.versionId === undefined ? undefined : { versionId: serves.versionId }), serves);
 
-        if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !serves.types.has(type)
-            || (typeof file.bytes === 'number' && file.bytes > serves.limit)
-            || (serves.pixels !== undefined && typeof width === 'number' && typeof height === 'number' && width * height > serves.pixels)) {
+        if (!file) {
             return null;
         }
 
         const data = await images.get(file.cid, serves.limit);
 
-        return data && data.length > 0 && data.length <= serves.limit ? { type, data } : null;
+        return data && data.length > 0 && data.length <= serves.limit ? { type: file.type, data } : null;
     };
 
     // An identity's avatar: the image asset its document names as `avatar`,
@@ -1001,6 +998,32 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     return router;
 }
 
+// The file of an image asset the service serves, by what the asset says of
+// itself: of a kind it serves, and no more bytes or pixels than it does. An
+// asset that says otherwise, or is no image, has none.
+export function imageFile(
+    asset: { didDocumentData?: unknown; didDocumentMetadata?: { deactivated?: boolean } },
+    serves: { types: Set<string>; limit: number; pixels?: number },
+): { cid: string; type: string } | null {
+    const held = asset.didDocumentData as {
+        file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: { width?: unknown; height?: unknown };
+    } | undefined;
+    const file = held?.file;
+    const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
+    const { width, height } = held?.image && typeof held.image === 'object' ? held.image : {} as { width?: unknown; height?: unknown };
+
+    if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !serves.types.has(type)
+        || (typeof file.bytes === 'number' && file.bytes > serves.limit)
+        || (serves.pixels !== undefined && typeof width === 'number' && typeof height === 'number' && width * height > serves.pixels)) {
+        return null;
+    }
+
+    return { cid: file.cid, type };
+}
+
+// What the service serves as an image embedded in text, as Text formatting bounds it.
+export const EMBEDDED = { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS };
+
 // Whether a string has the shape of a DID. One from a request or from a
 // stranger's document is asked of the node only where it has: the node's
 // client puts it in the path of its request, where anything else would name
@@ -1016,6 +1039,9 @@ export function createMemepoolApp(options: MemepoolOptions): express.Express {
         res.status(404).json({ error: 'no such route' });
     });
     if (options.pagesDir) {
+        app.use(pageRoutes({
+            pagesDir: options.pagesDir, site: 'Memepool', publicURL: options.publicURL, previews: options.previews, isDid,
+        }));
         // The pages are files a browser may keep; the page that names them is
         // asked for each time, so that a new build is picked up.
         app.use(express.static(options.pagesDir, {

@@ -130,6 +130,20 @@ it('serves the pages at the mount, and their files beside them', async () => {
     expect(file.headers['cache-control']).toBe('public, max-age=31536000, immutable');
 });
 
+// A link to a publication or an author is a path under the mount, which
+// whatever shows the link asks for.
+it('serves the page at the address of a publication and of an author, with its files found from there', async () => {
+    for (const [path, up] of [['/memepool/p/did:cid:bagaaierapost', '../'], ['/memepool/a/did:cid:bagaaieraauthor', '../'], ['/memepool/a/did:cid:bagaaieraauthor/replies', '../../']]) {
+        const page = await request(drawbridge()).get(path);
+
+        expect([path, page.status]).toStrictEqual([path, 200]);
+        expect(page.headers['content-type']).toContain('text/html');
+        expect(page.text).toContain(`src="${up}assets/app.js"`);
+    }
+    // The file the page names is where it says.
+    expect((await request(drawbridge()).get('/memepool/p/../assets/app.js')).text).toBe('console.log("memepool")');
+});
+
 it('sends a reader who leaves off the last slash to where the pages\' files are found', async () => {
     const response = await request(drawbridge()).get('/memepool');
 

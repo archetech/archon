@@ -244,6 +244,7 @@ on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise
 |---|---|---|
 | `ARCHON_MEMEPOOL_WALLET_PASSPHRASE` | none | Encrypts the service's wallet. The service does not start without it |
 | `ARCHON_MEMEPOOL_PUBLIC_URL` | none | Where users reach the service, such as `https://node.example/memepool`. With it, a challenge names the service's callback and a wallet sends its answer straight back. Without it, a user copies the answer from the wallet to the page |
+| `ARCHON_MEMEPLEX_INDEXER_URL` | *(from the profile)* | The node's Memeplex indexer. With it, the page at the address of a publication or an author says what is there, for whatever shows a link to it. The page names its own address and an image only where `ARCHON_MEMEPOOL_PUBLIC_URL` is set |
 | `ARCHON_MEMEPOOL_PAGES_DIR` | `public` | The built [pages](../../../apps/memepool/README.md), which the service serves beside its API. The image carries them. Empty serves none |
 | `ARCHON_MEMEPOOL_NAME` | `memepool` | The name of the service's identity, and the name it gives in a grant request |
 | `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on. Not `local`: the service does not start with that setting, or with a wallet whose identity is on `local`, since such an identity can publish only on `local` |

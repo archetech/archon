@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { hashOf, linkTo, routeOf } from './route';
+import { linkTo, pathOf, routeOf } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Person, Publication, Reply, Responses } from './api';
@@ -629,7 +629,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 <div className="original">
                     <header>
                         <Identity did={shown.memeplex!.author} />
-                        <a className="when" href={hashOf({ publication: address })} title="Link to this"><time>{when(shown)}</time></a>
+                        <a className="when" href={pathOf({ publication: address })} title="Link to this"><time>{when(shown)}</time></a>
                     </header>
                     <Titled object={shown.memeplex!} />
                     <Body object={shown.memeplex!} />
@@ -746,7 +746,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting }: {
                 {waiting && <span className="badge" role="status">Edit waiting to be anchored</span>}
                 {/* The time is the link to this publication alone, as it is elsewhere. */}
                 {publication.did
-                    ? <a className="when" href={hashOf({ publication: publication.did })} title="Link to this"><time>{when(publication)}</time></a>
+                    ? <a className="when" href={pathOf({ publication: publication.did })} title="Link to this"><time>{when(publication)}</time></a>
                     : <time>{when(publication)}</time>}
             </header>
             {answers && object.kind === 'reply' && typeof object.target === 'string' && (
@@ -1611,7 +1611,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     const started = useCallback(() => setSigning(true), []);
     // Whether a publication an address names is being read, with nothing to show yet.
     const [arriving, setArriving] = useState(() => {
-        const route = routeOf(window.location.hash);
+        const route = routeOf(window.location);
 
         return route !== null && 'publication' in route;
     });
@@ -1692,7 +1692,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // What is shown has an address, which is kept as the reader goes from one
     // thing to another, so that the address bar always holds a link to what is
     // on the page and the browser's back button goes to what was shown before.
-    const address = open?.did ? hashOf({ publication: open.did }) : hashOf(author ? { author, replies } : null);
+    const address = pathOf(open?.did ? { publication: open.did } : author ? { author, replies } : null);
     const addressed = useRef(address);
     // Counts the times the reader has gone somewhere, by an address or within
     // the pages, so that a publication an earlier address named is not shown
@@ -1711,8 +1711,8 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         arrivals.current += 1;
         setLost('');
         setArriving(false);
-        if (address !== window.location.hash) {
-            window.history.pushState(null, '', address || `${window.location.pathname}${window.location.search}`);
+        if (address !== window.location.pathname) {
+            window.history.pushState(null, '', address);
         }
     }, [address]);
 
@@ -1722,7 +1722,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // indexer first, and what is shown stays until it has answered.
     const arrive = useCallback(async () => {
         const mine = arrivals.current += 1;
-        const route = routeOf(window.location.hash);
+        const route = routeOf(window.location);
         // Shows a list: an author's, or the reader's timeline.
         const list = (to: string | null, listed: boolean) => {
             if (to !== author || listed !== replies) {
@@ -1771,7 +1771,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         }
         // The address stays the one followed, over the reader's timeline, so
         // that what it says is of that address.
-        addressed.current = '';
+        addressed.current = pathOf(null);
         list(null, false);
         setLost(said);
     }, [api, open, author, replies, loadTimeline]);
@@ -1784,11 +1784,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
             arrive();
         }
         window.addEventListener('popstate', arrive);
-        window.addEventListener('hashchange', arrive);
 
         return () => {
             window.removeEventListener('popstate', arrive);
-            window.removeEventListener('hashchange', arrive);
         };
     }, [arrive]);
 
@@ -2015,7 +2013,20 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
 
     return (
         <Ways visit={visit} open={setOpen} gone={gone} embedding={embedding} upload={me.grant ? api.upload : undefined}>
-            <main>
+            {/* A link to something the pages show is followed within them, and
+                not by asking the service for the page anew. */}
+            <main
+                onClick={event => {
+                    const link = (event.target as Element).closest?.('a.when');
+                    const path = link?.getAttribute('href');
+
+                    if (path && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                        event.preventDefault();
+                        window.history.pushState(null, '', path);
+                        arrive();
+                    }
+                }}
+            >
                 <header className="top">
                     <h1>Memepool</h1>
                     {!visitor && <Identity did={me.did} />}
