@@ -283,6 +283,11 @@ describe('what a line about a text says', () => {
         expect(embedsIn(`[a link](${IMAGE}?versionId=bafyone)`)).toStrictEqual([]);
         expect(embedsIn(`![words] then [a link](${IMAGE}?versionId=bafyone)`)).toStrictEqual([]);
         expect(embedsIn(`\`\`\`\n![in code](${IMAGE}?versionId=bafycode)\n\`\`\`\n![after](${IMAGE}?versionId=bafyafter)`)).toStrictEqual([{ did: IMAGE, version: 'bafyafter' }]);
+        // A fence may hold backticks, or be of tildes, and what is in it is still code.
+        expect(embedsIn(`\`\`\`\nconst a = \`x\`;\n![in code](${IMAGE}?versionId=bafycode)\n\`\`\`\n![after](${IMAGE}?versionId=bafyafter)`)).toStrictEqual([{ did: IMAGE, version: 'bafyafter' }]);
+        expect(embedsIn(`~~~\n![in code](${IMAGE}?versionId=bafycode)\n\`\`\`\n~~~\n![after](${IMAGE}?versionId=bafyafter)`)).toStrictEqual([{ did: IMAGE, version: 'bafyafter' }]);
+        // One that is never closed is code to the end.
+        expect(embedsIn(`\`\`\`\n![in code](${IMAGE}?versionId=bafycode)`)).toStrictEqual([]);
         // No more than a few are taken, however many there are.
         expect(embedsIn(`![x](${IMAGE}?versionId=v) `.repeat(50))).toHaveLength(5);
     });

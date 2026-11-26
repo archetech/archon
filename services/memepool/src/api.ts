@@ -837,23 +837,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return null;
         }
 
-        const asset = await keymaster.resolveDID(did, serves.versionId === undefined ? undefined : { versionId: serves.versionId });
-        const held = asset.didDocumentData as {
-            file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: { width?: unknown; height?: unknown };
-        } | undefined;
-        const file = held?.file;
-        const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
-        const { width, height } = held?.image && typeof held.image === 'object' ? held.image : {} as { width?: unknown; height?: unknown };
+        const file = imageFile(await keymaster.resolveDID(did, serves.versionId === undefined ? undefined : { versionId: serves.versionId }), serves);
 
-        if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !serves.types.has(type)
-            || (typeof file.bytes === 'number' && file.bytes > serves.limit)
-            || (serves.pixels !== undefined && typeof width === 'number' && typeof height === 'number' && width * height > serves.pixels)) {
+        if (!file) {
             return null;
         }
 
         const data = await images.get(file.cid, serves.limit);
 
-        return data && data.length > 0 && data.length <= serves.limit ? { type, data } : null;
+        return data && data.length > 0 && data.length <= serves.limit ? { type: file.type, data } : null;
     };
 
     // An identity's avatar: the image asset its document names as `avatar`,
@@ -1005,6 +997,32 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     return router;
 }
+
+// The file of an image asset the service serves, by what the asset says of
+// itself: of a kind it serves, and no more bytes or pixels than it does. An
+// asset that says otherwise, or is no image, has none.
+export function imageFile(
+    asset: { didDocumentData?: unknown; didDocumentMetadata?: { deactivated?: boolean } },
+    serves: { types: Set<string>; limit: number; pixels?: number },
+): { cid: string; type: string } | null {
+    const held = asset.didDocumentData as {
+        file?: { cid?: unknown; type?: unknown; bytes?: unknown }; image?: { width?: unknown; height?: unknown };
+    } | undefined;
+    const file = held?.file;
+    const type = typeof file?.type === 'string' ? file.type.trim().toLowerCase().replace(/^image\/jpg$/, 'image/jpeg') : '';
+    const { width, height } = held?.image && typeof held.image === 'object' ? held.image : {} as { width?: unknown; height?: unknown };
+
+    if (asset.didDocumentMetadata?.deactivated || !held?.image || typeof file?.cid !== 'string' || !serves.types.has(type)
+        || (typeof file.bytes === 'number' && file.bytes > serves.limit)
+        || (serves.pixels !== undefined && typeof width === 'number' && typeof height === 'number' && width * height > serves.pixels)) {
+        return null;
+    }
+
+    return { cid: file.cid, type };
+}
+
+// What the service serves as an image embedded in text, as Text formatting bounds it.
+export const EMBEDDED = { types: IMAGE_TYPES, limit: IMAGE_LIMIT, pixels: IMAGE_PIXELS };
 
 // Whether a string has the shape of a DID. One from a request or from a
 // stranger's document is asked of the node only where it has: the node's

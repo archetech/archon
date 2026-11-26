@@ -9,7 +9,7 @@ import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { PERMITTED_REGISTRIES } from '@didcid/memeplex';
 import { IndexerClient, MemeplexClient } from '@didcid/memeplex/client';
-import { createMemepoolApp } from './api.js';
+import { createMemepoolApp, EMBEDDED, imageFile } from './api.js';
 
 export interface MemepoolSettings {
     gatekeeperURL: string;
@@ -195,11 +195,8 @@ export async function startMemepool(
             // No more of a body than a line about it and its first image need.
             body: cid => gatekeeper.getText(cid, 1_000_000),
             image: async (did, versionId) => {
-                const asset = await keymaster.resolveDID(did, { versionId });
-                const held = asset.didDocumentData as { image?: unknown; file?: { type?: unknown } } | undefined;
-
-                return !asset.didDocumentMetadata?.deactivated && Boolean(held?.image)
-                    && typeof held?.file?.type === 'string' && held.file.type.startsWith('image/');
+                // One the service serves at the address the page gives for it.
+                return imageFile(await keymaster.resolveDID(did, { versionId }), EMBEDDED) !== null;
             },
             name: async did => {
                 const name = ((await keymaster.resolveDID(did)).didDocumentData as { name?: unknown } | undefined)?.name;

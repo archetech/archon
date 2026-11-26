@@ -96,7 +96,19 @@ export function wordsOf(markdown: string): string {
 // The text is gone over once. An embed ends in `](<DID>?versionId=<version>)`,
 // which is looked for, and is one where a `![` opens the words before it.
 export function embedsIn(markdown: string, most = EMBEDS): { did: string; version: string }[] {
-    const text = markdown.replace(/```[^`]*```/g, ' ');
+    // A fence opens on a line of three or more backticks or tildes, and is
+    // closed by the next line of the same.
+    let fence = '';
+    const text = markdown.split('\n').filter(line => {
+        const marks = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1][0] ?? '';
+
+        if (fence ? marks === fence : marks) {
+            fence = fence ? '' : marks;
+            return false;
+        }
+
+        return !fence;
+    }).join('\n');
     const ends = /\]\(\s*(did:[a-z0-9]+:[A-Za-z0-9._%-]{1,200})\?versionId=([A-Za-z0-9]{1,200})\s*\)/g;
     const found: { did: string; version: string }[] = [];
     let from = 0;
