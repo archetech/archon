@@ -97,13 +97,18 @@ export function wordsOf(markdown: string): string {
 // which is looked for, and is one where a `![` opens the words before it.
 export function embedsIn(markdown: string, most = EMBEDS): { did: string; version: string }[] {
     // A fence opens on a line of three or more backticks or tildes, and is
-    // closed by the next line of the same.
+    // closed by a line of as many of the same or more, with nothing after
+    // them. A shorter run inside it is part of the code.
     let fence = '';
     const text = markdown.split('\n').filter(line => {
-        const marks = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1][0] ?? '';
+        const [, marks = '', after = ''] = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line) ?? [];
 
-        if (fence ? marks === fence : marks) {
-            fence = fence ? '' : marks;
+        if (!fence && marks) {
+            fence = marks;
+            return false;
+        }
+        if (fence && marks[0] === fence[0] && marks.length >= fence.length && !after.trim()) {
+            fence = '';
             return false;
         }
 
