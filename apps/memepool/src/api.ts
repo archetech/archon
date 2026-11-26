@@ -22,8 +22,8 @@ export interface Responses {
     boosts: Publication[];
     ratings: { ratings: Publication[]; mean?: number };
     // `applied` is each object that applies the tag, which its author
-    // withdraws to take the tag away.
-    tags: { tag: string; authors: string[]; applied?: { did: string; author: string; grant: string }[] }[];
+    // withdraws to take the tag away, and the version of the object it was put on.
+    tags: { tag: string; authors: string[]; applied?: { did: string; author: string; grant: string; version?: string }[] }[];
 }
 
 // Who is signed in: with a grant to publish under, or with the link that asks
