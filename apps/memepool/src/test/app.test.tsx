@@ -278,6 +278,47 @@ describe('the grant', () => {
         expect(write).toHaveBeenCalledWith('did:cid:1');
     });
 
+    it('says that it is checking for the grant, and what it found and when, where none is found yet', async () => {
+        const { api } = services({ me: { did: ALICE, pending: ['did:cid:grant'] } });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const button = await screen.findByRole('button', { name: 'Check again' }) as HTMLButtonElement;
+        let answer = (_: Me) => {};
+
+        expect(screen.queryByRole('status')).toBeNull();
+        vi.mocked(api.me).mockImplementation(() => new Promise<Me>(resolve => { answer = resolve; }));
+        await user.click(button);
+
+        // While the service is asked, the button says so and cannot be pressed.
+        expect(button.textContent).toBe('Checking…');
+        expect(button.disabled).toBe(true);
+        answer({ did: ALICE, pending: ['did:cid:grant'] });
+
+        await waitFor(() => expect(button.textContent).toBe('Check again'));
+        expect(button.disabled).toBe(false);
+        expect(screen.getByRole('status').textContent).toMatch(/^Not anchored yet, as of .+\. A chain can take from minutes to hours\.$/);
+
+        // A check the service did not answer says why, and nothing of what was found.
+        vi.mocked(api.me).mockRejectedValueOnce(new ApiError(502, 'the service did not answer'));
+        await user.click(button);
+        expect((await screen.findByRole('alert')).textContent).toContain('the service did not answer');
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(button.disabled).toBe(false);
+
+        // A reader who has approved nothing the service can see is told that.
+        vi.mocked(api.me).mockResolvedValue({ did: ALICE, link: 'archon://auth?grant=did:cid:request' });
+        await user.click(button);
+        await user.click(await screen.findByRole('button', { name: 'I have approved it' }));
+        expect((await screen.findByRole('status')).textContent).toMatch(/^No grant of yours was found, as of .+\.$/);
+
+        // And one whose grant is found is shown what they came for.
+        vi.mocked(api.me).mockResolvedValue(granted);
+        await user.click(screen.getByRole('button', { name: 'I have approved it' }));
+        expect(await screen.findByLabelText('Post')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'I have approved it' })).toBeNull();
+    });
+
     it('says a grant is waiting to be anchored, and checks again when asked', async () => {
         const { api, state } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' } });
         render(<App api={api} />);
@@ -648,7 +689,7 @@ describe('reading and publishing', () => {
         expect((await screen.findAllByRole('alert'))[0].textContent).toBe('the service could not answer');
     });
 
-    it('takes the later of two checks of the grant, whichever answers last', async () => {
+    it('makes one check of the grant at a time', async () => {
         const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' };
         const { api } = services({ me: waitingForGrant });
         render(<App api={api} />);
@@ -656,14 +697,17 @@ describe('reading and publishing', () => {
 
         await screen.findByText(/waiting to be anchored on its chain/);
         let first!: (me: Me) => void;
-        vi.mocked(api.me).mockReturnValueOnce(new Promise(answer => { first = answer; })).mockResolvedValueOnce(granted);
-        await user.click(screen.getByRole('button', { name: 'Check again' }));
-        await user.click(screen.getByRole('button', { name: 'Check again' }));
-        expect(await screen.findByLabelText('Post')).toBeTruthy();
+        const asked = vi.mocked(api.me).mock.calls.length;
 
-        first(waitingForGrant);
-        await new Promise(wait => setTimeout(wait, 50));
-        expect(screen.getByLabelText('Post')).toBeTruthy();
+        vi.mocked(api.me).mockReturnValueOnce(new Promise(answer => { first = answer; }));
+        const button = screen.getByRole('button', { name: 'Check again' });
+
+        await user.click(button);
+        await user.click(button);
+        expect(vi.mocked(api.me).mock.calls.length).toBe(asked + 1);
+
+        first(granted);
+        expect(await screen.findByLabelText('Post')).toBeTruthy();
     });
 
     it('signs out', async () => {

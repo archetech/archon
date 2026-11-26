@@ -365,14 +365,41 @@ const copying = (text: string, unable: string) => async () => {
     }
 };
 
-function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
+// `onChecked` asks the service anew, and answers whether the service said how
+// the reader stands: it did not where the request failed, which is said elsewhere.
+function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<boolean> }) {
+    const [checking, setChecking] = useState(false);
+    // When the service was last asked and still had no grant to publish under.
+    const [checked, setChecked] = useState<Date | null>(null);
+
+    // A check that finds a grant puts this prompt away. One that finds none
+    // leaves it as it was, so it says that it asked, and when.
+    const check = async () => {
+        setChecking(true);
+        try {
+            // What is said to have been found is what the service answered, and nothing where it did not.
+            setChecked(await onChecked() ? new Date() : null);
+        }
+        finally {
+            setChecking(false);
+        }
+    };
+    const waiting = Boolean(me.pending && me.pending.length > 0);
+    const said = checked && !checking && (
+        <p className="muted" role="status">
+            {waiting ? 'Not anchored yet' : 'No grant of yours was found'}, as of {checked.toLocaleTimeString()}.
+            {waiting && ' A chain can take from minutes to hours.'}
+        </p>
+    );
+
     return (
         <section className="card">
             <h2>Let Memepool publish for you</h2>
             {me.pending && me.pending.length > 0 ? (
                 <>
                     <p>Your grant is waiting to be anchored on its chain. Memepool can publish for you once it is.</p>
-                    <button onClick={onChecked}>Check again</button>
+                    <button disabled={checking} onClick={check}>{checking ? 'Checking…' : 'Check again'}</button>
+                    {said}
                 </>
             ) : (
                 <>
@@ -393,7 +420,8 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
                     )}
                     {me.unavailable
                         ? <p role="alert" className="error">Memepool cannot be granted here: {me.unavailable}.</p>
-                        : <button onClick={onChecked}>I have approved it</button>}
+                        : <button disabled={checking} onClick={check}>{checking ? 'Checking…' : 'I have approved it'}</button>}
+                    {said}
                 </>
             )}
         </section>
@@ -2455,7 +2483,7 @@ const HEADINGS: Record<Listing, string> = { posts: 'Posts', articles: 'Articles'
 const VISITOR: Me = { did: '' };
 
 function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
-    api: Api; me: Me; onCheck: () => void; onSignedOut: () => void;
+    api: Api; me: Me; onCheck: () => Promise<boolean>; onSignedOut: () => void;
     // How a visitor signs in, from wherever they are.
     onSignedIn?: (did: string) => void; pollMs?: number;
 }) {
@@ -3101,6 +3129,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 setMe(read);
                 setError('');
             }
+
+            return true;
         }
         catch (failure) {
             // The service did not say the reader is signed out, so someone who
@@ -3109,6 +3139,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 setMe(known => known ?? null);
                 setError(message(failure));
             }
+
+            return false;
         }
     }, [api]);
 
