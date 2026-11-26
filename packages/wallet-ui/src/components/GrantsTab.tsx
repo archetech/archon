@@ -1,6 +1,7 @@
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import GrantsView from "./GrantsView";
 
 // `request` is a grant request that arrived by a link or a scan, to be shown
@@ -9,6 +10,7 @@ export default function GrantsTab({ request, onRequestTaken }: { request?: strin
     const { keymaster } = useWalletContext();
     const { currentId, currentDID, registries } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
+    const { scanQr } = usePlatformCapabilities();
 
     if (!keymaster || !currentId) {
         return null;
@@ -22,6 +24,7 @@ export default function GrantsTab({ request, onRequestTaken }: { request?: strin
             registries={registries ?? []}
             request={request}
             onRequestTaken={onRequestTaken}
+            scanQr={scanQr}
             notify={{ error: setError, success: setSuccess }}
         />
     );

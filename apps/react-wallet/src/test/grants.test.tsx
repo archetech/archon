@@ -183,6 +183,39 @@ describe('Grants view: a grant link', () => {
         expect(memeplexGrant.expiresAt).toBe('2030-01-02T03:04:00Z');
     });
 
+    it('reviews a request whose code is scanned, where the host has a camera, as one whose link was pasted', async () => {
+        const scanQr = vi.fn(async () => ` ${linkFor()} ` as string | null);
+        view({ scanQr });
+        const user = userEvent.setup();
+
+        expect(await screen.findByText('Paste the link the client shows, or scan its code.')).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Scan the grant code' }));
+
+        expect(await screen.findByRole('button', { name: 'Create Grant' })).toBeTruthy();
+        expect(screen.getByText('Memepool')).toBeTruthy();
+        expect(keymaster.resolveDID).toHaveBeenCalledWith(REQUEST);
+    });
+
+    it('says so when no code was read, or the code is no grant request, and offers no scan without a camera', async () => {
+        const scanQr = vi.fn(async (): Promise<string | null> => null);
+        const shown = view({ scanQr });
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Scan the grant code' }));
+        expect(await screen.findByText('No code was read.')).toBeTruthy();
+
+        // A sign-in challenge's code is not a grant request's.
+        scanQr.mockResolvedValue('archon://auth?challenge=did:cid:challenge');
+        await user.click(screen.getByRole('button', { name: 'Scan the grant code' }));
+        expect(await screen.findByText(/not a link to a grant request/)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Create Grant' })).toBeNull();
+        shown.unmount();
+
+        view();
+        expect(await screen.findByText('Paste the link the client shows.')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Scan the grant code' })).toBeNull();
+    });
+
     it('creates no grant for a local identity, whose assets cannot be on a chain', async () => {
         keymaster.resolveDID.mockImplementation(async (did: string) => requests[did] ?? alice('local'));
         view();

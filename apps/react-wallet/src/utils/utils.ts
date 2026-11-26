@@ -294,6 +294,13 @@ export function nativeScanQrFrames(): typeof scanQrFrames | undefined {
     return Capacitor.isNativePlatform() ? scanQrFrames : undefined;
 }
 
+// The scanner of one code, where this app has one. The plugin opens a camera
+// for it on a phone alone: in a browser it reads nothing, and a view offers no
+// scan without this.
+export function nativeScanQr(): typeof scanQrText | undefined {
+    return Capacitor.isNativePlatform() ? scanQrText : undefined;
+}
+
 export async function scanAliasQrCode(): Promise<{ alias: string; did: string } | null> {
     try {
         const perm = await BarcodeScanner.requestPermissions();
