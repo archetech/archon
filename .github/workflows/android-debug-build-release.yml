@@ -83,11 +83,17 @@ jobs:
         with:
           name: app-debug-artifact
 
-      # The downloaded artifact will be in the repository root
+      # The downloaded artifact is in the working directory, under the name
+      # Gradle gives every debug build. A release names it for what it is, with
+      # no version in the name, so that a link to the latest release's file
+      # stays the same from one release to the next.
+      - name: Name the APK
+        run: mv app-debug.apk archon-wallet.apk
+
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3
         with:
-          files: app-debug.apk
+          files: archon-wallet.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
