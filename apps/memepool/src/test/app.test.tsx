@@ -1557,11 +1557,11 @@ describe('a post that is listed, and what an open one offers', () => {
 
         await user.click(more);
         expect(more.getAttribute('aria-expanded')).toBe('true');
-        expect(screen.getAllByRole('menuitem').map(each => each.textContent)).toStrictEqual(['Withdraw', 'Copy link', 'Copy embed', 'Copy DID']);
+        expect(screen.getAllByRole('menuitem').map(each => each.textContent)).toStrictEqual(['Withdraw', 'Copy link', 'Copy embed', 'Copy DID', 'View source']);
         // The first is where the keyboard is, and the arrows go round.
         expect(document.activeElement?.textContent).toBe('Withdraw');
         await user.keyboard('{ArrowUp}');
-        expect(document.activeElement?.textContent).toBe('Copy DID');
+        expect(document.activeElement?.textContent).toBe('View source');
         await user.keyboard('{ArrowDown}{ArrowDown}');
         expect(document.activeElement?.textContent).toBe('Copy link');
 
@@ -1620,12 +1620,77 @@ describe('a post that is listed, and what an open one offers', () => {
         await user.click((await screen.findByText('As I left it.')).closest('article')!);
         await screen.findByText(/Your edit is waiting to be anchored\. Until it is/);
         // An embed is of a version, and the one waiting is not one yet.
-        expect(await offered(user)).toStrictEqual(['Withdraw', 'Copy link', 'Copy DID']);
+        expect(await offered(user)).toStrictEqual(['Withdraw', 'Copy link', 'Copy DID', 'View source']);
 
         // An earlier version is there to copy, and is not withdrawn by itself.
         await user.selectOptions(screen.getByLabelText('Version'), 'bafyone');
         await screen.findByText('As it was at first.');
-        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID', 'View source']);
+    });
+
+    it('shows the text of a post as its author wrote it, and renders none of it', async () => {
+        const text = 'Some *emphasis*, [a link](https://example.org/) and $x^2$.\n\n<b>bold</b>';
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', BOB, text)] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await toOpen());
+        expect(await screen.findByRole('link', { name: 'a link' })).toBeTruthy();
+        await choose(user, 'View source');
+
+        const source = document.querySelector('article.post pre.source') as HTMLElement;
+
+        expect(source.textContent).toBe(text);
+        expect(source.children).toHaveLength(0);
+        expect(screen.queryByRole('link', { name: 'a link' })).toBeNull();
+        // The same button puts it back as it is read.
+        expect(await offered(user)).toContain('Hide source');
+        await choose(user, 'Hide source');
+        expect(document.querySelector('pre.source')).toBeNull();
+        expect(screen.getByRole('link', { name: 'a link' })).toBeTruthy();
+    });
+
+    it('shows the source of an article, read from the node, and of an earlier version its own; a boost has none', async () => {
+        const article = (cid: string, current: number): Publication => ({
+            ...post('did:cid:1', BOB, ''), current,
+            versions: [
+                { opid: 'bafyone', type: 'create', outcome: 'attributed', position: { block: 1, time: '2026-11-21T12:00:00Z' } },
+                { opid: 'bafytwo', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } },
+            ] as Publication['versions'],
+            memeplex: { kind: 'post', author: BOB, title: 'An article', content: { cid, type: 'text/markdown', bytes: 9 } },
+        });
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', BOB, '', { memeplex: { kind: 'post', author: BOB, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted, timeline: [article('bafybodytwo', 1)] });
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        state.bodies.bafybodytwo = '# Second\n\nAs it **is**.';
+        state.bodies.bafybodyone = '# First\n\nAs it **was**.';
+        state.revisions['did:cid:1 bafyone'] = article('bafybodyone', 0);
+        state.known['did:cid:2'] = original;
+        state.known['did:cid:9'] = boost;
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        const view = render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await toOpen());
+        await screen.findByRole('heading', { name: 'Second' });
+        await choose(user, 'View source');
+        await waitFor(() => expect(document.querySelector('article.post pre.source')?.textContent).toBe('# Second\n\nAs it **is**.'));
+        expect(screen.queryByRole('heading', { name: 'Second' })).toBeNull();
+        // The title is the entry's and is still there.
+        expect(screen.getByText('An article')).toBeTruthy();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'bafyone');
+        await screen.findByRole('heading', { name: 'First' });
+        await choose(user, 'View source');
+        await waitFor(() => expect([...document.querySelectorAll('article.post pre.source')].map(each => each.textContent)).toContain('# First\n\nAs it **was**.'));
+        view.unmount();
+
+        window.history.replaceState(null, '', '/p/did:cid:9');
+        render(<App api={api} />);
+        await screen.findByText('From Bob.');
+        expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
     });
 
     it('leaves the reader where they went while a post was being withdrawn', async () => {
@@ -1684,7 +1749,7 @@ describe('a post that is listed, and what an open one offers', () => {
 
         await user.click((await screen.findByText('From Bob.')).closest('article')!);
         await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
-        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID', 'View source']);
     });
 
     it('opens a reply from the thread it is in, and what a reply answers from the card above it', async () => {
@@ -4383,7 +4448,7 @@ describe('a visitor, who has not signed in', () => {
         expect(api.state).not.toHaveBeenCalled();
         expect(api.publish).not.toHaveBeenCalled();
         // A link to copy is theirs to give on, and nothing that changes the post.
-        expect(await offered(userEvent.setup())).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+        expect(await offered(userEvent.setup())).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID', 'View source']);
     });
 
     it('reads an author a link names, and the author\'s replies, and goes from one thing to another', async () => {

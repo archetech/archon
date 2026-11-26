@@ -457,7 +457,9 @@ async function inTurn<T, R>(things: T[], make: (thing: T) => Promise<R>, atOnce 
 // The body of an article, which is kept apart from its entry, on IPFS. The
 // entry gives its CID, and the node serves it: an article is read wherever
 // it is shown. A CID names one text, so another version's is another CID.
-function Article({ api, cid }: { api: Api; cid: string }) {
+//
+// `source` shows the text as its author wrote it and renders none of it.
+function Article({ api, cid, source }: { api: Api; cid: string; source?: boolean }) {
     const [body, setBody] = useState<{ text?: string; error?: string } | null>(null);
 
     useEffect(() => {
@@ -482,12 +484,14 @@ function Article({ api, cid }: { api: Api; cid: string }) {
         return <p className="muted">The full text is not on this node.</p>;
     }
 
-    return <Markdown text={body.text} className="text article" />;
+    return source ? <pre className="source">{body.text}</pre> : <Markdown text={body.text} className="text article" />;
 }
 
 // `full` shows the body of an article, where a list shows its summary alone.
-function Body({ object, full, embeds = true }: {
-    object: NonNullable<Publication['memeplex']>; full?: Api; embeds?: boolean;
+// `source` shows what the author wrote, as text: nothing in it is rendered,
+// loaded or followed.
+function Body({ object, full, embeds = true, source }: {
+    object: NonNullable<Publication['memeplex']>; full?: Api; embeds?: boolean; source?: boolean;
 }) {
     const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
     const article = object.text === undefined && object.content !== undefined;
@@ -496,8 +500,9 @@ function Body({ object, full, embeds = true }: {
     return (
         <>
             {/* A post's text is Markdown. An article's summary is a line about it, shown as it is. */}
-            {words && (article ? <p className="text summary">{words}</p> : <Markdown text={words} embeds={embeds} />)}
-            {article && (full && typeof cid === 'string' ? <Article api={full} cid={cid} /> : <p className="muted">Open it to read the full text.</p>)}
+            {words && article && <p className="text summary">{words}</p>}
+            {words && !article && (source ? <pre className="source">{words}</pre> : <Markdown text={words} embeds={embeds} />)}
+            {article && (full && typeof cid === 'string' ? <Article api={full} cid={cid} source={source} /> : <p className="muted">Open it to read the full text.</p>)}
             {!words && !article && object.target && (
                 <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>
             )}
@@ -846,6 +851,8 @@ function Post({ publication, onOpen, opened, onWithdraw, undo, full, answers, wa
     waiting?: boolean;
 }) {
     const object = publication.memeplex;
+    // Whether the post's text is shown as its author wrote it, where it has one.
+    const [source, setSource] = useState(false);
 
     if (publication.state === 'withdrawn' || !object) {
         return <article className="post muted">Withdrawn</article>;
@@ -862,6 +869,7 @@ function Post({ publication, onOpen, opened, onWithdraw, undo, full, answers, wa
     // in these pages, its DID, which another wallet or node resolves it by,
     // and what another text is given to show this version of it.
     const link = publication.did ? linkTo({ publication: publication.did }) : '';
+    const written = object.text !== undefined || object.content !== undefined;
     const more = opened && publication.did ? [
         ...(onWithdraw ? [{ label: 'Withdraw', act: onWithdraw }] : []),
         { label: 'Copy link', act: copying(link, `Could not copy. The link is ${link}`) },
@@ -869,6 +877,7 @@ function Post({ publication, onOpen, opened, onWithdraw, undo, full, answers, wa
             ? [{ label: 'Copy embed', act: copying(embedFor(publication), `Could not copy. The embed is ${embedFor(publication)}`) }]
             : []),
         { label: 'Copy DID', act: copying(publication.did, `Could not copy. The DID is ${publication.did}`) },
+        ...(written ? [{ label: source ? 'Hide source' : 'View source', act: () => setSource(!source) }] : []),
     ] : null;
 
     return (
@@ -896,7 +905,7 @@ function Post({ publication, onOpen, opened, onWithdraw, undo, full, answers, wa
             {object.kind === 'paper' && (
                 <Authors key={`${publication.did} ${shownVersion(publication)}`} publication={publication} api={full} reader={waiting ? undefined : reader} past={past} />
             )}
-            <Body object={object} full={full} />
+            <Body object={object} full={full} source={source && Boolean(more)} />
             {object.kind === 'paper' && full && <Downloads object={object} api={full} />}
         </article>
     );
