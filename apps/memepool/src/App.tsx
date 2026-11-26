@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { linkTo, pathOf, routeOf } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -1810,7 +1810,10 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     const [taken, setTaken] = useState<ReadonlySet<string>>(new Set());
     const withdrawals = useMemo(() => ({ dids: taken, add: (did: string) => setTaken(had => new Set([...had, did])) }), [taken]);
 
-    useEffect(() => {
+    // Before anything else can happen: were it left for later, the reader
+    // going back in between would have the address of what was shown put
+    // over the one they went back to.
+    useLayoutEffect(() => {
         if (address === addressed.current) {
             return;
         }
@@ -1823,6 +1826,13 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         }
     }, [address]);
 
+    // What is shown as it is at this moment, for what follows an address: it
+    // is asked when the reader goes somewhere, which may be before the pages
+    // have taken note of the last place they went.
+    const shown = useRef({ open, author, replies, loadTimeline });
+
+    shown.current = { open, author, replies, loadTimeline };
+
     // Shows what the address names: at the start, which is how a link given by
     // someone else is followed, and whenever the reader goes back or forward
     // or follows a link within the pages. A publication is read from the
@@ -1832,7 +1842,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         const route = routeOf(window.location);
         // Shows a list: an author's, or the reader's timeline.
         const list = (to: string | null, listed: boolean) => {
-            if (to !== author || listed !== replies) {
+            const now = shown.current;
+
+            if (to !== now.author || listed !== now.replies) {
                 setTimeline(null);
                 setFetched(0);
                 setTotal(0);
@@ -1840,8 +1852,8 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                 setAuthor(to);
                 setReplies(listed);
             }
-            else if (open) {
-                loadTimeline();
+            else if (now.open) {
+                now.loadTimeline();
             }
             setOpen(null);
         };
@@ -1852,7 +1864,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
             list(route ? route.author : null, route ? route.replies === true : false);
             return;
         }
-        if (open?.did === route.publication) {
+        if (shown.current.open?.did === route.publication) {
             setArriving(false);
             return;
         }
@@ -1881,7 +1893,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         addressed.current = pathOf(null);
         list(null, false);
         setLost(said);
-    }, [api, open, author, replies, loadTimeline]);
+    }, [api]);
 
     const arrived = useRef(false);
 
