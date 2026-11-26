@@ -3040,16 +3040,17 @@ describe('a paper', () => {
 
 describe('the earlier versions of a post', () => {
     const at = (block: number) => ({ block, time: `2026-11-2${block}T12:00:00Z` });
-    // A post edited twice, with an edit between them that was never attributed.
+    // A post edited twice, and once more after its grant had ended. That last
+    // edit was never attributed, and nothing after one that was not ever is.
     const edited = (): Publication => ({
         state: 'published',
         did: 'did:cid:1',
-        current: 3,
+        current: 2,
         versions: [
             { opid: 'v1', type: 'create', outcome: 'attributed', position: at(1) },
             { opid: 'v2', type: 'update', outcome: 'attributed', position: at(2) },
-            { opid: 'vx', type: 'update', outcome: 'unattributed' },
             { opid: 'v3', type: 'update', outcome: 'attributed', position: at(3) },
+            { opid: 'vx', type: 'update', outcome: 'unattributed' },
         ],
         memeplex: { kind: 'post', author: BOB, text: 'As it is.' },
     });
