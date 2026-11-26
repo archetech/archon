@@ -1,14 +1,20 @@
 // What the pages show is named by their address, so that an address can be
 // given to someone else: a publication of any kind by its DID, and an author
-// by theirs, with the author's replies apart from their posts.
+// by theirs, with the author's articles, papers and replies each apart from
+// their posts.
 //
 // It is a path under the pages' own, `p/<DID>` and `a/<DID>`, since whatever
 // shows a link asks for the address and is given the page that says what is
 // there, and the part of an address after a `#` is never asked for. The
 // service answers such a path with the page.
+// What of an author's is listed: their posts, which is what an author's
+// address names by itself, or their articles, their papers or their replies.
+export const LISTS = ['posts', 'articles', 'papers', 'replies'] as const;
+export type Listing = typeof LISTS[number];
+
 export type Route =
     | { publication: string }
-    | { author: string; replies?: boolean }
+    | { author: string; list?: Listing }
     | null;
 
 const DID = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
@@ -30,8 +36,8 @@ const named = (parts: (string | undefined)[]): Route => {
     if (kind === 'p' && rest === undefined) {
         return { publication: did as string };
     }
-    if (kind === 'a' && (rest === undefined || rest === 'replies')) {
-        return { author: did as string, replies: rest === 'replies' };
+    if (kind === 'a' && (rest === undefined || (rest !== 'posts' && (LISTS as readonly string[]).includes(rest)))) {
+        return { author: did as string, list: (rest ?? 'posts') as Listing };
     }
 
     return null;
@@ -59,9 +65,14 @@ export function pathOf(route: Route): string {
         return root;
     }
 
-    return 'publication' in route
-        ? `${root}p/${route.publication}`
-        : `${root}a/${route.author}${route.replies ? '/replies' : ''}`;
+    if ('publication' in route) {
+        return `${root}p/${route.publication}`;
+    }
+
+    // An author's posts are at the author's own address, and each other list under it.
+    const list = route.list && route.list !== 'posts' ? `/${route.list}` : '';
+
+    return `${root}a/${route.author}${list}`;
 }
 
 // The whole address of a route, as it is given to someone else.

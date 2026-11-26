@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { linkTo, pathOf, routeOf } from './route';
+import type { Listing } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Coauthor, FileRef, Me, Person, Publication, Reply, Responses } from './api';
@@ -1445,6 +1446,8 @@ interface Waiting {
     text?: string;
     // The verdict a review gives.
     verdict?: string;
+    // Whether it is a paper, which is listed apart from an article.
+    paper?: boolean;
     // An article's title and subtitle, which are shown as they were written.
     title?: string;
     subtitle?: string;
@@ -1470,6 +1473,7 @@ function readWaiting(reader: string): Waiting[] {
                 did: each.did,
                 ...(typeof each.text === 'string' ? { text: each.text } : {}),
                 ...(typeof each.verdict === 'string' ? { verdict: each.verdict } : {}),
+                ...(each.paper === true ? { paper: true } : {}),
                 ...(typeof each.title === 'string' ? { title: each.title } : {}),
                 ...(typeof each.subtitle === 'string' ? { subtitle: each.subtitle } : {}),
                 ...(typeof each.target === 'string' ? { target: each.target } : {}),
@@ -2194,6 +2198,9 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
 // and unmounted at sign-out, so whatever a request of that session answers
 // afterwards has nothing to change: the next reader starts with nothing of the
 // last one's.
+// What each list of an author's is called.
+const HEADINGS: Record<Listing, string> = { posts: 'Posts', articles: 'Articles', papers: 'Papers', replies: 'Replies' };
+
 // Someone who has not signed in, who reads what an address names and does
 // nothing else: they are nobody, with no grant.
 const VISITOR: Me = { did: '' };
@@ -2232,7 +2239,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // reply is part of a conversation: the reader's timeline has none, and an
     // author's are listed apart from the author's posts.
     const [author, setAuthor] = useState<string | null>(null);
-    const [replies, setReplies] = useState(false);
+    const [listing, setListing] = useState<Listing>('posts');
     // How many times the timeline has been read from its start.
     const [refreshes, setRefreshes] = useState(0);
     const [following, setFollowing] = useState('');
@@ -2254,7 +2261,10 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
             const page = await api.timeline(
                 author ? [author] : [me.did, ...follows.filter(did => did !== me.did)],
                 older?.from ?? 0,
-                author && replies ? ['reply'] : ['post', 'paper'],
+                // An author's posts, articles, papers and replies are each
+                // listed apart. A reader's timeline is all but the replies.
+                author ? [listing === 'replies' ? 'reply' : listing === 'papers' ? 'paper' : 'post'] : ['post', 'paper'],
+                ...(author && (listing === 'posts' || listing === 'articles') ? [listing === 'articles'] : []),
             );
 
             if (mine !== reads.current) {
@@ -2280,7 +2290,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                 setError(message(failure));
             }
         }
-    }, [api, me.did, visitor, follows, author, replies]);
+    }, [api, me.did, visitor, follows, author, listing]);
 
     useEffect(() => {
         loadTimeline();
@@ -2291,7 +2301,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // What is shown has an address, which is kept as the reader goes from one
     // thing to another, so that the address bar always holds a link to what is
     // on the page and the browser's back button goes to what was shown before.
-    const address = pathOf(open?.did ? { publication: open.did } : author ? { author, replies } : null);
+    const address = pathOf(open?.did ? { publication: open.did } : author ? { author, list: listing } : null);
     const addressed = useRef(address);
     // Counts the times the reader has gone somewhere, by an address or within
     // the pages, so that a publication an earlier address named is not shown
@@ -2324,9 +2334,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // What is shown as it is at this moment, for what follows an address: it
     // is asked when the reader goes somewhere, which may be before the pages
     // have taken note of the last place they went.
-    const shown = useRef({ open, author, replies, loadTimeline });
+    const shown = useRef({ open, author, listing, loadTimeline });
 
-    shown.current = { open, author, replies, loadTimeline };
+    shown.current = { open, author, listing, loadTimeline };
 
     // Shows what the address names: at the start, which is how a link given by
     // someone else is followed, and whenever the reader goes back or forward
@@ -2336,16 +2346,16 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         const mine = arrivals.current += 1;
         const route = routeOf(window.location);
         // Shows a list: an author's, or the reader's timeline.
-        const list = (to: string | null, listed: boolean) => {
+        const list = (to: string | null, listed: Listing) => {
             const now = shown.current;
 
-            if (to !== now.author || listed !== now.replies) {
+            if (to !== now.author || listed !== now.listing) {
                 setTimeline(null);
                 setFetched(0);
                 setTotal(0);
                 setWriting(false);
                 setAuthor(to);
-                setReplies(listed);
+                setListing(listed);
             }
             else if (now.open) {
                 now.loadTimeline();
@@ -2356,7 +2366,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         setLost('');
         if (!route || !('publication' in route)) {
             setArriving(false);
-            list(route ? route.author : null, route ? route.replies === true : false);
+            list(route ? route.author : null, route ? route.list ?? 'posts' : 'posts');
             return;
         }
         if (shown.current.open?.did === route.publication) {
@@ -2386,7 +2396,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         // The address stays the one followed, over the reader's timeline, so
         // that what it says is of that address.
         addressed.current = pathOf(null);
-        list(null, false);
+        list(null, 'posts');
         setLost(said);
     }, [api]);
 
@@ -2433,20 +2443,20 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
         setTimeline(null);
         setFetched(0);
         setTotal(0);
-        setReplies(false);
+        setListing('posts');
         setAuthor(did);
     };
 
     // Shows an author's posts, or the author's replies. What was shown is the
     // other list, so it is put away until this one is read.
-    const list = (which: 'posts' | 'replies') => {
-        if ((which === 'replies') === replies) {
+    const list = (which: Listing) => {
+        if (which === listing) {
             return;
         }
         setTimeline(null);
         setFetched(0);
         setTotal(0);
-        setReplies(which === 'replies');
+        setListing(which);
     };
 
     const unfollow = (did: string) => {
@@ -2469,7 +2479,14 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // What the reader has published that waits to be anchored, where the list
     // shown is one it belongs in: the reader's posts in the reader's timeline
     // and among the reader's posts, and the reader's replies among those.
-    const pending = author && author !== me.did ? [] : waiting.filter(each => Boolean(each.target) === replies);
+    //
+    // Where the reader's own things are listed apart, each waits in its own
+    // list: a paper among the papers, an article, which has a title, among the
+    // articles, and a post among the posts.
+    const belongs = (each: Waiting): Listing => (each.target ? 'replies' : each.paper ? 'papers' : each.title !== undefined ? 'articles' : 'posts');
+    const pending = author
+        ? (author !== me.did ? [] : waiting.filter(each => belongs(each) === listing))
+        : waiting.filter(each => !each.target);
 
     // What each of the reader's own posts in the list says in an edit that
     // waits, as the node has it: the reader is shown their post as they left
@@ -2685,13 +2702,13 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                     {!visitor && author !== me.did && (follows.includes(author)
                                         ? <button className="quiet" onClick={() => unfollow(author)}>Unfollow</button>
                                         : <button className="quiet" onClick={() => follow(author)}>Follow</button>)}
-                                    <Copy text={linkTo({ author, replies })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ author, replies })}`} />
+                                    <Copy text={linkTo({ author, list: listing })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ author, list: listing })}`} />
                                     <Copy text={author} label="Copy DID" unable={`Could not copy. The DID is ${author}`} />
                                 </p>
                                 <Tabs
                                     label="What of this author's is listed"
-                                    tabs={[['posts', 'Posts'], ['replies', 'Replies']]}
-                                    selected={replies ? 'replies' : 'posts'}
+                                    tabs={[['posts', 'Posts'], ['articles', 'Articles'], ['papers', 'Papers'], ['replies', 'Replies']]}
+                                    selected={listing}
                                     onSelect={list}
                                     panel="author-list"
                                 />
@@ -2725,14 +2742,14 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                         ? { kind: 'paper', ...article, authors: [me.did, ...(coauthors ?? []).filter(each => each !== me.did)] }
                                         : { kind: 'post', ...article });
 
-                                    setWaiting(current => [...current, { did, title: article.title, ...(article.subtitle ? { subtitle: article.subtitle } : {}) }]);
+                                    setWaiting(current => [...current, { did, title: article.title, ...(article.subtitle ? { subtitle: article.subtitle } : {}), ...(writing === 'paper' ? { paper: true } : {}) }]);
                                     setWriting(false);
                                 }}
                             />
                         )}
 
-                        <section id={author ? 'author-list' : undefined} role={author ? 'tabpanel' : undefined} aria-label={author ? (replies ? 'Replies' : 'Posts') : undefined}>
-                            <h2>{author ? (replies ? 'Replies' : 'Posts') : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
+                        <section id={author ? 'author-list' : undefined} role={author ? 'tabpanel' : undefined} aria-label={author ? HEADINGS[listing] : undefined}>
+                            <h2>{author ? HEADINGS[listing] : 'Timeline'} <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
                             {pending.map(each => <Awaited key={each.did} entry={each} author={me.did} onDismiss={dismiss} />)}
                             {timeline === null && <p className="muted">Loading…</p>}
                             {timeline?.length === 0 && pending.length === 0 && <p className="muted">Nothing here yet.</p>}

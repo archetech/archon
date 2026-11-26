@@ -133,7 +133,7 @@ it('serves the pages at the mount, and their files beside them', async () => {
 // A link to a publication or an author is a path under the mount, which
 // whatever shows the link asks for.
 it('serves the page at the address of a publication and of an author, with its files found from there', async () => {
-    for (const [path, up] of [['/memepool/p/did:cid:bagaaierapost', '../'], ['/memepool/a/did:cid:bagaaieraauthor', '../'], ['/memepool/a/did:cid:bagaaieraauthor/replies', '../../']]) {
+    for (const [path, up] of [['/memepool/p/did:cid:bagaaierapost', '../'], ['/memepool/a/did:cid:bagaaieraauthor', '../'], ['/memepool/a/did:cid:bagaaieraauthor/replies', '../../'], ['/memepool/a/did:cid:bagaaieraauthor/articles', '../../'], ['/memepool/a/did:cid:bagaaieraauthor/papers', '../../']]) {
         const page = await request(drawbridge()).get(path);
 
         expect([path, page.status]).toStrictEqual([path, 200]);

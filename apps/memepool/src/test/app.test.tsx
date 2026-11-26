@@ -57,8 +57,10 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         publish: vi.fn(async object => { state.published.push(object); return `did:cid:new${state.published.length}`; }),
         edit: vi.fn(async (did: string, object: Record<string, unknown>) => { state.edited.push({ did, object }); }),
         withdraw: vi.fn(async did => { state.timeline = state.timeline.map(each => (each.did === did ? { ...each, state: 'withdrawn' as const } : each)); }),
-        timeline: vi.fn(async (authors, offset = 0, kinds) => {
-            const all = state.timeline.filter(each => authors.includes(each.memeplex!.author) && (!kinds || kinds.includes(String(each.memeplex!.kind))));
+        timeline: vi.fn(async (authors, offset = 0, kinds, titled) => {
+            const article = (each: Publication) => typeof each.memeplex!.title === 'string';
+            const all = state.timeline.filter(each => authors.includes(each.memeplex!.author) && (!kinds || kinds.includes(String(each.memeplex!.kind)))
+                && (titled === undefined || each.memeplex!.kind !== 'post' || article(each) === titled));
 
             return { total: all.length, publications: all.slice(offset, offset + PAGE) };
         }),
@@ -1179,7 +1181,7 @@ describe('an author\'s own posts', () => {
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
         expect(screen.getByText('From Bob.')).toBeTruthy();
         expect(screen.getByText('Bob once more.')).toBeTruthy();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
         // Who it is, and nowhere to write: these are another's posts.
         expect(within(document.querySelector('.author') as HTMLElement).getByText('Bob B.')).toBeTruthy();
         expect(screen.queryByLabelText('Post')).toBeNull();
@@ -1208,7 +1210,7 @@ describe('an author\'s own posts', () => {
 
         expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([BOB]);
         // Still Bob's posts: following changes the reader's timeline, not this list.
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
 
         await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
         expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([]);
@@ -1263,7 +1265,7 @@ describe('an author\'s own posts', () => {
         expect(await screen.findByText('Bob once more.')).toBeTruthy();
         expect(screen.queryByLabelText('Reply')).toBeNull();
         expect(screen.queryByText('Loading…')).toBeNull();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
 
         // And the reader's timeline likewise, from a post opened on it.
         await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
@@ -1312,7 +1314,7 @@ describe('an author\'s own posts', () => {
 
         // Nor does the author's posts.
         await user.click(authorOf('From Bob.'));
-        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]));
         expect(screen.queryByText('What Bob answered.')).toBeNull();
         expect(screen.getByRole('tab', { name: 'Posts' }).getAttribute('aria-selected')).toBe('true');
 
@@ -1329,9 +1331,11 @@ describe('an author\'s own posts', () => {
         expect(await within(answered).findByText('What Alice asked.')).toBeTruthy();
         expect(api.revision).toHaveBeenCalledWith(PARENT, 'bafyparent');
 
-        // And the posts are a tab back, by the keyboard as well.
+        // And the posts are three tabs back, by the keyboard as well: past the papers and the articles.
         screen.getByRole('tab', { name: 'Replies' }).focus();
         await user.keyboard('{ArrowLeft}');
+        expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Papers' }));
+        await user.keyboard('{ArrowLeft}{ArrowLeft}');
         expect(await screen.findByText('From Bob.')).toBeTruthy();
         expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Posts' }));
         expect(screen.getByRole('tab', { name: 'Replies' }).tabIndex).toBe(-1);
@@ -1354,7 +1358,7 @@ describe('an author\'s own posts', () => {
         await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
         expect(await screen.findByText('From Alice.')).toBeTruthy();
         expect(screen.getByRole('tab', { name: 'Posts' }).getAttribute('aria-selected')).toBe('true');
-        expect(lastRead(api)).toStrictEqual([[ALICE], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[ALICE], 0, ['post'], false]);
     });
 
     it('reach older posts past a page of replies, from an indexer that gives every kind', async () => {
@@ -1439,7 +1443,97 @@ describe('an author\'s own posts', () => {
         await user.click(await screen.findByRole('button', { name: 'Older' }));
 
         expect(await screen.findByText(`Bob ${PAGE + 1}.`)).toBeTruthy();
-        expect(lastRead(api)).toStrictEqual([[BOB], PAGE, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], PAGE, ['post'], false]);
+    });
+});
+
+describe('an author\'s articles and papers', () => {
+    const lastRead = (api: Api) => vi.mocked(api.timeline).mock.calls.slice(-1)[0];
+    const article = (did: string, author: string, title: string): Publication =>
+        ({ ...post(did, author, ''), memeplex: { kind: 'post', author, title, content: { cid: `bafy${did.slice(-1)}`, type: 'text/markdown', bytes: 3 } } });
+    const paper = (did: string, author: string, title: string): Publication =>
+        ({ ...post(did, author, ''), memeplex: { kind: 'paper', author, title, summary: 'About it.', authors: [author], content: { cid: `bafy${did.slice(-1)}`, type: 'text/markdown', bytes: 3 } } });
+    const all = () => [post('did:cid:1', BOB, 'A note from Bob.'), article('did:cid:2', BOB, 'An article by Bob'), paper('did:cid:3', BOB, 'A paper by Bob')];
+
+    it('are each listed apart from the author\'s posts, and all of them are in a reader\'s timeline', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: all() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // A reader's timeline is what those they follow have published, of every kind but replies.
+        await screen.findByText('A note from Bob.');
+        expect(screen.getByText('An article by Bob')).toBeTruthy();
+        expect(screen.getByText('A paper by Bob')).toBeTruthy();
+
+        await user.click(within(screen.getByText('A note from Bob.').closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ }));
+
+        // The author's posts are those with no title.
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]));
+        await waitFor(() => expect(screen.queryByText('An article by Bob')).toBeNull());
+        expect(screen.getByText('A note from Bob.')).toBeTruthy();
+        expect(screen.queryByText('A paper by Bob')).toBeNull();
+        expect(screen.getAllByRole('tab').map(each => each.textContent)).toStrictEqual(['Posts', 'Articles', 'Papers', 'Replies']);
+
+        await user.click(screen.getByRole('tab', { name: 'Articles' }));
+        expect(await screen.findByText('An article by Bob')).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], true]);
+        expect(screen.queryByText('A note from Bob.')).toBeNull();
+        expect(screen.getByRole('heading', { name: /Articles/ })).toBeTruthy();
+        expect(window.location.pathname).toBe(`/a/${BOB}/articles`);
+
+        await user.click(screen.getByRole('tab', { name: 'Papers' }));
+        expect(await screen.findByText('A paper by Bob')).toBeTruthy();
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['paper']]);
+        expect(screen.queryByText('An article by Bob')).toBeNull();
+        expect(window.location.pathname).toBe(`/a/${BOB}/papers`);
+    });
+
+    it('are what a link to them shows, and what a link copied there names', async () => {
+        const { api } = services({ me: granted, timeline: all() });
+        const copied: string[] = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied.push(text); } } });
+        window.history.replaceState(null, '', `/a/${BOB}/papers`);
+        render(<App api={api} />);
+
+        expect(await screen.findByText('A paper by Bob')).toBeTruthy();
+        expect(screen.getByRole('tab', { name: 'Papers' }).getAttribute('aria-selected')).toBe('true');
+        expect(screen.queryByText('A note from Bob.')).toBeNull();
+
+        fireEvent.click(within(document.querySelector('.author') as HTMLElement).getByRole('button', { name: 'Copy link' }));
+        await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/a/${BOB}/papers`]));
+    });
+
+    it('have what the reader published and waits to be anchored each in its own list', async () => {
+        const { api } = services({ me: granted });
+        localStorage.setItem(`memepool.waiting.${ALICE}`, JSON.stringify([
+            { did: 'did:cid:w1', text: 'A waiting note.' },
+            { did: 'did:cid:w2', title: 'A waiting article' },
+            { did: 'did:cid:w3', title: 'A waiting paper', paper: true },
+            { did: 'did:cid:w4', text: 'A waiting reply.', target: 'did:cid:9' },
+        ]));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // The reader's timeline has all but the reply.
+        await screen.findByText('A waiting note.');
+        expect(screen.getByText('A waiting article')).toBeTruthy();
+        expect(screen.getByText('A waiting paper')).toBeTruthy();
+        expect(screen.queryByText('A waiting reply.')).toBeNull();
+
+        await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
+        await screen.findByRole('tab', { name: 'Articles' });
+        const waits = async (tab: string) => {
+            await user.click(screen.getByRole('tab', { name: tab }));
+            await screen.findByRole('heading', { name: new RegExp(tab) });
+
+            return ['A waiting note.', 'A waiting article', 'A waiting paper', 'A waiting reply.'].filter(text => screen.queryByText(text));
+        };
+
+        expect(await waits('Articles')).toStrictEqual(['A waiting article']);
+        expect(await waits('Papers')).toStrictEqual(['A waiting paper']);
+        expect(await waits('Replies')).toStrictEqual(['A waiting reply.']);
+        expect(await waits('Posts')).toStrictEqual(['A waiting note.']);
     });
 });
 
@@ -3756,8 +3850,10 @@ describe('the address of what is shown', () => {
         const at = (pathname: string) => routeOf({ pathname });
 
         expect(at(`/p/${BOB}`)).toStrictEqual({ publication: BOB });
-        expect(at(`/a/${BOB}`)).toStrictEqual({ author: BOB, replies: false });
-        expect(at(`/a/${BOB}/replies`)).toStrictEqual({ author: BOB, replies: true });
+        expect(at(`/a/${BOB}`)).toStrictEqual({ author: BOB, list: 'posts' });
+        expect(at(`/a/${BOB}/replies`)).toStrictEqual({ author: BOB, list: 'replies' });
+        expect(at(`/a/${BOB}/articles`)).toStrictEqual({ author: BOB, list: 'articles' });
+        expect(at(`/a/${BOB}/papers`)).toStrictEqual({ author: BOB, list: 'papers' });
         // A DID's own part may be written encoded, as an address may be.
         expect(at(`/p/${encodeURIComponent(BOB)}`)).toStrictEqual({ publication: BOB });
         for (const path of ['/', '/p/', '/p/not-a-did', `/x/${BOB}`, `/p/${BOB}/replies`, `/a/${BOB}/posts`, `/a/${BOB}/replies/more`, '/p/did:cid:<b>', '/p/%E0%A4%A', '/assets/index.js']) {
@@ -3766,7 +3862,7 @@ describe('the address of what is shown', () => {
 
         // An address is read back as the route it was made from.
         // A DID's own part may have colons in it.
-        for (const route of [{ publication: BOB }, { author: BOB, replies: false }, { author: BOB, replies: true }, { publication: 'did:web:example.org:users:alice' }]) {
+        for (const route of [{ publication: BOB }, { author: BOB, list: 'posts' as const }, { author: BOB, list: 'articles' as const }, { author: BOB, list: 'papers' as const }, { author: BOB, list: 'replies' as const }, { publication: 'did:web:example.org:users:alice' }]) {
             expect(at(pathOf(route))).toStrictEqual(route);
         }
         expect(pathOf(null)).toBe('/');
@@ -3779,7 +3875,7 @@ describe('the address of what is shown', () => {
         try {
             expect(pathOf({ publication: BOB })).toBe(`/memepool/p/${BOB}`);
             expect(pathOf(null)).toBe('/memepool/');
-            expect(routeOf({ pathname: `/memepool/a/${BOB}/replies` })).toStrictEqual({ author: BOB, replies: true });
+            expect(routeOf({ pathname: `/memepool/a/${BOB}/replies` })).toStrictEqual({ author: BOB, list: 'replies' });
             // A path that is not under the pages' own names nothing.
             expect(routeOf({ pathname: `/p/${BOB}` })).toBeNull();
             expect(linkTo({ author: BOB }, { origin: 'https://node.example' })).toBe(`https://node.example/memepool/a/${BOB}`);
@@ -3810,7 +3906,7 @@ describe('the address of what is shown', () => {
 
         expect(await screen.findByText('From Bob.')).toBeTruthy();
         expect(screen.queryByText('From Alice.')).toBeNull();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
 
         cleanup();
         at(`a/${BOB}/replies`);
@@ -3847,7 +3943,7 @@ describe('the address of what is shown', () => {
         // The browser's own back and forward show what each address names.
         go(`a/${BOB}`);
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
         go('p/did:cid:2');
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
         go('');
@@ -3861,7 +3957,7 @@ describe('the address of what is shown', () => {
         window.history.back();
         await waitFor(() => expect(window.location.pathname).toBe(`/a/${BOB}`));
         await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
         window.history.forward();
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
         expect(window.location.pathname).toBe('/p/did:cid:2');
@@ -3939,7 +4035,7 @@ describe('the address of what is shown', () => {
         // Open is pressed, and the reader goes to an author before the post is read.
         await user.click(within(article).getByRole('button', { name: 'Open' }));
         go(`a/${BOB}`);
-        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]));
+        await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]));
         answer(original);
         await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -4034,7 +4130,7 @@ describe('a visitor, who has not signed in', () => {
 
         expect(await screen.findByText('From Bob.')).toBeTruthy();
         expect(screen.queryByText('From Alice.')).toBeNull();
-        expect(lastRead(api)).toStrictEqual([[BOB], 0, POSTS]);
+        expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]);
         // They have no timeline to go back to, and nobody to follow as.
         expect(screen.queryByRole('button', { name: 'Back to your timeline' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Follow' })).toBeNull();
@@ -4236,6 +4332,29 @@ describe('the services\' client', () => {
         // Asked for as bytes, under a name, so that a browser saves it.
         expect(api.download({ cid: 'bafypdf', type: 'application/pdf', bytes: 3 }, 'a paper.pdf'))
             .toBe('https://node.example/api/v1/ipfs/stream/bafypdf?filename=a%20paper.pdf&type=application%2Foctet-stream');
+    });
+
+    it('asks a timeline for posts with a title or with none, and keeps to that where the indexer does not', async () => {
+        const asked: string[] = [];
+        const both = [post('did:cid:1', BOB, 'A note.'), { ...post('did:cid:2', BOB, ''), memeplex: { kind: 'post', author: BOB, title: 'An article' } }];
+        const fetcher = (async (url: string) => {
+            asked.push(url);
+
+            // An indexer that does not know the question gives posts of both kinds.
+            return new Response(JSON.stringify({ total: 2, publications: both }), { status: 200 });
+        }) as unknown as typeof fetch;
+        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex' }, fetcher);
+
+        const articles = await api.timeline([BOB], 0, ['post'], true);
+
+        expect(asked[0]).toBe(`/memeplex/api/v1/timeline?author=${encodeURIComponent(BOB)}&kind=post&titled=true`);
+        expect(articles.publications.map(each => each.did)).toStrictEqual(['did:cid:2']);
+        expect(articles.read).toBe(2);
+        expect((await api.timeline([BOB], 0, ['post'], false)).publications.map(each => each.did)).toStrictEqual(['did:cid:1']);
+        expect(asked[1]).toContain('titled=false');
+        // Asked for neither, nothing is said of titles.
+        await api.timeline([BOB], 0, ['post', 'paper']);
+        expect(asked[2]).not.toContain('titled');
     });
 
     it('reads a body from the node by its CID, as text, and none when the node has none', async () => {

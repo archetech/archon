@@ -251,6 +251,18 @@ describe('the page at the address of an author', () => {
         expect(tag(posts, 'twitter:card')).toBe('summary');
         expect(posts).toContain('src="../assets/index-abc.js"');
 
+        // An author's articles and papers have addresses as their replies do.
+        for (const list of ['articles', 'papers']) {
+            const listed = (await request(app()).get(`/a/${ALICE}/${list}`)).text;
+
+            expect([list, tag(listed, 'og:title')]).toStrictEqual([list, 'Alice A. on Memepool']);
+            expect(tag(listed, 'og:url')).toBe(`https://node.example/memepool/a/${ALICE}/${list}`);
+            expect(listed).toContain('src="../../assets/index-abc.js"');
+        }
+        // What is no list of an author's is no page.
+        expect((await request(app()).get(`/a/${ALICE}/posts`)).status).toBe(404);
+        expect((await request(app()).get(`/a/${ALICE}/anything`)).status).toBe(404);
+
         const replies = (await request(app()).get(`/a/${ALICE}/replies`)).text;
 
         expect(tag(replies, 'og:title')).toBe('Alice A. on Memepool');
