@@ -2955,6 +2955,7 @@ describe('an article', () => {
 
         expect(link.getAttribute('href')).toBe('https://example.org/a-title');
         expect(link.getAttribute('rel')).toBe('noreferrer noopener');
+        expect(within(both as HTMLElement).getByRole('link', { name: 'original publication' })).toBe(link);
         // A day alone, and a place alone.
         expect((await of('A day'))!.textContent).toMatch(/^First published .*29.*2020|^First published .*2020/);
         expect((await of('A day'))!.querySelector('a')).toBeNull();

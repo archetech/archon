@@ -40,15 +40,28 @@ function rules(data: unknown): Validity | undefined {
     return v === 1 ? undefined : 'unsupported';
 }
 
-// Counted here, not by Date, which reads a year below 100 as one in the 1900s.
+// Whether a year, a month and a day are a day of the calendar. Counted here,
+// not by Date, which reads a year below 100 as one in the 1900s.
+function isDay(year: number, month: number, day: number): boolean {
+    if (month < 1 || month > 12) return false;
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+    return day >= 1 && day <= days;
+}
+
+function isDate(value: string): boolean {
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!parts) return false;
+    const [year, month, day] = parts.slice(1).map(Number);
+    return isDay(year, month, day);
+}
+
 function isInstant(value: string): boolean {
     const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?Z$/.exec(value);
     if (!parts) return false;
     const [year, month, day, hour, minute, second] = parts.slice(1, 7).map(Number);
-    if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false;
-    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
-    return day >= 1 && day <= days;
+    if (hour > 23 || minute > 59 || second > 59) return false;
+    return isDay(year, month, day);
 }
 
 // An object, by the schema its own `kind` names.
@@ -65,7 +78,7 @@ export function validateObject(memeplex: unknown): Validity {
         return 'rating-bounds';
     }
     if (kind === 'paper' && !value.authors.includes(value.author)) return 'paper-authors';
-    if (value.firstPublished !== undefined && !isInstant(`${value.firstPublished}T00:00:00Z`)) return 'first-published';
+    if (value.firstPublished !== undefined && !isDate(value.firstPublished)) return 'first-published';
 
     return 'valid';
 }

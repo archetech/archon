@@ -31,7 +31,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `authors` | 1–100 distinct DIDs, including `author` | paper; required |
 | `source` | `{ cid, type, bytes }` | paper |
 | `pdf` | `{ cid, type, bytes }` | paper |
-| `firstPublished` | date, `YYYY-MM-DD`: when the work first appeared, where that was before it was published here | post, paper |
+| `firstPublished` | date, `YYYY-MM-DD`: when the work first appeared, for work that appeared before it was published here | post, paper |
 | `original` | `https` URL, at most 2,000 characters: where the work first appeared | post, paper |
 | `verdict` | string, at most 300 code points | reply |
 | `rating`, `min`, `max` | integers from −100 to 100 (see Ratings) | rating; required |

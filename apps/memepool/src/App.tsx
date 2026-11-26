@@ -1132,7 +1132,8 @@ const ORIGINAL_LENGTH = 2000;
 const isOriginal = (text: string) => /^https:\/\/\S+$/.test(text) && [...text].length <= ORIGINAL_LENGTH;
 
 // A date as the protocol writes it, in words. It is a day and no instant, so
-// it is read in no time zone but its own.
+// it is read in no time zone but its own, and in the calendar it is written in
+// whatever the reader's is: another calendar's year is another number.
 const dayOf = (date: string): string | undefined => {
     const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
 
@@ -1148,7 +1149,7 @@ const dayOf = (date: string): string | undefined => {
 
     // A day that is none comes out as another, and is not shown as that one.
     return day.getUTCFullYear() === year && day.getUTCMonth() === month - 1 && day.getUTCDate() === of
-        ? day.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+        ? day.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC', calendar: 'gregory' })
         : undefined;
 };
 
@@ -1166,7 +1167,7 @@ function First({ object }: { object: NonNullable<Publication['memeplex']> }) {
     return (
         <p className="first muted">
             {day ? `First published ${day}` : 'First published elsewhere'}
-            {original && <>{' · '}<a href={original} target="_blank" rel="noreferrer noopener">original</a></>}
+            {original && <>{' · '}<a href={original} target="_blank" rel="noreferrer noopener" aria-label="original publication">original</a></>}
         </p>
     );
 }
