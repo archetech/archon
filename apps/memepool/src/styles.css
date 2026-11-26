@@ -67,6 +67,9 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
     font-size: 0.85rem;
 }
 
+.authors ul { list-style: none; margin: 0.25rem 0 0.5rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9rem; }
+.authors li { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+
 a.when { color: inherit; text-decoration: none; }
 a.when:hover, a.when:focus-visible { text-decoration: underline; }
 
