@@ -451,15 +451,18 @@ const IMAGE_BYTES = 10_000_000;
 
 // What a reader's pages are given to go by: the way to an author's posts, the
 // way to open a publication, and how an embed is shown.
-function Ways({ visit, open, gone, embedding, upload, children }: {
+function Ways({ visit, open, gone, withdrawals, embedding, upload, children }: {
     visit: (did: string) => void; open: (publication: Publication) => void; gone: () => number; embedding: Embedding;
+    withdrawals: { dids: ReadonlySet<string>; add: (did: string) => void };
     upload?: (image: Blob) => Promise<{ did: string; versionId: string }>; children: ReactNode;
 }) {
     return (
         <Visits.Provider value={visit}>
             <Opens.Provider value={open}>
                 <Uploads.Provider value={upload}>
-                    <Goings.Provider value={gone}><Embeds.Provider value={embedding}>{children}</Embeds.Provider></Goings.Provider>
+                    <Goings.Provider value={gone}>
+                        <Withdrawn.Provider value={withdrawals}><Embeds.Provider value={embedding}>{children}</Embeds.Provider></Withdrawn.Provider>
+                    </Goings.Provider>
                 </Uploads.Provider>
             </Opens.Provider>
         </Visits.Provider>
@@ -1170,6 +1173,11 @@ const may = (me: Me, action: string) => me.grant !== undefined && (!me.actions |
 // and counts once its chain has anchored it.
 // A response the reader has sent that its chain has not anchored yet, and how
 // to tell from what the indexer shows that it has been.
+// The objects the reader has withdrawn in this session, which the indexer
+// shows until their withdrawal is anchored. It is kept above any one post, so
+// that leaving a post and coming back offers no undoing of what is undone.
+const Withdrawn = createContext<{ dids: ReadonlySet<string>; add: (did: string) => void }>({ dids: new Set(), add: () => undefined });
+
 interface Sent {
     what: string;
     shown: (responses: Responses) => boolean;
@@ -1219,8 +1227,9 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
     // one this service can change, made here or shown by the indexer under a
     // grant of the reader's to this service. A rating made through another
     // client is left alone, and a new one made, which counts as the later.
+    const withdrawn = useContext(Withdrawn);
     const mine = rated ?? responses?.ratings.ratings.find(
-        each => each.memeplex?.author === me.did && grants.has(String(each.memeplex.grant)),
+        each => each.memeplex?.author === me.did && grants.has(String(each.memeplex.grant)) && !withdrawn.dids.has(each.did ?? ''),
     )?.did;
 
     // Whether the response was sent.
@@ -1276,24 +1285,33 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
     // What the reader has made of this that the indexer shows and this
     // service can take back: made under a grant of theirs to it. A response
     // made through another client is that client's to withdraw.
-    const boosts = responses?.boosts.filter(each => byMe(each) && each.did && grants.has(String(each.memeplex?.grant))).map(each => each.did!) ?? [];
+    //
+    // One already withdrawn here is not among them, though the indexer shows
+    // it until that is anchored.
+    const boosts = responses?.boosts
+        .filter(each => byMe(each) && each.did && grants.has(String(each.memeplex?.grant)) && !withdrawn.dids.has(each.did))
+        .map(each => each.did!) ?? [];
     const tagged = (value: string) => responses?.tags.find(each => each.tag === value)?.applied
-        ?.filter(each => each.author === me.did && grants.has(each.grant)).map(each => each.did) ?? [];
+        ?.filter(each => each.author === me.did && grants.has(each.grant) && !withdrawn.dids.has(each.did)).map(each => each.did) ?? [];
     const myTags = responses?.tags.filter(each => each.tag !== LIKE && tagged(each.tag).length > 0).map(each => each.tag) ?? [];
 
     // The reader's rating as the indexer shows it, which is one that can be withdrawn.
-    const ratedShown = responses?.ratings.ratings.find(each => byMe(each) && grants.has(String(each.memeplex?.grant)))?.did;
+    const ratedShown = responses?.ratings.ratings
+        .find(each => byMe(each) && grants.has(String(each.memeplex?.grant)) && !withdrawn.dids.has(each.did ?? ''))?.did;
     // Whether something of this name waits to be anchored: it is not asked for twice.
     const waits = (what: string) => sent.some(each => each.what === what);
 
     // Takes back responses of the reader's, which are objects they withdraw.
-    // It is done once the indexer shows none of them.
-    const undo = (what: string, dids: string[], gone: Sent['shown'], replaces?: string) => send(
+    // Each is counted as withdrawn as soon as it is, so that where a later one
+    // fails, trying once more is of those that are left. It is done once the
+    // indexer shows none of them, whatever else of the same kind it shows.
+    const undo = (what: string, dids: string[], shows: (read: Responses) => (string | undefined)[], replaces?: string) => send(
         what,
-        gone,
+        read => !shows(read).some(did => dids.includes(did ?? '')),
         async () => {
             for (const did of dids) {
                 await api.withdraw(did);
+                withdrawn.add(did);
             }
             if (replaces === 'rating') {
                 setRated(undefined);
@@ -1301,6 +1319,9 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         },
         replaces,
     );
+    const boosted = (read: Responses) => read.boosts.map(each => each.did);
+    const ratings = (read: Responses) => read.ratings.ratings.map(each => each.did);
+    const applying = (value: string) => (read: Responses) => read.tags.find(each => each.tag === value)?.applied?.map(each => each.did) ?? [];
 
     return (
         <div className="respond">
@@ -1324,7 +1345,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                             <button
                                 className="quiet"
                                 disabled={busy || waits('The undoing of your boost')}
-                                onClick={() => undo('The undoing of your boost', boosts, read => !read.boosts.some(each => boosts.includes(each.did ?? '')))}
+                                onClick={() => undo('The undoing of your boost', boosts, boosted)}
                             >
                                 Undo boost
                             </button>
@@ -1342,7 +1363,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                                 <button
                                     className="quiet"
                                     disabled={busy || waits('The removal of your rating')}
-                                    onClick={() => undo('The removal of your rating', [ratedShown], read => !read.ratings.ratings.some(each => each.did === ratedShown), 'rating')}
+                                    onClick={() => undo('The removal of your rating', [ratedShown], ratings, 'rating')}
                                 >
                                     Remove rating
                                 </button>
@@ -1351,19 +1372,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                     )}
                     {may(me, 'memeplex:tag') && (
                         <>
-                            {tagged(LIKE).length > 0
-                                ? (
-                                    <button
-                                        className="quiet"
-                                        disabled={busy || waits('The removal of your like')}
-                                        aria-label="Unlike"
-                                        aria-pressed="true"
-                                        onClick={() => undo('The removal of your like', tagged(LIKE), read => !read.tags.some(each => each.tag === LIKE && each.authors.includes(me.did)))}
-                                    >
-                                        {LIKE} ✓
-                                    </button>
-                                )
-                                : <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>}
+                            {tagged(LIKE).length === 0 && <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>}
                             <label className="inline">
                                 Tag
                                 <input value={word} disabled={busy} onChange={event => setWord(event.target.value)} placeholder="a word" />
@@ -1381,13 +1390,24 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                             </button>
                         </>
                     )}
-                    {/* A tag the reader put on this is theirs to take off, whatever their grant allows since. */}
+                    {/* A like or a tag the reader put on this is theirs to take off, whatever their grant allows since. */}
+                    {tagged(LIKE).length > 0 && (
+                        <button
+                            className="quiet"
+                            disabled={busy || waits('The removal of your like')}
+                            aria-label="Unlike"
+                            aria-pressed="true"
+                            onClick={() => undo('The removal of your like', tagged(LIKE), applying(LIKE))}
+                        >
+                            {LIKE} ✓
+                        </button>
+                    )}
                     {myTags.map(value => (
                         <button
                             key={value}
                             className="quiet"
                             disabled={busy || waits(`The removal of your tag ${value}`)}
-                            onClick={() => undo(`The removal of your tag ${value}`, tagged(value), read => !read.tags.some(each => each.tag === value && each.authors.includes(me.did)))}
+                            onClick={() => undo(`The removal of your tag ${value}`, tagged(value), applying(value))}
                         >
                             Remove tag {value}
                         </button>
@@ -1773,6 +1793,9 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // failure to read the list, which a later read of the list clears.
     const [lost, setLost] = useState('');
     const gone = useCallback(() => arrivals.current, []);
+    // What the reader has withdrawn while signed in, whichever post it was of.
+    const [taken, setTaken] = useState<ReadonlySet<string>>(new Set());
+    const withdrawals = useMemo(() => ({ dids: taken, add: (did: string) => setTaken(had => new Set([...had, did])) }), [taken]);
 
     useEffect(() => {
         if (address === addressed.current) {
@@ -2083,7 +2106,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     const nowhere = visitor && !open && !author;
 
     return (
-        <Ways visit={visit} open={setOpen} gone={gone} embedding={embedding} upload={me.grant ? api.upload : undefined}>
+        <Ways visit={visit} open={setOpen} gone={gone} withdrawals={withdrawals} embedding={embedding} upload={me.grant ? api.upload : undefined}>
             {/* A link to something the pages show is followed within them, and
                 not by asking the service for the page anew. */}
             <main

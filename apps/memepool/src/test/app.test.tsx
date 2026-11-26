@@ -696,13 +696,76 @@ describe('responding to a post', () => {
             expect(api.withdraw).toHaveBeenCalledWith('did:cid:b1');
             expect(api.withdraw).not.toHaveBeenCalledWith('did:cid:b2');
             expect(await screen.findByText('The undoing of your boost is waiting to be anchored.')).toBeTruthy();
-            // It is not asked for twice.
-            expect((screen.getByRole('button', { name: 'Undo boost' }) as HTMLButtonElement).disabled).toBe(true);
+            // It is not asked for twice: what is withdrawn is the reader's to undo no more.
+            await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull());
+            expect(screen.getByRole('button', { name: 'Boost' })).toBeTruthy();
+
+            // Nor when the post is left and come back to, while the indexer still shows the boost.
+            await user.click(screen.getByRole('button', { name: 'Back' }));
+            await user.click(await screen.findByRole('button', { name: 'Open' }));
+            await screen.findByText(/\d boosts? · /);
+            expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull();
+            expect(api.withdraw).toHaveBeenCalledTimes(1);
 
             state.responses = { ...made(), boosts: made().boosts.slice(1) };
             await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
-            await waitFor(() => expect(screen.queryByText(/undoing of your boost/)).toBeNull());
             expect(await screen.findByRole('button', { name: 'Boost' })).toBeTruthy();
+        });
+
+        it('tries once more only what is left, where one of two could not be withdrawn', async () => {
+            const twice = made();
+
+            twice.boosts = [mine('did:cid:b1'), mine('did:cid:b3')];
+            const { api, user } = await responded(twice);
+
+            vi.mocked(api.withdraw).mockImplementation(async did => {
+                if (did === 'did:cid:b3' && vi.mocked(api.withdraw).mock.calls.length < 3) {
+                    throw new ApiError(502, 'the node did not answer');
+                }
+            });
+            await user.click(await screen.findByRole('button', { name: 'Undo boost' }));
+            expect((await screen.findByRole('alert')).textContent).toContain('the node did not answer');
+
+            await user.click(await screen.findByRole('button', { name: 'Undo boost' }));
+            await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull());
+            // The one withdrawn the first time is not asked for a second.
+            expect(vi.mocked(api.withdraw).mock.calls.map(call => call[0])).toStrictEqual(['did:cid:b1', 'did:cid:b3', 'did:cid:b3']);
+        });
+
+        it('lets a like be taken back by a reader whose grant allows no tag since, and a rating be made after one is removed', async () => {
+            localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+            const narrowed = services({ me: { ...granted, actions: ['memeplex:post', 'memeplex:rate'] }, timeline: [root] });
+            narrowed.state.responses = made();
+            render(<App api={narrowed.api} />);
+            const user = userEvent.setup();
+
+            await user.click(await screen.findByRole('button', { name: 'Open' }));
+            // No new like or tag, and the ones made are still theirs to take off.
+            expect(await screen.findByRole('button', { name: 'Unlike' })).toBeTruthy();
+            expect(screen.queryByRole('button', { name: 'Like' })).toBeNull();
+            expect(screen.queryByLabelText('Tag')).toBeNull();
+            expect(screen.getByRole('button', { name: 'Remove tag cryptography' })).toBeTruthy();
+
+            // A thumb after the rating is removed makes a rating, and changes none that is gone.
+            await user.click(screen.getByRole('button', { name: 'Remove rating' }));
+            await waitFor(() => expect(narrowed.api.withdraw).toHaveBeenCalledWith('did:cid:r1'));
+            await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+            await waitFor(() => expect(narrowed.state.published).toHaveLength(1));
+            expect(narrowed.api.edit).not.toHaveBeenCalled();
+        });
+
+        it('is done when its own objects are gone, though another client\'s still applies the tag for the reader', async () => {
+            const both = made();
+
+            both.tags = [{ tag: '❤️', authors: [ALICE], applied: [{ did: 'did:cid:l1', author: ALICE, grant: 'did:cid:grant' }, { did: 'did:cid:l2', author: ALICE, grant: 'did:cid:another' }] }];
+            const { state, user } = await responded(both);
+
+            await user.click(await screen.findByRole('button', { name: 'Unlike' }));
+            expect(await screen.findByText('The removal of your like is waiting to be anchored.')).toBeTruthy();
+
+            state.responses = { ...both, tags: [{ tag: '❤️', authors: [ALICE], applied: [{ did: 'did:cid:l2', author: ALICE, grant: 'did:cid:another' }] }] };
+            await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+            await waitFor(() => expect(screen.queryByText(/removal of your like/)).toBeNull());
         });
 
         it('removes the reader\'s rating, like and tag, and no one else\'s', async () => {
@@ -746,7 +809,7 @@ describe('responding to a post', () => {
 
             expect((await screen.findByRole('alert')).textContent).toContain('no grant to publish under');
             expect(screen.queryByText(/undoing of your boost/)).toBeNull();
-            expect((screen.getByRole('button', { name: 'Undo boost' }) as HTMLButtonElement).disabled).toBe(false);
+            expect((await screen.findByRole('button', { name: 'Undo boost' }) as HTMLButtonElement).disabled).toBe(false);
         });
 
         it('reads a view of the tags that names no objects, from an indexer that gives none, and offers no undoing', async () => {
