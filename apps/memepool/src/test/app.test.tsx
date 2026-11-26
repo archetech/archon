@@ -3008,6 +3008,7 @@ describe('an article', () => {
             first('did:cid:7', { title: 'No such day', firstPublished: '2019-02-30' }),
             first('did:cid:8', { title: 'Long', original: `https://example.org/${'🙂'.repeat(1900)}` }),
             first('did:cid:9', { title: 'Too long', original: `https://example.org/${'a'.repeat(1981)}` }),
+            first('did:cid:10', { title: 'No address', original: 'https://:80' }),
         ] });
         render(<App api={api} />);
 
@@ -3035,6 +3036,8 @@ describe('an article', () => {
         // An address is as long as the protocol counts it, in code points.
         expect((await of('Long'))!.querySelector('a')).not.toBeNull();
         expect(await of('Too long')).toBeNull();
+        // What has the shape and is no address a browser can open is no link.
+        expect(await of('No address')).toBeNull();
         expect(document.querySelector('a[href^="javascript"]')).toBeNull();
     });
 

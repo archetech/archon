@@ -1138,7 +1138,19 @@ function Heading({ title, subtitle = '', summary = '' }: { title: string; subtit
 // appeared: an `https` one, with no space in it, of no more code points than
 // the protocol counts.
 const ORIGINAL_LENGTH = 2000;
-const isOriginal = (text: string) => /^https:\/\/\S+$/.test(text) && [...text].length <= ORIGINAL_LENGTH;
+const isOriginal = (text: string) => {
+    if (!/^https:\/\/\S+$/.test(text) || [...text].length > ORIGINAL_LENGTH) {
+        return false;
+    }
+
+    // The protocol goes by the shape alone. The pages make a link, and ask for one, only of what a browser can open.
+    try {
+        return new URL(text).protocol === 'https:';
+    }
+    catch {
+        return false;
+    }
+};
 
 // A date as the protocol writes it, in words. It is a day and no instant, so
 // it is read in no time zone but its own, and in the calendar it is written in
