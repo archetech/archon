@@ -21,6 +21,32 @@ const post = (did: string, author: string, text: string, more: Partial<Publicati
 });
 
 // How many publications the indexer gives at once.
+// The first post listed that a click opens, once there is one.
+const toOpen = () => waitFor(() => {
+    const found = document.querySelector<HTMLElement>('article.post.opens');
+
+    if (!found) {
+        throw new Error('nothing is listed that a click opens');
+    }
+
+    return found;
+});
+
+// Chooses one of the things the post that is open offers under its More button.
+const choose = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(await screen.findByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('menuitem', { name }));
+};
+// What the post that is open offers under its More button.
+const offered = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole('button', { name: 'More' }));
+    const names = screen.getAllByRole('menuitem').map(each => each.textContent);
+
+    await user.keyboard('{Escape}');
+
+    return names;
+};
+
 const PAGE = 50;
 // The kinds a reader's timeline and an author's posts are, and an author's replies.
 const POSTS = ['post', 'paper'];
@@ -223,15 +249,16 @@ describe('the grant', () => {
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
 
-        // Each post has its own, the reader's and another author's alike.
-        const copies = await screen.findAllByRole('button', { name: 'Copy DID' });
-        expect(copies).toHaveLength(2);
-        await user.click(copies[1]);
+        // A post that is open has its own, another author's as the reader's.
+        await user.click((await screen.findByText('Second.')).closest('article')!);
+        await choose(user, 'Copy DID');
         expect(write).toHaveBeenCalledWith('did:cid:2');
-        expect((await screen.findByRole('status')).textContent).toMatch(/Copied/);
+        expect(within(document.querySelector('.more') as HTMLElement).getByRole('status').textContent).toMatch(/Copied/);
 
         write.mockRejectedValue(new Error('not allowed'));
-        await user.click(copies[0]);
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click((await screen.findByText('First.')).closest('article')!);
+        await choose(user, 'Copy DID');
         await waitFor(() => expect(screen.getAllByRole('status').some(said => /Could not copy\. The DID is did:cid:1/.test(said.textContent ?? ''))).toBe(true));
         localStorage.clear();
     });
@@ -243,9 +270,11 @@ describe('the grant', () => {
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
 
-        expect(await screen.findAllByRole('button', { name: 'Copy DID' })).toHaveLength(1);
-        await user.click(screen.getByRole('button', { name: 'Open' }));
-        await user.click(await screen.findByRole('button', { name: 'Copy DID' }));
+        // What was withdrawn is not there to open.
+        expect(await screen.findByText('Withdrawn')).toBeTruthy();
+        expect(document.querySelectorAll('article.post.opens')).toHaveLength(1);
+        await user.click(await toOpen());
+        await choose(user, 'Copy DID');
         expect(write).toHaveBeenCalledWith('did:cid:1');
     });
 
@@ -318,7 +347,7 @@ describe('reading and publishing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText('A reply.')).toBeTruthy();
         expect(api.thread).toHaveBeenCalledWith('did:cid:1');
 
@@ -348,16 +377,30 @@ describe('reading and publishing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        const mine = (await screen.findByText('Mine.')).closest('article')!;
-        expect(within(screen.getByText('Under my other grant.').closest('article')!).getByRole('button', { name: 'Withdraw' })).toBeTruthy();
-        expect(within(screen.getByText('Through another client.').closest('article')!).queryByRole('button', { name: 'Withdraw' })).toBeNull();
-        const theirs = screen.getByText('Bob\'s.').closest('article')!;
-        expect(within(theirs).queryByRole('button', { name: 'Withdraw' })).toBeNull();
+        // Each is opened, and what it offers is looked at.
+        const offers = async (text: string) => {
+            await user.click((await screen.findByText(text)).closest('article')!);
+            const names = await offered(user);
 
-        await user.click(within(mine).getByRole('button', { name: 'Withdraw' }));
+            await user.click(screen.getByRole('button', { name: 'Back' }));
+
+            return names.includes('Withdraw');
+        };
+
+        expect(await offers('Under my other grant.')).toBe(true);
+        expect(await offers('Through another client.')).toBe(false);
+        expect(await offers('Bob\'s.')).toBe(false);
+        // Nothing listed is withdrawn from the list.
+        await screen.findByText('Mine.');
+        expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+
+        await user.click(screen.getByText('Mine.').closest('article')!);
+        await choose(user, 'Withdraw');
 
         expect(api.withdraw).toHaveBeenCalledWith('did:cid:1');
+        // The reader is back where the post was listed, and it is gone from there.
         expect(await screen.findByText('Withdrawn')).toBeTruthy();
+        expect(screen.getByRole('heading', { name: /Timeline/ })).toBeTruthy();
     });
 
     it('keeps follows in this browser', async () => {
@@ -419,7 +462,7 @@ describe('reading and publishing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.type(await screen.findByLabelText('Reply'), 'A reply.');
         await user.click(screen.getByRole('button', { name: 'Publish' }));
         expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
@@ -644,7 +687,7 @@ describe('responding to a post', () => {
         render(<App api={made.api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByRole('button', { name: 'Boost' });
 
         return { ...made, user };
@@ -660,7 +703,7 @@ describe('responding to a post', () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         render(<App api={made.api} />);
 
-        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await userEvent.setup().click(await toOpen());
 
         expect(await screen.findByText(/2 boosts · rated 75% by 1/)).toBeTruthy();
         expect(screen.getByText(/cryptography 2/)).toBeTruthy();
@@ -687,7 +730,7 @@ describe('responding to a post', () => {
             render(<App api={services_.api} />);
             const user = userEvent.setup();
 
-            await user.click(await screen.findByRole('button', { name: 'Open' }));
+            await user.click(await toOpen());
             await screen.findByText(/\d boosts? · /);
 
             return { ...services_, user };
@@ -709,7 +752,7 @@ describe('responding to a post', () => {
 
             // Nor when the post is left and come back to, while the indexer still shows the boost.
             await user.click(screen.getByRole('button', { name: 'Back' }));
-            await user.click(await screen.findByRole('button', { name: 'Open' }));
+            await user.click(await toOpen());
             await screen.findByText(/\d boosts? · /);
             expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull();
             expect(api.withdraw).toHaveBeenCalledTimes(1);
@@ -772,7 +815,7 @@ describe('responding to a post', () => {
             await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull());
 
             // And not offered under the post, which the indexer still shows boosted.
-            await user.click(within((await screen.findByText('A post.', { selector: 'article.post:not(.boost) *' })).closest('article')!).getByRole('button', { name: 'Open' }));
+            await user.click((await screen.findByText('A post.', { selector: 'article.post:not(.boost) *' })).closest('article')!);
             await screen.findByText(/\d boosts? · /);
             expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull();
             expect(both.api.withdraw).toHaveBeenCalledTimes(1);
@@ -805,7 +848,7 @@ describe('responding to a post', () => {
             render(<App api={narrowed.api} />);
             const user = userEvent.setup();
 
-            await user.click(await screen.findByRole('button', { name: 'Open' }));
+            await user.click(await toOpen());
             // No new like or tag, and the ones made are still theirs to take off.
             expect(await screen.findByRole('button', { name: 'Unlike' })).toBeTruthy();
             expect(screen.queryByRole('button', { name: 'Like' })).toBeNull();
@@ -922,7 +965,7 @@ describe('responding to a post', () => {
         render(<App api={made.api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByText(/rated 100% by 1/);
         await user.click(screen.getByRole('button', { name: 'Thumb down' }));
 
@@ -939,7 +982,7 @@ describe('responding to a post', () => {
         render(<App api={made.api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByText(/rated 100% by 1/);
         await user.click(screen.getByRole('button', { name: 'Thumb down' }));
 
@@ -985,7 +1028,7 @@ describe('responding to a post', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect((await screen.findByRole('alert')).textContent).toBe('the index is still being built');
 
         await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
@@ -999,7 +1042,7 @@ describe('responding to a post', () => {
         vi.mocked(api.responses).mockReturnValue(new Promise(() => undefined));
         render(<App api={api} />);
 
-        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await userEvent.setup().click(await toOpen());
 
         expect((await screen.findByRole('button', { name: 'Thumb up' }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole('button', { name: 'Boost' }) as HTMLButtonElement).disabled).toBe(false);
@@ -1038,7 +1081,7 @@ describe('responding to a post', () => {
         const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?grant=abc' }, timeline: [root] });
         render(<App api={api} />);
 
-        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await userEvent.setup().click(await toOpen());
         await screen.findByText(/0 boosts · no ratings/);
 
         expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
@@ -1063,7 +1106,7 @@ describe('a grant that allows some kinds', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        const open = await screen.findByRole('button', { name: 'Open' });
+        const open = await toOpen();
         expect(screen.queryByLabelText('Post')).toBeNull();
 
         await user.click(open);
@@ -1083,7 +1126,7 @@ describe('a grant that allows some kinds', () => {
         render(<App api={made.api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Thumb down' }));
 
         await waitFor(() => expect(made.state.edited).toHaveLength(1));
@@ -1098,7 +1141,7 @@ describe('a grant that allows some kinds', () => {
         const user = userEvent.setup();
 
         expect(await screen.findByLabelText('Post')).toBeTruthy();
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
 
         for (const name of ['Boost', 'Thumb up', 'Thumb down', 'Like', 'Add tag']) {
             expect(await screen.findByRole('button', { name })).toBeTruthy();
@@ -1238,7 +1281,7 @@ describe('an author\'s own posts', () => {
         const user = userEvent.setup();
 
         await screen.findByText('From Bob.');
-        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click(screen.getByText('From Bob.').closest('article')!);
         await screen.findByLabelText('Reply');
         await user.click(authorOf('From Bob.'));
 
@@ -1257,7 +1300,7 @@ describe('an author\'s own posts', () => {
         await user.click(authorOf('From Bob.'));
         await waitFor(() => expect(screen.queryByText('From Alice.')).toBeNull());
 
-        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click(screen.getByText('From Bob.').closest('article')!);
         await screen.findByLabelText('Reply');
         await user.click(authorOf('From Bob.'));
 
@@ -1269,7 +1312,7 @@ describe('an author\'s own posts', () => {
 
         // And the reader's timeline likewise, from a post opened on it.
         await user.click(screen.getByRole('button', { name: 'Back to your timeline' }));
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         await screen.findByLabelText('Reply');
         await user.click(screen.getByRole('button', { name: 'Back' }));
         expect(await screen.findByText('From Bob.')).toBeTruthy();
@@ -1388,7 +1431,7 @@ describe('an author\'s own posts', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         await user.type(await screen.findByLabelText('Reply'), 'Not anchored yet.');
         await user.click(screen.getByRole('button', { name: 'Publish' }));
         await screen.findByText('Waiting to be anchored');
@@ -1413,7 +1456,7 @@ describe('an author\'s own posts', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         await user.type(await screen.findByLabelText('Reply'), 'Soon anchored.');
         await user.click(screen.getByRole('button', { name: 'Publish' }));
         await screen.findByText('Waiting to be anchored');
@@ -1444,6 +1487,223 @@ describe('an author\'s own posts', () => {
 
         expect(await screen.findByText(`Bob ${PAGE + 1}.`)).toBeTruthy();
         expect(lastRead(api)).toStrictEqual([[BOB], PAGE, ['post'], false]);
+    });
+});
+
+describe('a post that is listed, and what an open one offers', () => {
+    const REPLY = 'did:cid:bagaaierareplyreplyreplyreplyreplyreplyreplyreplyreplyreplyre';
+    const listed = () => [under(post('did:cid:1', ALICE, 'Mine, with [a link](https://example.org/).'), 'did:cid:grant'), post('did:cid:2', BOB, 'From Bob.')];
+
+    it('is opened by a click on it, and offers nothing else where it is listed', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: listed() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        const theirs = (await screen.findByText('From Bob.')).closest('article')!;
+
+        for (const name of ['Open', 'Withdraw', 'Copy link', 'Copy embed', 'Copy DID', 'More']) {
+            expect([name, screen.queryByRole('button', { name })]).toStrictEqual([name, null]);
+        }
+
+        await user.click(screen.getByText('From Bob.'));
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+        expect(window.location.pathname).toBe('/p/did:cid:2');
+        // The post that is open is not opened again by a click on it.
+        expect(theirs.isConnected).toBe(false);
+        expect(document.querySelector('article.post.opens')).toBeNull();
+    });
+
+    it('is not opened by a click on something in it that does something of its own, or by selecting its text', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: listed() });
+        render(<App api={api} />);
+
+        const link = await screen.findByRole('link', { name: 'a link' });
+
+        link.addEventListener('click', event => event.preventDefault());
+        fireEvent.click(link);
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // The end of a selection is a click as well.
+        const selected = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'From' } as Selection);
+
+        fireEvent.click(screen.getByText('From Bob.'));
+        expect(api.thread).not.toHaveBeenCalled();
+        selected.mockRestore();
+
+        // Nor by any button but the first one of the mouse.
+        fireEvent.click(screen.getByText('From Bob.'), { button: 1 });
+        expect(api.thread).not.toHaveBeenCalled();
+
+        // The author's name goes to the author.
+        fireEvent.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        await screen.findByRole('tab', { name: 'Posts' });
+        expect(api.thread).not.toHaveBeenCalled();
+    });
+
+    it('offers what else can be done with it under one button, which the keyboard works as the mouse does', async () => {
+        const { api } = services({ me: granted, timeline: listed() });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText(/^Mine, with/)).closest('article')!);
+        const more = await screen.findByRole('button', { name: 'More' });
+
+        // It is at the end of the post's header.
+        expect(more.closest('header')).toBe(document.querySelector('article.post > header'));
+        expect(more.getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByRole('menu')).toBeNull();
+
+        await user.click(more);
+        expect(more.getAttribute('aria-expanded')).toBe('true');
+        expect(screen.getAllByRole('menuitem').map(each => each.textContent)).toStrictEqual(['Withdraw', 'Copy link', 'Copy embed', 'Copy DID']);
+        // The first is where the keyboard is, and the arrows go round.
+        expect(document.activeElement?.textContent).toBe('Withdraw');
+        await user.keyboard('{ArrowUp}');
+        expect(document.activeElement?.textContent).toBe('Copy DID');
+        await user.keyboard('{ArrowDown}{ArrowDown}');
+        expect(document.activeElement?.textContent).toBe('Copy link');
+
+        // Escape puts it away and leaves the keyboard on the button.
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('menu')).toBeNull();
+        expect(document.activeElement).toBe(more);
+        expect(api.withdraw).not.toHaveBeenCalled();
+
+        // From the button as well, where the keyboard has gone back to it.
+        await user.click(more);
+        await user.keyboard('{Shift>}{Tab}{/Shift}');
+        expect(document.activeElement).toBe(more);
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('menu')).toBeNull();
+
+        // And when the keyboard leaves it for something else.
+        await user.click(more);
+        await user.keyboard('{Shift>}{Tab}{Tab}{/Shift}');
+        expect(screen.queryByRole('menu')).toBeNull();
+
+        // So does a click anywhere else, and a second one on the button.
+        await user.click(more);
+        await user.click(screen.getByRole('heading', { name: 'Memepool' }));
+        expect(screen.queryByRole('menu')).toBeNull();
+        await user.click(more);
+        await user.click(more);
+        expect(screen.queryByRole('menu')).toBeNull();
+    });
+
+    it('says why a post could not be withdrawn, and leaves it open', async () => {
+        const { api } = services({ me: granted, timeline: listed() });
+        vi.mocked(api.withdraw).mockRejectedValue(new ApiError(502, 'the node did not answer'));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText(/^Mine, with/)).closest('article')!);
+        await choose(user, 'Withdraw');
+
+        expect((await within(document.querySelector('.more') as HTMLElement).findByRole('status')).textContent).toContain('the node did not answer');
+        expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(screen.getByText(/^Mine, with/)).toBeTruthy();
+    });
+
+    it('offers no embed of a post whose edit waits, and nothing that changes an earlier version', async () => {
+        const mine = { ...listed()[0], current: 1, versions: [
+            { opid: 'bafyone', type: 'create' as const, outcome: 'attributed' as const, position: { block: 1, time: '2026-11-21T12:00:00Z' } },
+            { opid: 'bafytwo', type: 'update' as const, outcome: 'attributed' as const, position: { block: 2, time: '2026-11-22T12:00:00Z' } },
+        ] };
+        const { api, state } = services({ me: granted, timeline: [mine] });
+        state.revisions['did:cid:1 bafyone'] = { ...mine, current: 0, memeplex: { ...mine.memeplex!, text: 'As it was at first.' } };
+        state.unanchored['did:cid:1'] = { versionId: 'bafythree', memeplex: { ...mine.memeplex!, text: 'As I left it.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText('As I left it.')).closest('article')!);
+        await screen.findByText(/Your edit is waiting to be anchored\. Until it is/);
+        // An embed is of a version, and the one waiting is not one yet.
+        expect(await offered(user)).toStrictEqual(['Withdraw', 'Copy link', 'Copy DID']);
+
+        // An earlier version is there to copy, and is not withdrawn by itself.
+        await user.selectOptions(screen.getByLabelText('Version'), 'bafyone');
+        await screen.findByText('As it was at first.');
+        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+    });
+
+    it('leaves the reader where they went while a post was being withdrawn', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: listed() });
+        let done = () => {};
+        vi.mocked(api.withdraw).mockImplementation(() => new Promise<void>(resolve => { done = resolve; }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText(/^Mine, with/)).closest('article')!);
+        await choose(user, 'Withdraw');
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+
+        done();
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.pathname).toBe('/p/did:cid:2');
+    });
+
+    it('gives a card a link to what it shows, and keeps a click on a card that cannot be opened from opening what it is in', async () => {
+        const QUOTE = 'did:cid:bagaaieraquotequotequotequotequotequotequotequotequotequote';
+        const quoted = { ...post(QUOTE, BOB, 'What Bob wrote.'), versions: [{ opid: 'bafyquote', type: 'create' as const, outcome: 'attributed' as const }] };
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `See:\n\n![it](${QUOTE}?versionId=bafyquote)`)] });
+        state.known[QUOTE] = quoted;
+        state.revisions[`${QUOTE} bafyquote`] = quoted;
+        const view = render(<App api={api} />);
+
+        const card = (await screen.findByText('What Bob wrote.')).closest('.quoted') as HTMLElement;
+        expect(within(card).getByRole('link').getAttribute('href')).toBe(`/p/${QUOTE}`);
+        view.unmount();
+
+        // Withdrawn since: the card says so, has no link, and a click on it opens nothing.
+        state.revisions[`${QUOTE} bafyquote`] = { ...quoted, state: 'withdrawn' };
+        render(<App api={api} />);
+        const gone = (await screen.findByText('What Bob wrote.')).closest('.quoted') as HTMLElement;
+
+        expect(within(gone).queryByRole('link')).toBeNull();
+        fireEvent.click(screen.getByText('What Bob wrote.'));
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        expect(api.thread).not.toHaveBeenCalled();
+    });
+
+    it('goes from a boost that is open to the post it is of, which is where there is something to copy', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted });
+        state.known['did:cid:2'] = original;
+        state.known['did:cid:9'] = boost;
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        window.history.replaceState(null, '', '/p/did:cid:9');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
+        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+    });
+
+    it('opens a reply from the thread it is in, and what a reply answers from the card above it', async () => {
+        const root = post('did:cid:1', BOB, 'What Bob asked.');
+        const reply: Publication = { ...post(REPLY, ALICE, 'What Alice answered.'), memeplex: { kind: 'reply', author: ALICE, text: 'What Alice answered.', target: 'did:cid:1', targetVersion: 'op-did:cid:1' } };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [root] });
+        state.known['did:cid:1'] = root;
+        state.known[REPLY] = reply;
+        state.revisions['did:cid:1 op-did:cid:1'] = root;
+        vi.mocked(api.thread).mockImplementation(async did => (did === 'did:cid:1' ? [{ publication: reply, depth: 1 }] as never : []));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await toOpen());
+        await user.click((await screen.findByText('What Alice answered.')).closest('article')!);
+
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith(REPLY));
+        await waitFor(() => expect(window.location.pathname).toBe(`/p/${REPLY}`));
     });
 });
 
@@ -1715,7 +1975,7 @@ describe('what the reader published that waits to be anchored', () => {
         const view = render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         await user.type(await screen.findByLabelText('Reply'), 'A reply that waits.');
         await user.click(screen.getByRole('button', { name: 'Publish' }));
         const card = await waitingCard('A reply that waits.');
@@ -1723,7 +1983,7 @@ describe('what the reader published that waits to be anchored', () => {
         view.unmount();
 
         render(<App api={api} />);
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         expect(await waitingCard('A reply that waits.')).not.toBeNull();
     });
 });
@@ -1792,13 +2052,15 @@ describe('a boost', () => {
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
 
+        // A click on the boost opens the post, and the boost offers nothing to copy.
         await screen.findByText('What Bob wrote.');
-        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
-        expect(write).toHaveBeenCalledWith(ORIGINAL);
+        expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull();
 
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         // The thread is the post's own, as it is: that is what there is to answer.
         expect(await screen.findByLabelText('Reply')).toBeTruthy();
+        await choose(user, 'Copy DID');
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
         expect(api.thread).toHaveBeenCalledWith(ORIGINAL);
         expect(screen.getByText('What Bob wrote, corrected.')).toBeTruthy();
         expect(screen.queryByText('boosted')).toBeNull();
@@ -1812,7 +2074,7 @@ describe('a boost', () => {
 
         await screen.findByText('What Bob wrote.');
         vi.mocked(api.publication).mockRejectedValueOnce(new Error('the indexer is away'));
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click((document.querySelector('article.post.opens') as HTMLElement));
 
         // The version boosted is not opened in its place.
         expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
@@ -1821,13 +2083,13 @@ describe('a boost', () => {
 
         // Withdrawn since the boost was read.
         state.known[ORIGINAL] = { ...state.known[ORIGINAL], state: 'withdrawn' };
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click((document.querySelector('article.post.opens') as HTMLElement));
         expect(await screen.findByText(/The post cannot be opened as it is/)).toBeTruthy();
         expect(api.thread).not.toHaveBeenCalled();
 
         // And opened once it can be.
         state.known[ORIGINAL] = post(ORIGINAL, BOB, 'What Bob wrote.');
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click((document.querySelector('article.post.opens') as HTMLElement));
         expect(await screen.findByLabelText('Reply')).toBeTruthy();
     });
 
@@ -1900,10 +2162,10 @@ describe('a boost', () => {
 
         expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
         expect(vi.mocked(api.revision).mock.calls).toStrictEqual([[MIDDLE, `op-${MIDDLE}`], [ORIGINAL, `op-${ORIGINAL}`]]);
-        await user.click(screen.getByRole('button', { name: 'Copy DID' }));
-        expect(write).toHaveBeenCalledWith(ORIGINAL);
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith(ORIGINAL));
+        await choose(user, 'Copy DID');
+        expect(write).toHaveBeenCalledWith(ORIGINAL);
     });
 
     it('follows boosts of boosts only so far, and never round', async () => {
@@ -2172,7 +2434,7 @@ describe('adding an image to what is written', () => {
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(EMBED));
         await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-        await user.click(within(screen.getByText('From Alice.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click(screen.getByText('From Alice.').closest('article')!);
         await screen.findByLabelText('Reply');
         expect(chooser('Reply')).toBeTruthy();
         view.unmount();
@@ -2218,7 +2480,7 @@ describe('a post embedded in another', () => {
         const user = userEvent.setup();
 
         const card = (await screen.findByText('What Bob wrote.')).closest('.embed.card') as HTMLElement;
-        await user.click(within(card).getByRole('button', { name: 'Open' }));
+        await user.click(card.querySelector('.quoted') as HTMLElement);
 
         expect(await screen.findByLabelText('Reply')).toBeTruthy();
         expect(api.thread).toHaveBeenCalledWith(QUOTED);
@@ -2239,7 +2501,7 @@ describe('a post embedded in another', () => {
 
         // In the thread of the post that quotes it, a replay puts the version out of the history.
         // The post's own way to be opened, and not the card's.
-        await user.click(within(screen.getByText('See:').closest('article')!.querySelector(':scope > footer') as HTMLElement).getByRole('button', { name: 'Open' }));
+        await user.click(screen.getByText('See:').closest('article')!);
         await screen.findByLabelText('Reply');
         expect(await screen.findByText('What Bob wrote.')).toBeTruthy();
         delete state.revisions[`${QUOTED} bafyv1`];
@@ -2259,12 +2521,12 @@ describe('a post embedded in another', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('What Bob wrote.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('What Bob wrote.')).closest('article')!);
         const card = await waitFor(() => { const found = document.querySelector('.embed.card'); expect(found).not.toBeNull(); return found as HTMLElement; });
 
         // Bob edits the post, and the thread still shows it as it was read.
         state.known[QUOTED] = { ...at(QUOTED, BOB, 'What Bob wrote, corrected.'), current: 1, versions: [first.versions[0], { opid: 'bafyv2', type: 'update', outcome: 'attributed' }] };
-        await user.click(within(card).getByRole('button', { name: 'Open' }));
+        await user.click(card.querySelector('.quoted') as HTMLElement);
 
         expect(await screen.findAllByText('What Bob wrote, corrected.')).not.toHaveLength(0);
     });
@@ -2304,11 +2566,12 @@ describe('a post embedded in another', () => {
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
 
-        const theirs = (await screen.findByText('What Bob wrote.')).closest('article')!;
-        await user.click(within(theirs).getByRole('button', { name: 'Copy embed' }));
+        await user.click((await screen.findByText('What Bob wrote.')).closest('article')!);
+        await choose(user, 'Copy embed');
 
         const copied = `![On  DIDs](${QUOTED}?versionId=bafyv1)`;
         expect(write).toHaveBeenCalledWith(copied);
+        await user.click(screen.getByRole('button', { name: 'Back' }));
 
         // Pasted into a post, the preview shows the card.
         await user.click(screen.getByLabelText('Post'));
@@ -2475,7 +2738,7 @@ describe('previewing what is written', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.type(await screen.findByLabelText('Reply'), 'A `coded` reply.');
         await user.click(screen.getByRole('tab', { name: 'Preview' }));
         expect(within(screen.getByRole('tabpanel', { name: 'Reply preview' })).getByText('coded').tagName).toBe('CODE');
@@ -2562,7 +2825,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
         expect((screen.getByLabelText('Subtitle') as HTMLInputElement).value).toBe('What they are for.');
@@ -2617,7 +2880,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
 
         expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
         // The body asked for is that of the version shown.
@@ -2631,12 +2894,12 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText('The full text is not on this node.')).toBeTruthy();
 
         vi.mocked(api.content).mockRejectedValue(new ApiError(502, 'the node does not have the body'));
         await user.click(screen.getByRole('button', { name: 'Back' }));
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect((await screen.findByRole('alert')).textContent).toMatch(/could not be read: the node does not have the body/);
         localStorage.clear();
     });
@@ -2647,7 +2910,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
         expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
@@ -2668,7 +2931,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
         await user.type(screen.getByLabelText('Article'), 'More.');
@@ -2688,7 +2951,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText(/Every post is one\./)).toBeTruthy();
         await user.click(screen.getByRole('button', { name: 'Edit' }));
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
@@ -2723,7 +2986,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await waitFor(() => expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toBe(BODY));
         await user.type(screen.getByLabelText('Article'), 'Not to be saved over what was not seen.');
@@ -2752,7 +3015,7 @@ describe('an article', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/full text is not on this node/);
@@ -2842,7 +3105,7 @@ describe('a paper', () => {
         expect(api.coauthors).not.toHaveBeenCalled();
         expect(within(listed).queryByText(/confirmed|listed by the publisher/)).toBeNull();
 
-        await user.click(within(listed).getByRole('button', { name: 'Open' }));
+        await user.click(listed);
         const authors = await waitFor(() => document.querySelector('.authors') as HTMLElement);
 
         expect(await within(authors).findByText('confirmed')).toBeTruthy();
@@ -2860,7 +3123,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText(/This paper lists you as a coauthor/)).toBeTruthy();
         await user.click(screen.getByRole('button', { name: 'Confirm this revision' }));
 
@@ -2872,13 +3135,13 @@ describe('a paper', () => {
         cleanup();
         state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed-other' }];
         render(<App api={api} />);
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText(/You confirmed an earlier revision/)).toBeTruthy();
 
         cleanup();
         state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }];
         render(<App api={api} />);
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByText('confirmed');
         expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
     });
@@ -2891,7 +3154,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
         expect(await screen.findByText('Your confirmation is waiting to be anchored.')).toBeTruthy();
 
@@ -2997,7 +3260,7 @@ describe('a paper', () => {
         await screen.findByText('Convergent Replay');
         expect(screen.queryByRole('link', { name: /PDF/ })).toBeNull();
 
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click((document.querySelector('article.post.opens') as HTMLElement));
         const pdf = await screen.findByRole('link', { name: 'PDF (912 kB)' });
         const source = screen.getByRole('link', { name: 'Source (84 kB)' });
 
@@ -3013,7 +3276,7 @@ describe('a paper', () => {
         const { api } = services({ me: granted, timeline: [odd] });
         render(<App api={api} />);
 
-        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await userEvent.setup().click(await toOpen());
         await screen.findByRole('button', { name: 'Back' });
         await waitFor(() => expect(api.thread).toHaveBeenCalled());
         expect(screen.queryByRole('link', { name: /PDF|Source/ })).toBeNull();
@@ -3026,7 +3289,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.type(await screen.findByLabelText('Reply'), 'Section 4 assumes too much.');
         // With no verdict it is a reply.
         expect(screen.getByRole('button', { name: 'Publish' })).toBeTruthy();
@@ -3074,7 +3337,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         const review = (await screen.findByText('The argument holds.')).closest('article')!;
 
         expect(within(review).getByText('accept')).toBeTruthy();
@@ -3090,7 +3353,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByLabelText('Reply');
         expect(screen.queryByLabelText('Verdict')).toBeNull();
     });
@@ -3103,7 +3366,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByText('listed by the publisher');
         expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
 
@@ -3111,7 +3374,7 @@ describe('a paper', () => {
         const narrowed = services({ me: { ...granted, actions: ['memeplex:post'] }, timeline: [paper()] });
         narrowed.state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
         render(<App api={narrowed.api} />);
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findAllByText('listed by the publisher');
         expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
     });
@@ -3124,7 +3387,7 @@ describe('a paper', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
 
         expect((await screen.findByRole('alert')).textContent).toContain('no grant to publish under');
@@ -3187,7 +3450,7 @@ describe('the earlier versions of a post', () => {
         render(<App api={services_.api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByLabelText('Version');
 
         return { ...services_, user };
@@ -3439,7 +3702,7 @@ describe('the earlier versions of a post', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         // A confirmation that waits, and a review half written.
         await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
         await screen.findByText('Your confirmation is waiting to be anchored.');
@@ -3468,7 +3731,7 @@ describe('the earlier versions of a post', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await user.type(screen.getByLabelText('Edit'), ' And more.');
 
@@ -3494,7 +3757,7 @@ describe('the earlier versions of a post', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         expect(await screen.findByText('confirmed')).toBeTruthy();
         const asked = vi.mocked(api.coauthors).mock.calls.length;
 
@@ -3519,7 +3782,7 @@ describe('the earlier versions of a post', () => {
         expect(within(plain).queryByText('edited')).toBeNull();
         expect(within(screen.getByText('As it is.').closest('article')!).getByText('edited')).toBeTruthy();
 
-        await user.click(within(plain).getByRole('button', { name: 'Open' }));
+        await user.click(plain);
         await screen.findByRole('button', { name: 'Back' });
         await waitFor(() => expect(api.thread).toHaveBeenCalled());
         expect(screen.queryByLabelText('Version')).toBeNull();
@@ -3537,7 +3800,7 @@ describe('editing', () => {
         await screen.findByRole('button', { name: 'Sign out' });
         await user.click(within(document.querySelector('header.top') as HTMLElement).getByRole('button', { name: /did:cid/ }));
         await user.click(await screen.findByRole('tab', { name: 'Replies' }));
-        await user.click(within((await screen.findByText('A reply.')).closest('article')!.querySelector(':scope > footer') as HTMLElement).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('A reply.')).closest('article')!);
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await user.clear(screen.getByLabelText('Edit'));
         await user.type(screen.getByLabelText('Edit'), 'A better reply.');
@@ -3574,7 +3837,7 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
 
         // The author is shown the post as their edit leaves it, marked as waiting.
         expect(await screen.findByText(/Your edit is waiting to be anchored/)).toBeTruthy();
@@ -3632,9 +3895,6 @@ describe('editing', () => {
 
         expect(within(article).getByText('Edit waiting to be anchored')).toBeTruthy();
         expect(screen.queryByText('As it was.')).toBeNull();
-        // An embed is of a version, and the one listed is the version before the edit.
-        expect(within(article).queryByRole('button', { name: 'Copy embed' })).toBeNull();
-        expect(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Copy embed' })).toBeTruthy();
         expect(screen.getByText('From Bob.')).toBeTruthy();
         expect(screen.queryByText('Not yet.')).toBeNull();
         expect(api.unanchored).not.toHaveBeenCalledWith('did:cid:2');
@@ -3649,12 +3909,12 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
         await screen.findByRole('button', { name: 'Back' });
         expect(api.unanchored).not.toHaveBeenCalledWith('did:cid:2');
 
         await user.click(screen.getByRole('button', { name: 'Back' }));
-        await user.click(within((await screen.findByText('A post.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('A post.')).closest('article')!);
         expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
         expect(api.unanchored).toHaveBeenCalledWith('did:cid:1');
         expect(screen.queryByText(/Your edit is waiting to be anchored/)).toBeNull();
@@ -3667,7 +3927,7 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
 
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
         await waitFor(() => expect(api.thread).toHaveBeenCalled());
@@ -3692,7 +3952,7 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
 
         expect(await screen.findByText('A reply.')).toBeTruthy();
         expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
@@ -3712,7 +3972,7 @@ describe('editing', () => {
         expect(screen.queryByText('Not mine.')).toBeNull();
         expect(screen.queryByText('Edit waiting to be anchored')).toBeNull();
 
-        await user.click(screen.getByRole('button', { name: 'Open' }));
+        await user.click((document.querySelector('article.post.opens') as HTMLElement));
         await screen.findByRole('button', { name: 'Back' });
         await waitFor(() => expect(api.thread).toHaveBeenCalled());
         expect(screen.getByText('A post.')).toBeTruthy();
@@ -3753,7 +4013,7 @@ describe('editing', () => {
         // Opened where the indexer and the node can say nothing more, it is what is anchored.
         vi.mocked(api.publication).mockResolvedValue(undefined);
         vi.mocked(api.unanchored).mockRejectedValue(new Error('no node'));
-        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        await user.click(article);
         await screen.findByRole('button', { name: 'Back' });
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
         expect(await screen.findByText('Two, as it was.')).toBeTruthy();
@@ -3767,7 +4027,7 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await user.click(await screen.findByRole('button', { name: 'Edit' }));
         await user.type(screen.getByLabelText('Edit'), ' More.');
         expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
@@ -3796,14 +4056,14 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(within((await screen.findByText('As I left it.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('As I left it.')).closest('article')!);
         await screen.findByRole('button', { name: 'Back' });
         await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:1'));
         expect(await screen.findByText('As I left it.')).toBeTruthy();
         expect(screen.getByText('Edit waiting to be anchored')).toBeTruthy();
 
         await user.click(screen.getByRole('button', { name: 'Back' }));
-        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
         const answer = (await screen.findByText('A better reply.')).closest('article')!;
 
         expect(within(answer).getByText('Edit waiting to be anchored')).toBeTruthy();
@@ -3816,7 +4076,7 @@ describe('editing', () => {
         render(<App api={api} />);
         const user = userEvent.setup();
 
-        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await toOpen());
         await screen.findByRole('button', { name: 'Edit' });
 
         vi.mocked(api.publication).mockResolvedValue({ ...mine, state: 'withdrawn' });
@@ -3830,7 +4090,7 @@ describe('editing', () => {
         const { api } = services({ me: granted, timeline: [under(post('did:cid:2', BOB, 'Bob\'s.'), 'did:cid:bobs')] });
         render(<App api={api} />);
 
-        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await userEvent.setup().click(await toOpen());
         await screen.findByRole('button', { name: 'Boost' });
 
         expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
@@ -3931,7 +4191,7 @@ describe('the address of what is shown', () => {
         await user.click(screen.getByRole('tab', { name: 'Replies' }));
         await waitFor(() => expect(window.location.pathname).toBe(`/a/${BOB}/replies`));
         await user.click(screen.getByRole('tab', { name: 'Posts' }));
-        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
         await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
 
         // Back to the reader's own timeline, which has no name.
@@ -3973,10 +4233,12 @@ describe('the address of what is shown', () => {
 
         // The time is the link, as it is elsewhere.
         expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('/p/did:cid:1');
-        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        fireEvent.click(article);
+        fireEvent.click(await screen.findByRole('button', { name: 'More' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/p/did:cid:1`]));
 
-        fireEvent.click(within(article).getByRole('button', { name: /Posts by this author|did:cid/ }));
+        fireEvent.click(within(document.querySelector('article.post') as HTMLElement).getByRole('button', { name: /Posts by this author|did:cid/ }));
         fireEvent.click(within(await waitFor(() => document.querySelector('.author') as HTMLElement)).getByRole('button', { name: 'Copy link' }));
         await waitFor(() => expect(copied[1]).toBe(`${window.location.origin}/a/${ALICE}`));
     });
@@ -4015,7 +4277,7 @@ describe('the address of what is shown', () => {
         go('p/did:cid:none');
         expect(await screen.findByText('From Alice.')).toBeTruthy();
         expect(screen.getByRole('alert').textContent).toMatch(/Nothing is published/);
-        await user.click(within(screen.getByText('From Bob.').closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click(screen.getByText('From Bob.').closest('article')!);
         await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
         expect(screen.queryByRole('alert')).toBeNull();
     });
@@ -4033,7 +4295,7 @@ describe('the address of what is shown', () => {
         vi.mocked(api.publication).mockImplementation(() => new Promise(resolve => { answer = resolve; }));
 
         // Open is pressed, and the reader goes to an author before the post is read.
-        await user.click(within(article).getByRole('button', { name: 'Open' }));
+        await user.click(article);
         go(`a/${BOB}`);
         await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, ['post'], false]));
         answer(original);
@@ -4066,7 +4328,10 @@ describe('the address of what is shown', () => {
         const article = (await screen.findByText('From Bob.')).closest('article')!;
 
         expect(within(article).getByRole('link', { name: /2026|Nov|21/ }).getAttribute('href')).toBe('/p/did:cid:2');
-        fireEvent.click(within(article).getByRole('button', { name: 'Copy link' }));
+        // The boost opens the post, whose link is the one to give on.
+        fireEvent.click(article);
+        fireEvent.click(await screen.findByRole('button', { name: 'More' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(copied).toStrictEqual([`${window.location.origin}/p/did:cid:2`]));
     });
 
@@ -4080,7 +4345,7 @@ describe('the address of what is shown', () => {
 
         // The reader opens another post while the link's is still being read.
         state.known['did:cid:1'] = post('did:cid:1', ALICE, 'From Alice.');
-        await user.click(within((await screen.findByText('From Alice.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Alice.')).closest('article')!);
         await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:1'));
         answer(post('did:cid:2', BOB, 'From Bob.'));
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -4117,8 +4382,8 @@ describe('a visitor, who has not signed in', () => {
         expect(screen.queryByLabelText('Reply')).toBeNull();
         expect(api.state).not.toHaveBeenCalled();
         expect(api.publish).not.toHaveBeenCalled();
-        // A link to copy is theirs to give on.
-        expect(screen.getAllByRole('button', { name: 'Copy link' }).length).toBeGreaterThan(0);
+        // A link to copy is theirs to give on, and nothing that changes the post.
+        expect(await offered(userEvent.setup())).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
     });
 
     it('reads an author a link names, and the author\'s replies, and goes from one thing to another', async () => {
@@ -4139,7 +4404,7 @@ describe('a visitor, who has not signed in', () => {
         await user.click(screen.getByRole('tab', { name: 'Replies' }));
         await waitFor(() => expect(lastRead(api)).toStrictEqual([[BOB], 0, REPLIES]));
         await user.click(screen.getByRole('tab', { name: 'Posts' }));
-        await user.click(within((await screen.findByText('From Bob.')).closest('article')!).getByRole('button', { name: 'Open' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
         await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
         expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     });
