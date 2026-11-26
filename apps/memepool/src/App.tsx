@@ -313,7 +313,17 @@ function Menu({ items }: { items: { label: string; act: () => Promise<string | v
     };
 
     return (
-        <span className="more" ref={within}>
+        <span
+            className="more"
+            ref={within}
+            onKeyDown={event => {
+                // From the button as from what is under it.
+                if (open && event.key === 'Escape') {
+                    setOpen(false);
+                    button.current?.focus();
+                }
+            }}
+        >
             {said && <span className="muted" role="status">{said} </span>}
             <button ref={button} className="quiet" aria-label="More" aria-haspopup="menu" aria-expanded={open} onClick={() => { setSaid(''); setOpen(!open); }}>⋯</button>
             {open && (
@@ -324,11 +334,7 @@ function Menu({ items }: { items: { label: string; act: () => Promise<string | v
                         const each = [...list.current!.querySelectorAll('button')];
                         const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
 
-                        if (event.key === 'Escape') {
-                            setOpen(false);
-                            button.current?.focus();
-                        }
-                        else if (step) {
+                        if (step) {
                             event.preventDefault();
                             each[(each.indexOf(document.activeElement as HTMLButtonElement) + step + each.length) % each.length].focus();
                         }
@@ -588,14 +594,15 @@ function Quoted({ publication }: { publication: Publication }) {
 
     const opens = Boolean(onOpen && !withdrawn && publication.did);
 
-    // A click on the card opens what it shows, and not what the card is in.
+    // A click on the card is the card's: it opens what the card shows where
+    // that can be opened, and never what the card is in.
     return (
         <div
             className={opens ? 'quoted opens' : 'quoted'}
             onClick={event => {
-                if (opens && onItself(event)) {
+                if (onItself(event)) {
                     event.stopPropagation();
-                    if (!opening) {
+                    if (opens && !opening) {
                         open();
                     }
                 }
@@ -603,7 +610,10 @@ function Quoted({ publication }: { publication: Publication }) {
         >
             <header>
                 <Identity did={object.author} />
-                <time>{when(publication)}</time>
+                {/* The time is the link to what is shown, which the keyboard and a new tab open it by. */}
+                {opens
+                    ? <a className="when" href={pathOf({ publication: publication.did! })} title="Link to this"><time>{when(publication)}</time></a>
+                    : <time>{when(publication)}</time>}
             </header>
             <Titled object={object} />
             <Body object={object} embeds={false} />
@@ -2811,7 +2821,14 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                         onPublished={published => setWaiting(current => [...current, published])}
                         onDismiss={dismiss}
                         onBack={() => { setOpen(null); loadTimeline(); }}
-                        onWithdrawn={() => { withdrawals.add(open.did!); setOpen(null); loadTimeline(); }}
+                        onWithdrawn={() => {
+                            // The reader may have gone elsewhere while it was withdrawn: only the post withdrawn is put away.
+                            withdrawals.add(open.did!);
+                            if (shown.current.open?.did === open.did) {
+                                setOpen(null);
+                            }
+                            shown.current.loadTimeline();
+                        }}
                         onRead={read}
                     />
                 ) : (

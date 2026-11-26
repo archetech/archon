@@ -1571,6 +1571,13 @@ describe('a post that is listed, and what an open one offers', () => {
         expect(document.activeElement).toBe(more);
         expect(api.withdraw).not.toHaveBeenCalled();
 
+        // From the button as well, where the keyboard has gone back to it.
+        await user.click(more);
+        await user.keyboard('{Shift>}{Tab}{/Shift}');
+        expect(document.activeElement).toBe(more);
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('menu')).toBeNull();
+
         // So does a click anywhere else, and a second one on the button.
         await user.click(more);
         await user.click(screen.getByRole('heading', { name: 'Memepool' }));
@@ -1614,6 +1621,49 @@ describe('a post that is listed, and what an open one offers', () => {
         await user.selectOptions(screen.getByLabelText('Version'), 'bafyone');
         await screen.findByText('As it was at first.');
         expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
+    });
+
+    it('leaves the reader where they went while a post was being withdrawn', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: listed() });
+        let done = () => {};
+        vi.mocked(api.withdraw).mockImplementation(() => new Promise<void>(resolve => { done = resolve; }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText(/^Mine, with/)).closest('article')!);
+        await choose(user, 'Withdraw');
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
+        await waitFor(() => expect(api.thread).toHaveBeenCalledWith('did:cid:2'));
+
+        done();
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+        expect(window.location.pathname).toBe('/p/did:cid:2');
+    });
+
+    it('gives a card a link to what it shows, and keeps a click on a card that cannot be opened from opening what it is in', async () => {
+        const QUOTE = 'did:cid:bagaaieraquotequotequotequotequotequotequotequotequotequote';
+        const quoted = { ...post(QUOTE, BOB, 'What Bob wrote.'), versions: [{ opid: 'bafyquote', type: 'create' as const, outcome: 'attributed' as const }] };
+        const { api, state } = services({ me: granted, timeline: [post('did:cid:1', ALICE, `See:\n\n![it](${QUOTE}?versionId=bafyquote)`)] });
+        state.known[QUOTE] = quoted;
+        state.revisions[`${QUOTE} bafyquote`] = quoted;
+        const view = render(<App api={api} />);
+
+        const card = (await screen.findByText('What Bob wrote.')).closest('.quoted') as HTMLElement;
+        expect(within(card).getByRole('link').getAttribute('href')).toBe(`/p/${QUOTE}`);
+        view.unmount();
+
+        // Withdrawn since: the card says so, has no link, and a click on it opens nothing.
+        state.revisions[`${QUOTE} bafyquote`] = { ...quoted, state: 'withdrawn' };
+        render(<App api={api} />);
+        const gone = (await screen.findByText('What Bob wrote.')).closest('.quoted') as HTMLElement;
+
+        expect(within(gone).queryByRole('link')).toBeNull();
+        fireEvent.click(screen.getByText('What Bob wrote.'));
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        expect(api.thread).not.toHaveBeenCalled();
     });
 
     it('opens a reply from the thread it is in, and what a reply answers from the card above it', async () => {
