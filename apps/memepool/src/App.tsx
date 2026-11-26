@@ -759,7 +759,10 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader 
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
             )}
             <Titled object={object} />
-            {object.kind === 'paper' && <Authors publication={publication} api={full} reader={waiting ? undefined : reader} />}
+            {/* Of one revision: another's standings, and what the reader did about it, are not this one's. */}
+            {object.kind === 'paper' && (
+                <Authors key={`${publication.did} ${shownVersion(publication)}`} publication={publication} api={full} reader={waiting ? undefined : reader} />
+            )}
             <Body object={object} full={full} />
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
@@ -789,6 +792,9 @@ function Authors({ publication, api, reader }: { publication: Publication; api?:
     const others = authors.filter(each => each !== object.author);
     const revision = shownVersion(publication);
     const [stands, setStands] = useState<Coauthor[] | null>(null);
+    // Read anew whenever what the paper is shown in is: a confirmation is
+    // anchored, or taken back, without the paper changing.
+    const reads = useContext(Reads);
     const [confirming, setConfirming] = useState(false);
     const [confirmed, setConfirmed] = useState(false);
     const [error, setError] = useState('');
@@ -804,7 +810,7 @@ function Authors({ publication, api, reader }: { publication: Publication; api?:
 
         return () => { stale = true; };
         // How each stands is of the revision shown.
-    }, [api, publication.did, revision, others.length]);
+    }, [api, publication.did, revision, others.length, reads]);
 
     const standing = (did: string) => stands?.find(each => each.did === did)?.status;
     const mine = reader && others.includes(reader.did) ? standing(reader.did) : undefined;
@@ -849,7 +855,7 @@ function Authors({ publication, api, reader }: { publication: Publication; api?:
                     <button className="quiet" disabled={confirming} onClick={confirm}>Confirm this revision</button>
                 </p>
             )}
-            {confirmed && <p className="muted">Your confirmation is waiting to be anchored.</p>}
+            {confirmed && mine !== 'confirmed' && <p className="muted">Your confirmation is waiting to be anchored.</p>}
             {error && <p role="alert" className="error">{error}</p>}
         </div>
     );
@@ -1731,11 +1737,15 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     // known until the node has said. A post is another's to edit, or nobody's,
     // until then.
     const [waits, setWaits] = useState<NonNullable<Publication['memeplex']> | null | undefined>(undefined);
+    // How many times the thread has been read, for what is read with it.
+    const [loads, setLoads] = useState(0);
     // The same for each reply of the reader's own that the thread shows.
     const [answers, setAnswers] = useState<Record<string, NonNullable<Publication['memeplex']>>>({});
 
     const load = useCallback(async () => {
         const asked = reads.current += 1;
+
+        setLoads(asked);
 
         try {
             // What the node has of what the reader wrote, which is ahead of the
@@ -1805,7 +1815,9 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             <button className="quiet" onClick={load}>Refresh</button>
             {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
-            <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} reader={me} />
+            <Reads.Provider value={loads}>
+                <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} reader={me} />
+            </Reads.Provider>
             {/* One edit at a time: the next is of the post as the last one left it. */}
             {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>

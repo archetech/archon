@@ -2783,9 +2783,39 @@ describe('a paper', () => {
         state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }];
         render(<App api={api} />);
         await user.click(await screen.findByRole('button', { name: 'Open' }));
-        await waitFor(() => expect(api.coauthors).toHaveBeenCalledTimes(3));
         await screen.findByText('confirmed');
         expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+    });
+
+    it('reads how coauthors stand anew when the paper is, and asks of another revision what it asked of the last', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [paper()] });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        state.known['did:cid:9'] = paper();
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
+        expect(await screen.findByText('Your confirmation is waiting to be anchored.')).toBeTruthy();
+
+        // The confirmation is anchored, with the paper as it was: it waits no more.
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(screen.queryByText('Your confirmation is waiting to be anchored.')).toBeNull());
+        expect(await screen.findByText('confirmed')).toBeTruthy();
+
+        // Its publisher revises it. What was confirmed was the revision before.
+        state.known['did:cid:9'] = paper({
+            current: 1,
+            versions: [...paper().versions, { opid: 'op-revised', type: 'update', outcome: 'attributed', position: { block: 2, time: '2026-11-22T12:00:00Z' } }],
+        });
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'confirmed-other' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText(/You confirmed an earlier revision/)).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Confirm this revision' }));
+        await waitFor(() => expect(state.published.slice(-1)[0]).toStrictEqual({ kind: 'tag', target: 'did:cid:9', targetVersion: 'op-revised', tag: 'coauthor' }));
     });
 
     it('asks no reader it does not list, nor one who is not signed in or whose grant allows no tag', async () => {
