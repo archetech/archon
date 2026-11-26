@@ -969,6 +969,10 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         if (data[0] === 0x1f && data[1] === 0x8b) {
             return 'application/gzip';
         }
+        // A PDF may be text throughout, and is no source for being so.
+        if (data.subarray(0, 5).toString('latin1') === '%PDF-') {
+            return undefined;
+        }
 
         try {
             new TextDecoder('utf-8', { fatal: true }).decode(data);

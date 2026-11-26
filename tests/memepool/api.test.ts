@@ -1203,6 +1203,8 @@ describe('a paper\'s files', () => {
             ['pdf', Buffer.from('<html>%PDF-'), /not a PDF/],
             ['source', Buffer.concat([Buffer.from('text'), Buffer.from([0])]), /LaTeX, or a gzip archive/],
             ['source', PDF, /LaTeX, or a gzip archive/],
+            // A PDF that is text throughout is still a PDF.
+            ['source', Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'), /LaTeX, or a gzip archive/],
             ['source', Buffer.from([0xff, 0xfe, 0xfd]), /LaTeX, or a gzip archive/],
             ['image', PDF, /say which with `kind`/],
             [undefined, PDF, /say which with `kind`/],
