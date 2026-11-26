@@ -712,6 +712,65 @@ describe('responding to a post', () => {
             expect(await screen.findByRole('button', { name: 'Boost' })).toBeTruthy();
         });
 
+        it('undoes no post of the reader\'s that quotes this one, which is their writing and no boost', async () => {
+            const quoting = made();
+
+            quoting.boosts = [mine('did:cid:q1', { text: 'What I think of this.' }), mine('did:cid:q2', { title: 'On this', content: { cid: 'bafy', type: 'text/markdown', bytes: 3 } })];
+            const { api } = await responded(quoting);
+
+            // Nothing of theirs here is a boost, so Boost is what is offered.
+            expect(await screen.findByRole('button', { name: 'Boost' })).toBeTruthy();
+            expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull();
+
+            cleanup();
+            quoting.boosts.push(mine('did:cid:b1'));
+            const again = await responded(quoting);
+
+            await again.user.click(await screen.findByRole('button', { name: 'Undo boost' }));
+            await waitFor(() => expect(again.api.withdraw).toHaveBeenCalledTimes(1));
+            expect(again.api.withdraw).toHaveBeenCalledWith('did:cid:b1');
+            expect(api.withdraw).not.toHaveBeenCalled();
+        });
+
+        it('keeps a like made after one was taken off waiting, until the indexer shows the one made', async () => {
+            const { api, state, user } = await responded();
+
+            await user.click(await screen.findByRole('button', { name: 'Unlike' }));
+            await user.click(await screen.findByRole('button', { name: 'Like' }));
+            expect(await screen.findByText('Your like is waiting to be anchored.')).toBeTruthy();
+
+            // The indexer still shows the one taken off, which is not the one made.
+            await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+            await waitFor(() => expect(api.responses).toHaveBeenCalledTimes(2));
+            expect(screen.getByText('Your like is waiting to be anchored.')).toBeTruthy();
+
+            state.responses = { ...made(), tags: [{ tag: '❤️', authors: [ALICE], applied: [{ did: 'did:cid:new1', author: ALICE, grant: 'did:cid:grant' }] }] };
+            await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+            await waitFor(() => expect(screen.queryByText('Your like is waiting to be anchored.')).toBeNull());
+        });
+
+        it('offers no undoing in the timeline of a boost undone under its post, nor under the post of one undone in the timeline', async () => {
+            localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+            const boost = mine('did:cid:b1');
+            const both = services({ me: granted, timeline: [root, boost] });
+            both.state.responses = made();
+            both.state.revisions['did:cid:1 op-did:cid:1'] = root;
+            both.state.known['did:cid:1'] = root;
+            render(<App api={both.api} />);
+            const user = userEvent.setup();
+
+            // Undone in the timeline, on the boost's own card.
+            await user.click(await screen.findByRole('button', { name: 'Undo boost' }));
+            await waitFor(() => expect(both.api.withdraw).toHaveBeenCalledWith('did:cid:b1'));
+            await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull());
+
+            // And not offered under the post, which the indexer still shows boosted.
+            await user.click(within((await screen.findByText('A post.', { selector: 'article.post:not(.boost) *' })).closest('article')!).getByRole('button', { name: 'Open' }));
+            await screen.findByText(/\d boosts? · /);
+            expect(screen.queryByRole('button', { name: 'Undo boost' })).toBeNull();
+            expect(both.api.withdraw).toHaveBeenCalledTimes(1);
+        });
+
         it('tries once more only what is left, where one of two could not be withdrawn', async () => {
             const twice = made();
 

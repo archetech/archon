@@ -1269,11 +1269,19 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         },
         'rating',
     );
-    const tag = (value: string, what: string) => send(
-        what,
-        read => read.tags.some(each => each.tag === value && each.authors.includes(me.did)),
-        () => api.publish({ kind: 'tag', ...about, tag: value }),
-    );
+    const tag = (value: string, what: string) => {
+        let did: string | undefined;
+
+        // It is shown once the indexer has this object, where it names the
+        // objects: one of the reader's that was there before, and is being
+        // taken off, is not this one.
+        return send(
+            what,
+            read => read.tags.some(each => each.tag === value
+                && (each.applied ? each.applied.some(made => made.did === did) : each.authors.includes(me.did))),
+            async () => { did = await api.publish({ kind: 'tag', ...about, tag: value }); },
+        );
+    };
     const boost = () => {
         let did: string | undefined;
 
@@ -1288,8 +1296,13 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
     //
     // One already withdrawn here is not among them, though the indexer shows
     // it until that is anchored.
+    //
+    // A boost has no words of its own. A post of the reader's that quotes
+    // this one is among what the indexer lists, and is not undone as a boost:
+    // it is their writing.
     const boosts = responses?.boosts
-        .filter(each => byMe(each) && each.did && grants.has(String(each.memeplex?.grant)) && !withdrawn.dids.has(each.did))
+        .filter(each => byMe(each) && each.did && each.memeplex && boosted(each.memeplex)
+            && grants.has(String(each.memeplex.grant)) && !withdrawn.dids.has(each.did))
         .map(each => each.did!) ?? [];
     const tagged = (value: string) => responses?.tags.find(each => each.tag === value)?.applied
         ?.filter(each => each.author === me.did && grants.has(each.grant) && !withdrawn.dids.has(each.did)).map(each => each.did) ?? [];
@@ -1319,7 +1332,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         },
         replaces,
     );
-    const boosted = (read: Responses) => read.boosts.map(each => each.did);
+    const boostsIn = (read: Responses) => read.boosts.map(each => each.did);
     const ratings = (read: Responses) => read.ratings.ratings.map(each => each.did);
     const applying = (value: string) => (read: Responses) => read.tags.find(each => each.tag === value)?.applied?.map(each => each.did) ?? [];
 
@@ -1345,7 +1358,7 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                             <button
                                 className="quiet"
                                 disabled={busy || waits('The undoing of your boost')}
-                                onClick={() => undo('The undoing of your boost', boosts, boosted)}
+                                onClick={() => undo('The undoing of your boost', boosts, boostsIn)}
                             >
                                 Undo boost
                             </button>
@@ -1941,8 +1954,10 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
     // reader's and is not this service's to withdraw.
     const grants = new Set([...(me.grant ? [me.grant] : []), ...me.others ?? []]);
 
+    // One the reader has withdrawn is theirs to change no more, though the
+    // indexer shows it until that is anchored.
     const changeable = (each: Publication) =>
-        each.memeplex?.author === me.did && each.state === 'published' && grants.has(String(each.memeplex.grant));
+        each.memeplex?.author === me.did && each.state === 'published' && grants.has(String(each.memeplex.grant)) && !taken.has(each.did ?? '');
 
     // What the reader has published that waits to be anchored, where the list
     // shown is one it belongs in: the reader's posts in the reader's timeline
@@ -2211,6 +2226,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                         ? async () => {
                                             try {
                                                 await api.withdraw(each.did!);
+                                                withdrawals.add(each.did!);
                                                 await loadTimeline();
                                             }
                                             catch (failure) {
