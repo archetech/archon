@@ -271,6 +271,19 @@ describe('views', () => {
         ]);
     });
 
+    it('gives the objects that apply the tags, which their authors withdraw', () => {
+        const applied = filled().applied(post);
+
+        const pairs = applied.map(each => `${each.memeplex!.tag} ${each.memeplex!.author}`);
+
+        expect([...new Set(pairs)].sort()).toStrictEqual([`archon ${bob.did}`, `archon ${carol.did}`, `❤️ ${carol.did}`].sort());
+        // An author who applied a tag twice has two objects to withdraw, though they count once.
+        expect(pairs.length).toBeGreaterThan(new Set(pairs).size);
+        expect(new Set(applied.map(each => each.did)).size).toBe(applied.length);
+        expect(applied.every(each => each.did?.startsWith('did:') && each.state === 'published')).toBe(true);
+        expect(filled().applied('did:cid:nothing-targets-this')).toStrictEqual([]);
+    });
+
     it('reads coauthor confirmations', () => {
         expect(filled().coauthors(paper)).toStrictEqual([{ did: bob.did, status: 'confirmed' }]);
         expect(filled().coauthors(post)).toStrictEqual([]);

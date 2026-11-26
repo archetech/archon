@@ -1273,6 +1273,35 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         });
     };
 
+    // What the reader has made of this that the indexer shows and this
+    // service can take back: made under a grant of theirs to it. A response
+    // made through another client is that client's to withdraw.
+    const boosts = responses?.boosts.filter(each => byMe(each) && each.did && grants.has(String(each.memeplex?.grant))).map(each => each.did!) ?? [];
+    const tagged = (value: string) => responses?.tags.find(each => each.tag === value)?.applied
+        ?.filter(each => each.author === me.did && grants.has(each.grant)).map(each => each.did) ?? [];
+    const myTags = responses?.tags.filter(each => each.tag !== LIKE && tagged(each.tag).length > 0).map(each => each.tag) ?? [];
+
+    // The reader's rating as the indexer shows it, which is one that can be withdrawn.
+    const ratedShown = responses?.ratings.ratings.find(each => byMe(each) && grants.has(String(each.memeplex?.grant)))?.did;
+    // Whether something of this name waits to be anchored: it is not asked for twice.
+    const waits = (what: string) => sent.some(each => each.what === what);
+
+    // Takes back responses of the reader's, which are objects they withdraw.
+    // It is done once the indexer shows none of them.
+    const undo = (what: string, dids: string[], gone: Sent['shown'], replaces?: string) => send(
+        what,
+        gone,
+        async () => {
+            for (const did of dids) {
+                await api.withdraw(did);
+            }
+            if (replaces === 'rating') {
+                setRated(undefined);
+            }
+        },
+        replaces,
+    );
+
     return (
         <div className="respond">
             {responses && (
@@ -1290,7 +1319,17 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
             {error && <p role="alert" className="error">{error}</p>}
             {me.grant && (
                 <>
-                    {may(me, 'memeplex:post') && <button className="quiet" disabled={busy} onClick={boost}>Boost</button>}
+                    {boosts.length > 0
+                        ? (
+                            <button
+                                className="quiet"
+                                disabled={busy || waits('The undoing of your boost')}
+                                onClick={() => undo('The undoing of your boost', boosts, read => !read.boosts.some(each => boosts.includes(each.did ?? '')))}
+                            >
+                                Undo boost
+                            </button>
+                        )
+                        : may(me, 'memeplex:post') && <button className="quiet" disabled={busy} onClick={boost}>Boost</button>}
                     {/* Not until the ratings have been read: a thumb has to know
                         whether the reader has a rating to change. A rating the
                         reader has can be changed whatever the scope is since:
@@ -1299,11 +1338,32 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                         <>
                             <button className="quiet" disabled={busy || !responses} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
                             <button className="quiet" disabled={busy || !responses} onClick={() => rate(0)} aria-label="Thumb down">👎</button>
+                            {ratedShown && (
+                                <button
+                                    className="quiet"
+                                    disabled={busy || waits('The removal of your rating')}
+                                    onClick={() => undo('The removal of your rating', [ratedShown], read => !read.ratings.ratings.some(each => each.did === ratedShown), 'rating')}
+                                >
+                                    Remove rating
+                                </button>
+                            )}
                         </>
                     )}
                     {may(me, 'memeplex:tag') && (
                         <>
-                            <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>
+                            {tagged(LIKE).length > 0
+                                ? (
+                                    <button
+                                        className="quiet"
+                                        disabled={busy || waits('The removal of your like')}
+                                        aria-label="Unlike"
+                                        aria-pressed="true"
+                                        onClick={() => undo('The removal of your like', tagged(LIKE), read => !read.tags.some(each => each.tag === LIKE && each.authors.includes(me.did)))}
+                                    >
+                                        {LIKE} ✓
+                                    </button>
+                                )
+                                : <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>}
                             <label className="inline">
                                 Tag
                                 <input value={word} disabled={busy} onChange={event => setWord(event.target.value)} placeholder="a word" />
@@ -1321,6 +1381,17 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
                             </button>
                         </>
                     )}
+                    {/* A tag the reader put on this is theirs to take off, whatever their grant allows since. */}
+                    {myTags.map(value => (
+                        <button
+                            key={value}
+                            className="quiet"
+                            disabled={busy || waits(`The removal of your tag ${value}`)}
+                            onClick={() => undo(`The removal of your tag ${value}`, tagged(value), read => !read.tags.some(each => each.tag === value && each.authors.includes(me.did)))}
+                        >
+                            Remove tag {value}
+                        </button>
+                    ))}
                 </>
             )}
             {sent.map((each, index) => <p key={index} className="muted">{each.what} is waiting to be anchored.</p>)}
