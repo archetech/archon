@@ -1300,6 +1300,29 @@ describe('a paper\'s files', () => {
         added.mockRestore();
     }, 120_000);
 
+    it('gives the last place it has to one of two files sent at once', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files, filesHeld: 2,
+        });
+        const { agent } = await granted(alice);
+        const first = (await send(agent, 'pdf', PDF)).body;
+        const both = await Promise.all([send(agent, 'source', TEX), send(agent, 'source', GZIP)]);
+
+        expect(both.map(each => each.status).sort()).toStrictEqual([200, 503]);
+        // The one answered for before them is still the user's to publish.
+        expect((await agent.post('/api/v1/objects').send(paper({ pdf: first }))).status).toBe(200);
+
+        // A file that could not be stored gives its place back.
+        clock += 61 * 60_000;
+        const failing = jest.spyOn(files, 'add').mockRejectedValueOnce(new Error('no node'));
+
+        expect((await send(agent, 'pdf', PDF)).status).toBe(502);
+        failing.mockRestore();
+        expect((await send(agent, 'pdf', PDF)).status).toBe(200);
+        expect((await send(agent, 'source', TEX)).status).toBe(200);
+    }, 120_000);
+
     it('stores none when it has nowhere to keep them', async () => {
         app = createMemepoolApp({
             client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,

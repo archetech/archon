@@ -198,14 +198,16 @@ class Expiring<V> {
 
     // Whether there is room for one more without putting out one that has not
     // ended. Asked by what may not lose an entry it has answered for.
-    room(): boolean {
-        if (this.held.size >= this.most) {
+    //
+    // `coming` is how many are on their way in and not yet set.
+    room(coming = 0): boolean {
+        if (this.held.size + coming >= this.most) {
             for (const [each, { ends }] of this.held) {
                 if (ends <= this.now()) this.held.delete(each);
             }
         }
 
-        return this.held.size < this.most;
+        return this.held.size + coming < this.most;
     }
 
     // Removes an entry, and says whether it was there and had not ended.
@@ -697,6 +699,8 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // The files stored for papers yet to be published, each by who stored it,
     // what it is to be and its CID.
     const filed = new Expiring<{ cid: string; type: string; bytes: number }>(FILE_KEPT, now, options.filesHeld);
+    // How many files are being stored, each of which will be one of them.
+    let filing = 0;
 
     // What is published for a request: its fields, with a `body` stored and
     // replaced by the reference to it.
@@ -1012,7 +1016,10 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             // A file the service has answered for is the user's to publish for
             // the hour. Where it could keep no more without forgetting one, it
             // stores no more, and nothing is pinned for a paper that could not carry it.
-            if (!filed.room()) {
+            //
+            // One being stored has its place from here, so that two sent at
+            // once do not both take the last.
+            if (!filed.room(filing)) {
                 refuse(503, 'the service is holding as many files as it can; try again later');
                 return;
             }
@@ -1021,10 +1028,16 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 return;
             }
 
-            const reference = { cid: await options.files.add(req.body), type, bytes: req.body.length };
+            filing += 1;
+            try {
+                const reference = { cid: await options.files.add(req.body), type, bytes: req.body.length };
 
-            filed.set(`${user} ${kind} ${reference.cid}`, reference);
-            res.json(reference);
+                filed.set(`${user} ${kind} ${reference.cid}`, reference);
+                res.json(reference);
+            }
+            finally {
+                filing -= 1;
+            }
         }
         catch {
             refuse(502, 'the node did not store the file');
