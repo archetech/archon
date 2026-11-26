@@ -25,7 +25,9 @@ publishes for the user under their grant. Everything they read comes from the
    body. A writer is asked for no summary: that is a paper's, its abstract. The body is sent to
    the service, which stores it; a timeline shows the title and subtitle, and the
    body is read when the article is opened, from the node, by the CID its entry
-   gives.
+   gives. A writer who brings an article or a paper here from somewhere else may
+   say when it was first published and where the original is. Both are shown as the
+   author's claim, under the title, apart from the time the version was anchored.
 
 A boost is shown as what it passes on: the post it is of, as that post is shown
 anywhere, under a line saying who boosted it and when. A boost is of one version of

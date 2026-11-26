@@ -1134,9 +1134,94 @@ function Heading({ title, subtitle = '', summary = '' }: { title: string; subtit
     );
 }
 
-// The title and subtitle of an object that has them.
+// Whether a text is an address the protocol takes for where a work first
+// appeared: an `https` one, with no space in it, of no more code points than
+// the protocol counts.
+const ORIGINAL_LENGTH = 2000;
+const isOriginal = (text: string) => {
+    if (!/^https:\/\/\S+$/.test(text) || [...text].length > ORIGINAL_LENGTH) {
+        return false;
+    }
+
+    // The protocol goes by the shape alone. The pages make a link, and ask for one, only of what a browser can open.
+    try {
+        return new URL(text).protocol === 'https:';
+    }
+    catch {
+        return false;
+    }
+};
+
+// A date as the protocol writes it, in words. It is a day and no instant, so
+// it is read in no time zone but its own, and in the calendar it is written in
+// whatever the reader's is: another calendar's year is another number.
+const dayOf = (date: string): string | undefined => {
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+
+    if (!parts) {
+        return undefined;
+    }
+
+    // The year is set as it is written: given to a Date at its making, one below 100 is read as one in the 1900s.
+    const [year, month, of] = parts.slice(1).map(Number);
+    const day = new Date(0);
+
+    day.setUTCFullYear(year, month - 1, of);
+
+    // A day that is none comes out as another, and is not shown as that one.
+    return day.getUTCFullYear() === year && day.getUTCMonth() === month - 1 && day.getUTCDate() === of
+        ? day.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC', calendar: 'gregory' })
+        : undefined;
+};
+
+// When and where a work first appeared, as its author says: a claim, shown
+// apart from the time the version was anchored. The address is a stranger's,
+// followed as a link in text is and only where it is an `https` one.
+function First({ object }: { object: NonNullable<Publication['memeplex']> }) {
+    const day = typeof object.firstPublished === 'string' ? dayOf(object.firstPublished) : undefined;
+    const original = typeof object.original === 'string' && isOriginal(object.original) ? object.original : undefined;
+
+    if (!day && !original) {
+        return null;
+    }
+
+    return (
+        <p className="first muted">
+            {day ? `First published ${day}` : 'First published elsewhere'}
+            {original && <>{' · '}<a href={original} target="_blank" rel="noreferrer noopener" aria-label="original publication">original</a></>}
+        </p>
+    );
+}
+
+// The places to say when and where a work first appeared, for one that is
+// brought here from somewhere else. Both may be left empty.
+function FirstFields({ date, original, disabled, onDate, onOriginal }: {
+    date: string; original: string; disabled: boolean; onDate: (date: string) => void; onOriginal: (original: string) => void;
+}) {
+    return (
+        <fieldset className="first-fields">
+            <legend>If it was first published elsewhere</legend>
+            <label>
+                First published
+                <input type="date" value={date} disabled={disabled} onChange={event => onDate(event.target.value)} />
+            </label>
+            <label>
+                Original
+                <input type="url" value={original} disabled={disabled} placeholder="https://" onChange={event => onOriginal(event.target.value)} />
+            </label>
+            {original.trim() && !isOriginal(original.trim()) && <p className="muted" role="status">The original is an https address, with no spaces.</p>}
+        </fieldset>
+    );
+}
+
+// The title and subtitle of an object that has them, and where it first appeared.
 function Titled({ object }: { object: NonNullable<Publication['memeplex']> }) {
-    return <Heading title={object.title ?? ''} subtitle={typeof object.subtitle === 'string' ? object.subtitle : ''} />;
+    return (
+        <>
+            <Heading title={object.title ?? ''} subtitle={typeof object.subtitle === 'string' ? object.subtitle : ''} />
+            <First object={object} />
+        </>
+    );
 }
 
 // A text the reader writes, which is Markdown, with a view of how it will be
@@ -1440,6 +1525,7 @@ const AUTHORS = 100;
 function ArticleComposer({ onPublish, onCancel, paper = false, store }: {
     onPublish: (article: {
         title: string; subtitle?: string; body: string; summary?: string; coauthors?: string[]; pdf?: FileRef; source?: FileRef;
+        firstPublished?: string; original?: string;
     }) => Promise<void>;
     onCancel: () => void;
     paper?: boolean;
@@ -1455,6 +1541,8 @@ function ArticleComposer({ onPublish, onCancel, paper = false, store }: {
     const [subtitle, setSubtitle] = useState('');
     const [summary, setSummary] = useState('');
     const [listed, setListed] = useState('');
+    const [first, setFirst] = useState('');
+    const [original, setOriginal] = useState('');
     const [body, setBody] = useState('');
     const others = coauthorsIn(listed);
     const [busy, setBusy] = useState(false);
@@ -1473,6 +1561,8 @@ function ArticleComposer({ onPublish, onCancel, paper = false, store }: {
                 ...(paper ? { summary: summary.trim(), coauthors: others.dids } : {}),
                 ...(paper && pdf ? { pdf: reference(pdf) } : {}),
                 ...(paper && source ? { source: reference(source) } : {}),
+                ...(first ? { firstPublished: first } : {}),
+                ...(original.trim() ? { original: original.trim() } : {}),
             });
         }
         catch (failure) {
@@ -1548,9 +1638,10 @@ function ArticleComposer({ onPublish, onCancel, paper = false, store }: {
                 before={<Heading title={title} subtitle={subtitle} summary={paper ? summary : ''} />}
                 onStoring={setStoring}
             />
+            <FirstFields date={first} original={original} disabled={busy} onDate={setFirst} onOriginal={setOriginal} />
             {error && <p role="alert" className="error">{error}</p>}
             <button
-                disabled={busy || storing || filing > 0 || !title.trim() || !body.trim()
+                disabled={busy || storing || filing > 0 || !title.trim() || !body.trim() || Boolean(original.trim() && !isOriginal(original.trim()))
                     || (paper && (!summary.trim() || others.others.length > 0 || others.dids.length >= AUTHORS))}
                 onClick={publish}
             >
@@ -1965,6 +2056,12 @@ function Edit({ api, publication, blocked = false, onDone }: {
     const [title, setTitle] = useState(object.title ?? '');
     const [subtitle, setSubtitle] = useState(typeof object.subtitle === 'string' ? object.subtitle : '');
     const [summary, setSummary] = useState(typeof object.summary === 'string' ? object.summary : '');
+    const was = {
+        first: typeof object.firstPublished === 'string' ? object.firstPublished : '',
+        original: typeof object.original === 'string' ? object.original : '',
+    };
+    const [first, setFirst] = useState(was.first);
+    const [original, setOriginal] = useState(was.original);
     // A summary is a paper's. An article that was given one keeps the place to change it.
     const summarized = object.kind === 'paper' || typeof object.summary === 'string';
     // The body as the service holds it, once it has been read.
@@ -2017,15 +2114,17 @@ function Edit({ api, publication, blocked = false, onDone }: {
 
             // A body that has not changed is the one the entry already refers
             // to. A changed one is sent, and the service stores it.
-            const { content, summary: _summary, subtitle: _subtitle, ...rest } = fields;
+            const { content, summary: _summary, subtitle: _subtitle, firstPublished: _first, original: _original, ...rest } = fields;
 
-            void _summary; void _subtitle;
+            void _summary; void _subtitle; void _first; void _original;
             await api.edit(publication.did!, {
                 ...rest,
                 title: title.trim(),
                 ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
                 // A paper has a summary, which may be empty. A post has one or none.
                 ...(summary.trim() || object.kind === 'paper' ? { summary: summary.trim() } : {}),
+                ...(first ? { firstPublished: first } : {}),
+                ...(original.trim() ? { original: original.trim() } : {}),
                 ...(body === held ? { content } : { body }),
             });
             onDone(true);
@@ -2039,7 +2138,8 @@ function Edit({ api, publication, blocked = false, onDone }: {
     if (article) {
         const unchanged = title.trim() === object.title && body === held
             && subtitle.trim() === (typeof object.subtitle === 'string' ? object.subtitle : '')
-            && summary.trim() === (typeof object.summary === 'string' ? object.summary : '');
+            && summary.trim() === (typeof object.summary === 'string' ? object.summary : '')
+            && first === was.first && original.trim() === was.original;
 
         return (
             <div className="composer">
@@ -2066,9 +2166,10 @@ function Edit({ api, publication, blocked = false, onDone }: {
                     before={<Heading title={title} subtitle={subtitle} summary={summary} />}
                     onStoring={setStoring}
                 />
+                <FirstFields date={first} original={original} disabled={busy} onDate={setFirst} onOriginal={setOriginal} />
                 {error && <p role="alert" className="error">{error}</p>}
                 {blocked && <p className="muted">An edit of this is waiting to be anchored, and another cannot be saved until it is.</p>}
-                <button disabled={blocked || busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged} onClick={save}>Save</button>{' '}
+                <button disabled={blocked || busy || storing || held === undefined || !title.trim() || !body.trim() || unchanged || Boolean(original.trim() && !isOriginal(original.trim()))} onClick={save}>Save</button>{' '}
                 <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
             </div>
         );

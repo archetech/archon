@@ -37,6 +37,8 @@
         "summary": false,
         "authors": false,
         "source": false,
+        "firstPublished": false,
+        "original": false,
         "pdf": false,
         "verdict": false,
         "rating": false,
