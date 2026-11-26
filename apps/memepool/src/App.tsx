@@ -1304,9 +1304,12 @@ function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<st
         .filter(each => byMe(each) && each.did && each.memeplex && boosted(each.memeplex)
             && grants.has(String(each.memeplex.grant)) && !withdrawn.dids.has(each.did))
         .map(each => each.did!) ?? [];
-    const tagged = (value: string) => responses?.tags.find(each => each.tag === value)?.applied
-        ?.filter(each => each.author === me.did && grants.has(each.grant) && !withdrawn.dids.has(each.did)).map(each => each.did) ?? [];
-    const myTags = responses?.tags.filter(each => each.tag !== LIKE && tagged(each.tag).length > 0).map(each => each.tag) ?? [];
+    const own = (each: Responses['tags'][number]) => each.applied
+        ?.filter(made => made.author === me.did && grants.has(made.grant) && !withdrawn.dids.has(made.did)).map(made => made.did) ?? [];
+    // Each tag the reader has put on this, with the objects that apply it, read once.
+    const mineByTag = new Map(responses?.tags.map(each => [each.tag, own(each)] as const).filter(([, dids]) => dids.length > 0));
+    const tagged = (value: string) => mineByTag.get(value) ?? [];
+    const myTags = [...mineByTag.keys()].filter(value => value !== LIKE);
 
     // The reader's rating as the indexer shows it, which is one that can be withdrawn.
     const ratedShown = responses?.ratings.ratings
