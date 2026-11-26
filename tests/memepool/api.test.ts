@@ -1174,7 +1174,7 @@ describe('a paper\'s files', () => {
         expect(pdf.body).toStrictEqual({ cid: expect.any(String), type: 'application/pdf', bytes: PDF.length });
         expect(source.body).toStrictEqual({ cid: expect.any(String), type: 'application/x-tex', bytes: TEX.length });
         // They are on the node, pinned, as they were sent.
-        expect(Buffer.compare(await gatekeeper.getData(pdf.body.cid), PDF)).toBe(0);
+        expect(Buffer.compare((await gatekeeper.getData(pdf.body.cid))!, PDF)).toBe(0);
 
         const made = await agent.post('/api/v1/objects').send(paper({ pdf: pdf.body, source: source.body }));
 
@@ -1275,6 +1275,30 @@ describe('a paper\'s files', () => {
         clock += 61 * 60_000;
         await refused({ pdf });
     }, 180_000);
+
+    it('stores no more than it can hold for their papers, and forgets none it has answered for', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files, filesHeld: 2,
+        });
+        const { agent } = await granted(alice);
+        const added = jest.spyOn(files, 'add');
+        const first = (await send(agent, 'pdf', PDF)).body;
+
+        expect((await send(agent, 'source', TEX)).status).toBe(200);
+        // A third would put out one of the two, so it is not stored at all.
+        const third = await send(agent, 'source', GZIP);
+
+        expect(third.status).toBe(503);
+        expect(added).toHaveBeenCalledTimes(2);
+        // The first is still the user's to publish.
+        expect((await agent.post('/api/v1/objects').send(paper({ pdf: first }))).status).toBe(200);
+
+        // Once those it holds are past their hour there is room.
+        clock += 61 * 60_000;
+        expect((await send(agent, 'source', GZIP)).status).toBe(200);
+        added.mockRestore();
+    }, 120_000);
 
     it('stores none when it has nowhere to keep them', async () => {
         app = createMemepoolApp({

@@ -84,6 +84,8 @@ export interface MemepoolOptions {
     // them. Without it the service stores no file, and publishes no paper
     // that has one.
     files?: FileStore;
+    // How many files the service holds for papers yet to be published.
+    filesHeld?: number;
     // Where an author's avatar is read from. Without it the service serves no
     // avatar, and the pages show every author without one.
     images?: ImageStore;
@@ -169,15 +171,15 @@ const MAX_VERIFYING = 8;
 class Expiring<V> {
     private readonly held = new Map<string, { value: V; ends: number }>();
 
-    constructor(private readonly lifetime: number, private readonly now: () => number) { }
+    constructor(private readonly lifetime: number, private readonly now: () => number, private readonly most = MAX_HELD) { }
 
     set(key: string, value: V): void {
-        if (this.held.size >= MAX_HELD) {
+        if (this.held.size >= this.most) {
             for (const [each, { ends }] of this.held) {
                 if (ends <= this.now()) this.held.delete(each);
             }
         }
-        if (this.held.size >= MAX_HELD) {
+        if (this.held.size >= this.most) {
             this.held.delete(this.held.keys().next().value as string);
         }
         this.held.set(key, { value, ends: this.now() + this.lifetime });
@@ -192,6 +194,18 @@ class Expiring<V> {
         }
 
         return entry?.value;
+    }
+
+    // Whether there is room for one more without putting out one that has not
+    // ended. Asked by what may not lose an entry it has answered for.
+    room(): boolean {
+        if (this.held.size >= this.most) {
+            for (const [each, { ends }] of this.held) {
+                if (ends <= this.now()) this.held.delete(each);
+            }
+        }
+
+        return this.held.size < this.most;
     }
 
     // Removes an entry, and says whether it was there and had not ended.
@@ -682,7 +696,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
     // The files stored for papers yet to be published, each by who stored it,
     // what it is to be and its CID.
-    const filed = new Expiring<{ cid: string; type: string; bytes: number }>(FILE_KEPT, now);
+    const filed = new Expiring<{ cid: string; type: string; bytes: number }>(FILE_KEPT, now, options.filesHeld);
 
     // What is published for a request: its fields, with a `body` stored and
     // replaced by the reference to it.
@@ -993,6 +1007,13 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         try {
             if (liveGrants(await client.grantsFrom(user), new Date(now())).length === 0) {
                 refuse(403, 'no grant to publish under');
+                return;
+            }
+            // A file the service has answered for is the user's to publish for
+            // the hour. Where it could keep no more without forgetting one, it
+            // stores no more, and nothing is pinned for a paper that could not carry it.
+            if (!filed.room()) {
+                refuse(503, 'the service is holding as many files as it can; try again later');
                 return;
             }
             if (!room(user)) {
