@@ -2805,6 +2805,12 @@ describe('a paper', () => {
         await waitFor(() => expect(screen.queryByText('Your confirmation is waiting to be anchored.')).toBeNull());
         expect(await screen.findByText('confirmed')).toBeTruthy();
 
+        // The reader takes it back, and is asked once more, with nothing said to be waiting.
+        state.coauthors['did:cid:9'] = [{ did: ALICE, status: 'listed' }];
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByRole('button', { name: 'Confirm this revision' })).toBeTruthy();
+        expect(screen.queryByText('Your confirmation is waiting to be anchored.')).toBeNull();
+
         // Its publisher revises it. What was confirmed was the revision before.
         state.known['did:cid:9'] = paper({
             current: 1,

@@ -814,6 +814,14 @@ function Authors({ publication, api, reader }: { publication: Publication; api?:
 
     const standing = (did: string) => stands?.find(each => each.did === did)?.status;
     const mine = reader && others.includes(reader.did) ? standing(reader.did) : undefined;
+
+    // Once the indexer shows the reader's confirmation it waits no more, and
+    // one they take back after that is theirs to make once more.
+    useEffect(() => {
+        if (mine === 'confirmed') {
+            setConfirmed(false);
+        }
+    }, [mine]);
     const confirm = async () => {
         setConfirming(true);
         setError('');
