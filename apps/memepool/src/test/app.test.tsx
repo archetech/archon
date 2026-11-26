@@ -299,6 +299,13 @@ describe('the grant', () => {
         expect(button.disabled).toBe(false);
         expect(screen.getByRole('status').textContent).toMatch(/^Not anchored yet, as of .+\. A chain can take from minutes to hours\.$/);
 
+        // A check the service did not answer says why, and nothing of what was found.
+        vi.mocked(api.me).mockRejectedValueOnce(new ApiError(502, 'the service did not answer'));
+        await user.click(button);
+        expect((await screen.findByRole('alert')).textContent).toContain('the service did not answer');
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(button.disabled).toBe(false);
+
         // A reader who has approved nothing the service can see is told that.
         vi.mocked(api.me).mockResolvedValue({ did: ALICE, link: 'archon://auth?grant=did:cid:request' });
         await user.click(button);

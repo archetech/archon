@@ -365,7 +365,9 @@ const copying = (text: string, unable: string) => async () => {
     }
 };
 
-function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<void> | void }) {
+// `onChecked` asks the service anew, and answers whether the service said how
+// the reader stands: it did not where the request failed, which is said elsewhere.
+function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<boolean> }) {
     const [checking, setChecking] = useState(false);
     // When the service was last asked and still had no grant to publish under.
     const [checked, setChecked] = useState<Date | null>(null);
@@ -375,11 +377,11 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<void>
     const check = async () => {
         setChecking(true);
         try {
-            await onChecked();
+            // What is said to have been found is what the service answered, and nothing where it did not.
+            setChecked(await onChecked() ? new Date() : null);
         }
         finally {
             setChecking(false);
-            setChecked(new Date());
         }
     };
     const waiting = Boolean(me.pending && me.pending.length > 0);
@@ -2481,7 +2483,7 @@ const HEADINGS: Record<Listing, string> = { posts: 'Posts', articles: 'Articles'
 const VISITOR: Me = { did: '' };
 
 function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
-    api: Api; me: Me; onCheck: () => Promise<void> | void; onSignedOut: () => void;
+    api: Api; me: Me; onCheck: () => Promise<boolean>; onSignedOut: () => void;
     // How a visitor signs in, from wherever they are.
     onSignedIn?: (did: string) => void; pollMs?: number;
 }) {
@@ -3127,6 +3129,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 setMe(read);
                 setError('');
             }
+
+            return true;
         }
         catch (failure) {
             // The service did not say the reader is signed out, so someone who
@@ -3135,6 +3139,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 setMe(known => known ?? null);
                 setError(message(failure));
             }
+
+            return false;
         }
     }, [api]);
 
