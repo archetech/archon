@@ -1264,6 +1264,11 @@ describe('a paper\'s files', () => {
         await refused({ source: { ...source, type: 'application/gzip' } });
         await refused({ source: { ...pdf } });
 
+        // What is no reference at all is refused as one, and breaks nothing.
+        for (const odd of [{ cid: { toString: null }, type: 'application/pdf', bytes: 1 }, { cid: 7, type: 'application/pdf', bytes: 1 }, null, 'bafy', []]) {
+            expect([odd, (await agent.post('/api/v1/objects').send(paper({ pdf: odd }))).status]).toStrictEqual([odd, 400]);
+        }
+
         // What another user had it store is not this one's to publish.
         const other = await granted(bob);
         const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;

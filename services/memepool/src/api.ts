@@ -718,7 +718,8 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         for (const reference of REFERENCES) {
             // A paper's PDF and source are stored apart from it, by the one
             // who publishes it, and are named by what the service gave for them.
-            const file = reference === 'content' ? undefined : filed.get(`${(req as Signed).user} ${reference} ${String((stated[reference] as { cid?: unknown } | undefined)?.cid)}`);
+            const cid = (stated[reference] as { cid?: unknown } | null | undefined)?.cid;
+            const file = reference === 'content' || typeof cid !== 'string' ? undefined : filed.get(`${(req as Signed).user} ${reference} ${cid}`);
 
             if (reference in stated && !sameReference(stated[reference], held?.[reference]) && !sameReference(stated[reference], file)) {
                 throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: send the text of an article as \`body\``);
