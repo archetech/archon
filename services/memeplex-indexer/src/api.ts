@@ -120,7 +120,19 @@ export function createIndexerRouter({ index, status, version }: ApiOptions): exp
     });
 
     router.get('/tags/:did', (req, res) => {
-        res.json([...index.tags(req.params.did)].map(([tag, authors]) => ({ tag, authors })));
+        // Each object that applies a tag, for whoever made one to withdraw,
+        // gathered by its tag in one pass.
+        const applied = new Map<string, { did?: string; author: string; grant: string }[]>();
+
+        for (const each of index.applied(req.params.did)) {
+            const tag: string = each.memeplex!.tag;
+            const made = applied.get(tag) ?? [];
+
+            made.push({ did: each.did, author: each.memeplex!.author, grant: each.memeplex!.grant });
+            applied.set(tag, made);
+        }
+
+        res.json([...index.tags(req.params.did)].map(([tag, authors]) => ({ tag, authors, applied: applied.get(tag) ?? [] })));
     });
 
     router.get('/coauthors/:did', (req, res) => {

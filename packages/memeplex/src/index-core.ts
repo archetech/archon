@@ -268,6 +268,14 @@ export class MemeplexIndex {
         return new Map([...applied].sort(([a], [b]) => (a < b ? -1 : 1)).map(([value, authors]) => [value, [...authors].sort()]));
     }
 
+    // The tags on an object, each the object that applies it: what one who
+    // applied a tag withdraws to take it away.
+    applied(target: string): Publication[] {
+        return this.under(this.byTarget, target)
+            .filter(each => each.state === 'published' && kindOf(each) === 'tag')
+            .sort(newestFirst);
+    }
+
     // How each coauthor a paper lists stands towards the revision it shows.
     coauthors(paper: string): Coauthor[] {
         const publication = this.publications.get(paper);

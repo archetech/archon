@@ -408,7 +408,12 @@ describe('the HTTP views', () => {
 
         expect((await request(app).get(`/api/v1/threads/${first}`)).body).toMatchObject([{ depth: 1, publication: { did: reply } }]);
         expect((await request(app).get(`/api/v1/ratings/${first}`)).body).toMatchObject({ mean: 0.75, ratings: [{ did: rating }] });
-        expect((await request(app).get(`/api/v1/tags/${first}`)).body).toStrictEqual([{ tag: 'archon', authors: [userDid] }]);
+        expect((await request(app).get(`/api/v1/tags/${first}`)).body).toStrictEqual([{
+            tag: 'archon',
+            authors: [userDid],
+            // The object that applies the tag, for its author to withdraw.
+            applied: [{ did: expect.stringMatching(/^did:/), author: userDid, grant: expect.stringMatching(/^did:/) }],
+        }]);
         expect((await request(app).get(`/api/v1/boosts/${first}`)).body).toStrictEqual([]);
         expect((await request(app).get(`/api/v1/coauthors/${first}`)).body).toStrictEqual([]);
         expect((await request(app).get('/api/v1/threads/did:cid:nothing')).body).toStrictEqual([]);

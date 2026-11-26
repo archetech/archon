@@ -21,7 +21,9 @@ export interface Reply {
 export interface Responses {
     boosts: Publication[];
     ratings: { ratings: Publication[]; mean?: number };
-    tags: { tag: string; authors: string[] }[];
+    // `applied` is each object that applies the tag, which its author
+    // withdraws to take the tag away.
+    tags: { tag: string; authors: string[]; applied?: { did: string; author: string; grant: string }[] }[];
 }
 
 // Who is signed in: with a grant to publish under, or with the link that asks

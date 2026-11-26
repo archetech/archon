@@ -126,6 +126,7 @@ index.thread(target);               // replies and their replies, as a flat list
 index.boosts(target);
 index.ratings(target);              // the ratings that count, and their mean
 index.tags(target);                 // each value with the authors who applied it
+index.applied(target);              // the tag objects themselves, which their authors withdraw
 index.coauthors(paper);
 ```
 
