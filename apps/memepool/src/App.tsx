@@ -2295,9 +2295,14 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                     const failed = answer.state === 'none' || answer.state === 'unsupported';
                     const registry = answer.registry ?? each.registry;
 
+                    // Whatever else the entry holds is kept: what it says, and a review's verdict.
+                    const { failed: _failed, ...held } = each;
+
+                    void _failed;
+
                     return Boolean(each.failed) === failed && each.registry === registry
                         ? [each]
-                        : [{ did: each.did, text: each.text, title: each.title, subtitle: each.subtitle, target: each.target, registry, ...(failed ? { failed } : {}) }];
+                        : [{ ...held, registry, ...(failed ? { failed } : {}) }];
                 });
 
                 return next.length === now.length && next.every((each, index) => each === now[index]) ? now : next;

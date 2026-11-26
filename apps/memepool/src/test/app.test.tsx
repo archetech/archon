@@ -2848,6 +2848,14 @@ describe('a paper', () => {
         expect(within(waiting).getByText('Review')).toBeTruthy();
         expect((screen.getByLabelText('Verdict') as HTMLInputElement).value).toBe('');
 
+        // Once the service says which chain it waits on, it is still the review it was.
+        state.states['did:cid:new1'] = { state: 'pending', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        const named = (await screen.findByText(/Waiting to be anchored on BTC:mainnet/)).closest('article')!;
+
+        expect(within(named).getByText('minor revisions')).toBeTruthy();
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)[0]).toMatchObject({ did: 'did:cid:new1', verdict: 'minor revisions', registry: 'BTC:mainnet' });
+
         await user.type(screen.getByLabelText('Reply'), 'A question, and no review.');
         await user.click(screen.getByRole('button', { name: 'Publish' }));
         await waitFor(() => expect(state.published[1]).toStrictEqual({
