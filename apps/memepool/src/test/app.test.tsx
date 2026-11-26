@@ -2824,6 +2824,82 @@ describe('a paper', () => {
         await waitFor(() => expect(state.published.slice(-1)[0]).toStrictEqual({ kind: 'tag', target: 'did:cid:9', targetVersion: 'op-revised', tag: 'coauthor' }));
     });
 
+    // A reply that gives a verdict is a review.
+    it('is reviewed by a reply that gives a verdict, of the revision shown, and answered by one that gives none', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api, state } = services({ me: granted, timeline: [paper()] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'Section 4 assumes too much.');
+        // With no verdict it is a reply.
+        expect(screen.getByRole('button', { name: 'Publish' })).toBeTruthy();
+        await user.type(screen.getByLabelText('Verdict'), '  minor revisions ');
+        await user.click(screen.getByRole('button', { name: 'Publish review' }));
+
+        await waitFor(() => expect(state.published).toStrictEqual([{
+            kind: 'reply', target: 'did:cid:9', targetVersion: 'op-did:cid:9', text: 'Section 4 assumes too much.', verdict: 'minor revisions',
+        }]));
+        // It waits as a reply does, shown as the review it is, and the form is cleared for the next.
+        const waiting = (await screen.findByText('Section 4 assumes too much.')).closest('article')!;
+
+        expect(within(waiting).getByText('minor revisions')).toBeTruthy();
+        expect(within(waiting).getByText('Review')).toBeTruthy();
+        expect((screen.getByLabelText('Verdict') as HTMLInputElement).value).toBe('');
+
+        // Once the service says which chain it waits on, it is still the review it was.
+        state.states['did:cid:new1'] = { state: 'pending', registry: 'BTC:mainnet' };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        const named = (await screen.findByText(/Waiting to be anchored on BTC:mainnet/)).closest('article')!;
+
+        expect(within(named).getByText('minor revisions')).toBeTruthy();
+        expect(JSON.parse(localStorage.getItem(`memepool.waiting.${ALICE}`)!)[0]).toMatchObject({ did: 'did:cid:new1', verdict: 'minor revisions', registry: 'BTC:mainnet' });
+
+        await user.type(screen.getByLabelText('Reply'), 'A question, and no review.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await waitFor(() => expect(state.published[1]).toStrictEqual({
+            kind: 'reply', target: 'did:cid:9', targetVersion: 'op-did:cid:9', text: 'A question, and no review.',
+        }));
+    });
+
+    it('shows a review as one in its thread, and a reply as a reply', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [paper()] });
+        const answer = (did: string, text: string, more: Record<string, unknown> = {}) => ({
+            depth: 1,
+            publication: { ...post(did, CAROL, text), memeplex: { kind: 'reply', author: CAROL, text, target: 'did:cid:9', targetVersion: 'op-did:cid:9', ...more } },
+        });
+        vi.mocked(api.thread).mockResolvedValue([
+            answer('did:cid:r1', 'The argument holds.', { verdict: 'accept' }),
+            answer('did:cid:r2', 'Thanks for this.'),
+            // A verdict is a stranger's words, and is shown as words.
+            answer('did:cid:r3', 'See below.', { verdict: '<b>reject</b>' }),
+        ]);
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        const review = (await screen.findByText('The argument holds.')).closest('article')!;
+
+        expect(within(review).getByText('accept')).toBeTruthy();
+        expect(within(review).getByText('Review')).toBeTruthy();
+        expect(within(screen.getByText('Thanks for this.').closest('article')!).queryByText('Review')).toBeNull();
+        expect(screen.getByText('<b>reject</b>')).toBeTruthy();
+        expect(document.querySelector('.verdict b')).toBeNull();
+    });
+
+    it('asks for no verdict where what is answered is no paper', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'A post.')] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Reply');
+        expect(screen.queryByLabelText('Verdict')).toBeNull();
+    });
+
     it('asks no reader it does not list, nor one who is not signed in or whose grant allows no tag', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const unlisted = paper({ memeplex: { ...paper().memeplex!, authors: [BOB, CAROL] } });
