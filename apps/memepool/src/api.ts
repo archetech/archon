@@ -95,6 +95,11 @@ export interface Api {
     // Has the service store an image and make an asset of it, and gives the
     // asset's DID and the version to embed it at.
     upload(image: Blob): Promise<{ did: string; versionId: string }>;
+    // Has the service store a paper's PDF or its source, and gives the
+    // reference a paper of the reader's then carries.
+    file(kind: 'pdf' | 'source', file: Blob): Promise<FileRef>;
+    // The address a file is downloaded from the node at, under a name.
+    download(file: FileRef, name: string): string;
     // What an identity says of itself: the name it gives itself, which is a
     // claim, and the address its domain confirms is its own.
     identity(did: string): Promise<Person>;
@@ -106,6 +111,13 @@ export interface Api {
 export interface Coauthor {
     did: string;
     status: 'confirmed' | 'confirmed-other' | 'listed';
+}
+
+// A file a paper refers to: where it is on IPFS, what it is and how large.
+export interface FileRef {
+    cid: string;
+    type: string;
+    bytes: number;
 }
 
 export interface Person {
@@ -175,6 +187,20 @@ export function createApi(bases: { memepool: string; memeplex: string; node?: st
 
             return json(response);
         },
+        async file(kind, file) {
+            const response = await fetcher(`${bases.memepool}/api/v1/files?kind=${kind}`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: file,
+            });
+
+            return json(response);
+        },
+        // The node gives what is on IPFS as a download, under the name asked
+        // for. It is asked for as bytes of no stated kind, so that a browser
+        // saves it and shows nothing of a stranger's file.
+        download: (file, name) => `${bases.node ?? ''}/api/v1/ipfs/stream/${encodeURIComponent(file.cid)}?filename=${encodeURIComponent(name)}&type=application%2Foctet-stream`,
         async state(did) {
             const response = await call(bases.memepool, `/objects/${encodeURIComponent(did)}/state`).catch(() => undefined);
 

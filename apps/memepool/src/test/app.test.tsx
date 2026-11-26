@@ -68,6 +68,8 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         publication: vi.fn(async (did: string) => state.known[did]),
         state: vi.fn(async (did: string) => state.states[did]),
         upload: vi.fn(async () => ({ did: 'did:cid:bagaaieraimage', versionId: 'bafyimage' })),
+        file: vi.fn(async (kind: 'pdf' | 'source', file: Blob) => ({ cid: `bafy${kind}`, type: kind === 'pdf' ? 'application/pdf' : 'application/x-tex', bytes: file.size })),
+        download: (file: { cid: string }, name: string) => `/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(name)}`,
         revision: vi.fn(async (did: string, version: string) => state.revisions[`${did} ${version}`] ?? (state.known[did] ? 'no-revision' as const : undefined)),
         content: vi.fn(async (cid: string) => state.bodies[cid]),
         // The node has every object, at the version shown unless a test says it has a later one.
@@ -2824,6 +2826,105 @@ describe('a paper', () => {
         await waitFor(() => expect(state.published.slice(-1)[0]).toStrictEqual({ kind: 'tag', target: 'did:cid:9', targetVersion: 'op-revised', tag: 'coauthor' }));
     });
 
+    it('is published with the PDF and the source chosen for it, which the service stores when they are chosen', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const pdf = new File([new Uint8Array(2048)], 'replay.pdf', { type: 'application/pdf' });
+        const tex = new File(['\\documentclass{article}'], 'replay.tex', { type: '' });
+
+        await user.click(await screen.findByRole('button', { name: 'Write a paper' }));
+        await user.type(screen.getByLabelText('Title'), 'Convergent Replay');
+        await user.type(screen.getByLabelText('Abstract'), 'We show that nodes agree.');
+        await user.type(screen.getByLabelText('Paper'), 'The full text.');
+        await user.upload(screen.getByLabelText('PDF'), pdf);
+        await user.upload(screen.getByLabelText('Source'), tex);
+
+        // Each is stored as it is chosen, and named with its size.
+        expect(await screen.findByText(/PDF: replay\.pdf \(2 kB\)/)).toBeTruthy();
+        expect(await screen.findByText(/Source: replay\.tex/)).toBeTruthy();
+        expect(vi.mocked(api.file).mock.calls.map(call => call[0])).toStrictEqual(['pdf', 'source']);
+
+        // One chosen by mistake is taken off, and another chosen.
+        await user.click(within(screen.getByText(/Source: replay\.tex/).closest('p')!).getByRole('button', { name: 'Remove' }));
+        expect(screen.getByLabelText('Source')).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Publish paper' }));
+        await waitFor(() => expect(state.published).toStrictEqual([{
+            kind: 'paper', title: 'Convergent Replay', body: 'The full text.', summary: 'We show that nodes agree.', authors: [ALICE],
+            pdf: { cid: 'bafypdf', type: 'application/pdf', bytes: 2048 },
+        }]));
+    });
+
+    it('stores no file that is too large, says why one was refused, and waits for one that is being stored', async () => {
+        const { api } = services({ me: granted });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Write a paper' }));
+        await user.type(screen.getByLabelText('Title'), 'T');
+        await user.type(screen.getByLabelText('Abstract'), 'A');
+        await user.type(screen.getByLabelText('Paper'), 'B');
+
+        const large = new File([''], 'large.pdf', { type: 'application/pdf' });
+        Object.defineProperty(large, 'size', { value: 10_000_001 });
+        await user.upload(screen.getByLabelText('PDF'), large);
+        expect((await screen.findByRole('alert')).textContent).toBe('PDF may be 10 MB at most.');
+        expect(api.file).not.toHaveBeenCalled();
+
+        vi.mocked(api.file).mockRejectedValueOnce(new ApiError(400, 'not a PDF'));
+        await user.upload(screen.getByLabelText('PDF'), new File(['x'], 'notes.pdf'));
+        expect((await screen.findByRole('alert')).textContent).toBe('PDF was not stored: not a PDF');
+
+        // While one is being stored the paper is not published without it.
+        let stored!: (file: { cid: string; type: string; bytes: number }) => void;
+        vi.mocked(api.file).mockImplementationOnce(() => new Promise(resolve => { stored = resolve; }));
+        await user.upload(screen.getByLabelText('PDF'), new File(['x'], 'slow.pdf'));
+        expect(await screen.findByText('Storing PDF…')).toBeTruthy();
+        expect((screen.getByRole('button', { name: 'Publish paper' }) as HTMLButtonElement).disabled).toBe(true);
+        stored({ cid: 'bafyslow', type: 'application/pdf', bytes: 1 });
+        await waitFor(() => expect((screen.getByRole('button', { name: 'Publish paper' }) as HTMLButtonElement).disabled).toBe(false));
+    });
+
+    it('offers its PDF and its source as downloads once it is open, under its name, and shows neither', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const filed = paper({
+            memeplex: {
+                ...paper().memeplex!,
+                pdf: { cid: 'bafypdf', type: 'application/pdf', bytes: 912_340 },
+                source: { cid: 'bafysource', type: 'application/gzip', bytes: 84_112 },
+            },
+        });
+        const { api } = services({ me: granted, timeline: [filed] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // In a list a paper is its title and abstract.
+        await screen.findByText('Convergent Replay');
+        expect(screen.queryByRole('link', { name: /PDF/ })).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Open' }));
+        const pdf = await screen.findByRole('link', { name: 'PDF (912 kB)' });
+        const source = screen.getByRole('link', { name: 'Source (84 kB)' });
+
+        expect(pdf.getAttribute('href')).toBe('/api/v1/ipfs/stream/bafypdf?filename=convergent-replay.pdf');
+        expect(pdf.getAttribute('download')).toBe('convergent-replay.pdf');
+        expect(source.getAttribute('download')).toBe('convergent-replay.tar.gz');
+        expect(document.querySelector('iframe, embed, object')).toBeNull();
+    });
+
+    it('offers no download of what a paper says of a file that is none', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const odd = paper({ memeplex: { ...paper().memeplex!, pdf: { cid: '../../version', type: 'application/pdf', bytes: 1 }, source: 'bafysource' } });
+        const { api } = services({ me: granted, timeline: [odd] });
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.queryByRole('link', { name: /PDF|Source/ })).toBeNull();
+    });
+
     // A reply that gives a verdict is a review.
     it('is reviewed by a reply that gives a verdict, of the revision shown, and answered by one that gives none', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
@@ -3724,6 +3825,23 @@ describe('the services\' client', () => {
 
             expect([memeplex, await odd.unanchored('did:cid:1')]).toStrictEqual([memeplex, undefined]);
         }
+    });
+
+    it('sends a paper\'s file as bytes of no stated kind, and asks the node for one as a download', async () => {
+        const asked: { url: string; init?: RequestInit }[] = [];
+        const fetcher = (async (url: string, init?: RequestInit) => {
+            asked.push({ url, init });
+
+            return new Response(JSON.stringify({ cid: 'bafypdf', type: 'application/pdf', bytes: 3 }), { status: 200 });
+        }) as unknown as typeof fetch;
+        const api = createApi({ memepool: '/memepool', memeplex: '/memeplex', node: 'https://node.example' }, fetcher);
+
+        expect(await api.file('pdf', new Blob(['abc']))).toStrictEqual({ cid: 'bafypdf', type: 'application/pdf', bytes: 3 });
+        expect(asked[0].url).toBe('/memepool/api/v1/files?kind=pdf');
+        expect(asked[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' } });
+        // Asked for as bytes, under a name, so that a browser saves it.
+        expect(api.download({ cid: 'bafypdf', type: 'application/pdf', bytes: 3 }, 'a paper.pdf'))
+            .toBe('https://node.example/api/v1/ipfs/stream/bafypdf?filename=a%20paper.pdf&type=application%2Foctet-stream');
     });
 
     it('reads a body from the node by its CID, as text, and none when the node has none', async () => {

@@ -122,5 +122,5 @@ export function normalizePath(path: string): string {
     return label;
 }
 
-const MEMEPOOL_ROUTES = /^\/memepool\/(?:p\/:did|a\/:did(?:\/replies)?|api\/v1\/(?:ready|version|config|challenge|callback|login|logout|me|objects(?:\/:did(?:\/state)?)?|images|(?:avatars|identities|images)\/:did))$/;
+const MEMEPOOL_ROUTES = /^\/memepool\/(?:p\/:did|a\/:did(?:\/replies)?|api\/v1\/(?:ready|version|config|challenge|callback|login|logout|me|objects(?:\/:did(?:\/state)?)?|images|files|(?:avatars|identities|images)\/:did))$/;
 const MEMEPLEX_ROUTES = /^\/memeplex\/api\/v1\/(?:ready|version|status|timeline|(?:publications|threads|boosts|ratings|tags|coauthors)\/:did)$/;
