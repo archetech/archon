@@ -2152,8 +2152,8 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                         </p>
                     )}
                     <Post
-                        publication={!looking && answers[each.publication.did ?? ''] ? { ...each.publication, memeplex: answers[each.publication.did ?? ''] } : each.publication}
-                        waiting={!looking && Boolean(answers[each.publication.did ?? ''])}
+                        publication={answers[each.publication.did ?? ''] ? { ...each.publication, memeplex: answers[each.publication.did ?? ''] } : each.publication}
+                        waiting={Boolean(answers[each.publication.did ?? ''])}
                     />
                 </div>
             ))}

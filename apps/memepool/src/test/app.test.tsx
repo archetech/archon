@@ -3224,6 +3224,22 @@ describe('the earlier versions of a post', () => {
         expect(state.published).toHaveLength(1);
     });
 
+    it('show the reader\'s own answer to one as an edit of theirs that waits leaves it', async () => {
+        const { state, user } = await opened();
+
+        // The reader has edited their answer to the first version, and the edit waits.
+        state.unanchored['did:cid:r1'] = { versionId: 'op-edit', memeplex: { kind: 'reply', author: ALICE, text: 'To the first, reworded.', target: 'did:cid:1', targetVersion: 'v1' } };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await screen.findByText('To the first, reworded.');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        const mine = (await screen.findByText('To the first, reworded.')).closest('article')!;
+
+        expect(within(mine).getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('To the first.')).toBeNull();
+    });
+
     it('say nothing of how a paper\'s coauthors stand on an earlier revision, which is known of its latest', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const authored = (text: string, current: number): Publication => ({
