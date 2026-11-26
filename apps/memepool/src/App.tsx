@@ -1126,17 +1126,28 @@ function Heading({ title, subtitle = '', summary = '' }: { title: string; subtit
 }
 
 // Whether a text is an address the protocol takes for where a work first
-// appeared: an `https` one, with no space in it.
+// appeared: an `https` one, with no space in it, of no more code points than
+// the protocol counts.
 const ORIGINAL_LENGTH = 2000;
-const isOriginal = (text: string) => /^https:\/\/\S+$/.test(text) && text.length <= ORIGINAL_LENGTH;
+const isOriginal = (text: string) => /^https:\/\/\S+$/.test(text) && [...text].length <= ORIGINAL_LENGTH;
 
 // A date as the protocol writes it, in words. It is a day and no instant, so
 // it is read in no time zone but its own.
 const dayOf = (date: string): string | undefined => {
     const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-    const day = parts && new Date(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])));
 
-    return day && !Number.isNaN(day.getTime())
+    if (!parts) {
+        return undefined;
+    }
+
+    // The year is set as it is written: given to a Date at its making, one below 100 is read as one in the 1900s.
+    const [year, month, of] = parts.slice(1).map(Number);
+    const day = new Date(0);
+
+    day.setUTCFullYear(year, month - 1, of);
+
+    // A day that is none comes out as another, and is not shown as that one.
+    return day.getUTCFullYear() === year && day.getUTCMonth() === month - 1 && day.getUTCDate() === of
         ? day.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
         : undefined;
 };
@@ -1174,7 +1185,7 @@ function FirstFields({ date, original, disabled, onDate, onOriginal }: {
             </label>
             <label>
                 Original
-                <input type="url" value={original} disabled={disabled} maxLength={ORIGINAL_LENGTH} placeholder="https://" onChange={event => onOriginal(event.target.value)} />
+                <input type="url" value={original} disabled={disabled} placeholder="https://" onChange={event => onOriginal(event.target.value)} />
             </label>
             {original.trim() && !isOriginal(original.trim()) && <p className="muted" role="status">The original is an https address, with no spaces.</p>}
         </fieldset>

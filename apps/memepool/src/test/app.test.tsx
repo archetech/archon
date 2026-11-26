@@ -2939,6 +2939,10 @@ describe('an article', () => {
             first('did:cid:3', { title: 'A place', original: 'https://example.org/elsewhere' }),
             first('did:cid:4', { title: 'A script', firstPublished: '2019-02-30x', original: ['javascript', 'alert(1)'].join(':') }),
             first('did:cid:5', { title: 'Neither' }),
+            first('did:cid:6', { title: 'Long ago', firstPublished: '0099-03-12' }),
+            first('did:cid:7', { title: 'No such day', firstPublished: '2019-02-30' }),
+            first('did:cid:8', { title: 'Long', original: `https://example.org/${'🙂'.repeat(1900)}` }),
+            first('did:cid:9', { title: 'Too long', original: `https://example.org/${'a'.repeat(1981)}` }),
         ] });
         render(<App api={api} />);
 
@@ -2958,6 +2962,13 @@ describe('an article', () => {
         // What is no date and no https address is not shown, and nothing is said of a work that says nothing.
         expect(await of('A script')).toBeNull();
         expect(await of('Neither')).toBeNull();
+        // A year is the one written, and a day that is none is not shown as another.
+        expect((await of('Long ago'))!.textContent).toMatch(/\b0*99\b/);
+        expect((await of('Long ago'))!.textContent).not.toMatch(/1999/);
+        expect(await of('No such day')).toBeNull();
+        // An address is as long as the protocol counts it, in code points.
+        expect((await of('Long'))!.querySelector('a')).not.toBeNull();
+        expect(await of('Too long')).toBeNull();
         expect(document.querySelector('a[href^="javascript"]')).toBeNull();
     });
 
