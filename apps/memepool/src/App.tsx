@@ -1571,6 +1571,9 @@ function Respond({ api, me, grants, target, version, past = false }: {
     past?: boolean;
 }) {
     const [all, setResponses] = useState<Responses | null>(null);
+    // What is counted and shown, which may be one version's. What the reader
+    // has made of the object is looked for among all of it: a rating of an
+    // earlier version is still their rating, to change or take back.
     const responses = all && version ? responsesAt(all, version) : all;
     const [sent, setSent] = useState<Sent[]>([]);
     // The rating the reader made here, before the indexer shows it.
@@ -1612,7 +1615,7 @@ function Respond({ api, me, grants, target, version, past = false }: {
     // grant of the reader's to this service. A rating made through another
     // client is left alone, and a new one made, which counts as the later.
     const withdrawn = useContext(Withdrawn);
-    const mine = rated ?? responses?.ratings.ratings.find(
+    const mine = rated ?? all?.ratings.ratings.find(
         each => each.memeplex?.author === me.did && grants.has(String(each.memeplex.grant)) && !withdrawn.dids.has(each.did ?? ''),
     )?.did;
 
@@ -1684,19 +1687,19 @@ function Respond({ api, me, grants, target, version, past = false }: {
     // A boost has no words of its own. A post of the reader's that quotes
     // this one is among what the indexer lists, and is not undone as a boost:
     // it is their writing.
-    const boosts = responses?.boosts
+    const boosts = all?.boosts
         .filter(each => byMe(each) && each.did && each.memeplex && boosted(each.memeplex)
             && grants.has(String(each.memeplex.grant)) && !withdrawn.dids.has(each.did))
         .map(each => each.did!) ?? [];
     const own = (each: Responses['tags'][number]) => each.applied
         ?.filter(made => made.author === me.did && grants.has(made.grant) && !withdrawn.dids.has(made.did)).map(made => made.did) ?? [];
     // Each tag the reader has put on this, with the objects that apply it, read once.
-    const mineByTag = new Map(responses?.tags.map(each => [each.tag, own(each)] as const).filter(([, dids]) => dids.length > 0));
+    const mineByTag = new Map(all?.tags.map(each => [each.tag, own(each)] as const).filter(([, dids]) => dids.length > 0));
     const tagged = (value: string) => mineByTag.get(value) ?? [];
     const myTags = [...mineByTag.keys()].filter(value => value !== LIKE);
 
     // The reader's rating as the indexer shows it, which is one that can be withdrawn.
-    const ratedShown = responses?.ratings.ratings
+    const ratedShown = all?.ratings.ratings
         .find(each => byMe(each) && grants.has(String(each.memeplex?.grant)) && !withdrawn.dids.has(each.did ?? ''))?.did;
     // Whether something of this name waits to be anchored: it is not asked for twice.
     const waits = (what: string) => sent.some(each => each.what === what);

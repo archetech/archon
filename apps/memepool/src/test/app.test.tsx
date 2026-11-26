@@ -3184,7 +3184,9 @@ describe('the earlier versions of a post', () => {
             expect([text, seen(text)]).toStrictEqual([text, []]);
         }
         expect(screen.getByText(/final 1/)).toBeTruthy();
-        expect(screen.queryByText(/draft/)).toBeNull();
+        // A tag of an earlier version is not counted, and is still the reader's to take off.
+        expect(screen.queryByText(/draft 1/)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Remove tag draft' })).toBeTruthy();
         // It is still the latest: the reader may answer it and make of it what they will.
         expect(labelled('Reply')).toHaveLength(1);
         expect(screen.getByRole('button', { name: 'Boost' })).toBeTruthy();
@@ -3192,6 +3194,31 @@ describe('the earlier versions of a post', () => {
         await user.click(only);
         expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
         expect(seen('To the first.')).toHaveLength(1);
+    });
+
+    it('leave what the reader made of an earlier one theirs to change, though only the latest\'s are counted', async () => {
+        const { api, state, user } = await opened();
+        const mine = (did: string, version: string, more: Record<string, unknown>) => under(made(did, version, more), 'did:cid:grant');
+
+        // The reader rated, boosted and tagged the first version.
+        state.responses = {
+            boosts: [mine('did:cid:b1', 'v1', {})],
+            ratings: { ratings: [mine('did:cid:g1', 'v1', { kind: 'rating', rating: 1, min: 0, max: 1 })], mean: 1 },
+            tags: [{ tag: 'draft', authors: [ALICE], applied: [{ did: 'did:cid:t1', author: ALICE, grant: 'did:cid:grant', version: 'v1' }] }],
+        };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await screen.findByRole('button', { name: 'Undo boost' });
+
+        await user.click(screen.getByLabelText('Only responses to this version'));
+        // None of it is of the latest, so none is counted.
+        expect(await screen.findByText(/0 boosts · no ratings/)).toBeTruthy();
+        // It is still theirs: a thumb changes their rating and makes no second, and the rest is theirs to take back.
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+        await waitFor(() => expect(api.edit).toHaveBeenCalledWith('did:cid:g1', expect.objectContaining({ kind: 'rating', rating: 0 })));
+        expect(state.published).toHaveLength(0);
+        expect(screen.getByRole('button', { name: 'Undo boost' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Remove tag draft' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
     });
 
     it('are opened with what was made of them alone, and shown with all that was made of the post where the reader asks', async () => {
