@@ -389,6 +389,28 @@ describe('the HTTP views', () => {
         expect(replies.body).toMatchObject({ total: 1, publications: [{ did: reply }] });
     }, 60_000);
 
+    // An article is a post with a title, and a timeline tells the two apart by it.
+    it('gives an author\'s articles apart from their other posts', async () => {
+        const index = new MemeplexIndex();
+        const note = await post('A note.');
+        const article = await post('An article\'s text.', { title: 'A title' });
+        const blank = await post('A title of spaces is none.', { title: '   ' });
+
+        await anchor(200);
+        await syncing(index).rebuild();
+
+        const app = createIndexerApp({ index, status: () => ({ ready: true, ...index.size }), version });
+        const listed = async (query: Record<string, unknown>) =>
+            (await request(app).get('/api/v1/timeline').query({ author: userDid, ...query })).body.publications.map((each: { did: string }) => each.did).sort();
+
+        expect(await listed({ kind: 'post', titled: true })).toStrictEqual([article]);
+        expect(await listed({ kind: 'post', titled: false })).toStrictEqual([blank, note].sort());
+        expect(await listed({ kind: 'post' })).toStrictEqual([article, blank, note].sort());
+        // It is of posts alone: nothing else is left out for having a title or none.
+        expect(await listed({ titled: true })).toStrictEqual([article]);
+        expect((await request(app).get('/api/v1/timeline').query({ author: userDid, kind: 'post', titled: true })).body.total).toBe(1);
+    }, 60_000);
+
     it.each([
         ['no author', {}],
         ['a limit of zero', { author: 'did:cid:a', limit: 0 }],
@@ -397,6 +419,7 @@ describe('the HTTP views', () => {
         ['a negative offset', { author: 'did:cid:a', offset: -1 }],
         ['a kind a timeline does not hold', { author: 'did:cid:a', kind: ['post', 'rating'] }],
         ['a kind that is empty', { author: 'did:cid:a', kind: '' }],
+        ['a titled that is neither true nor false', { author: 'did:cid:a', titled: 'yes' }],
     ])('refuses a timeline with %s', async (_name, query) => {
         const { app } = await serving();
 

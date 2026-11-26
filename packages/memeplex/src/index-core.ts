@@ -197,12 +197,18 @@ export class MemeplexIndex {
     // What the authors have published and not withdrawn, newest first: posts,
     // papers and replies, or those of them that `kinds` names. A reply is part
     // of a conversation, and a reader may want an author's posts without them.
-    timeline(authors: string[], kinds: readonly string[] = TIMELINE_KINDS): Publication[] {
+    //
+    // `titled` is of the posts among them: with it, those that have a title,
+    // which are articles, or those that have none. An article is a post, and
+    // is told from one by its title alone.
+    timeline(authors: string[], kinds: readonly string[] = TIMELINE_KINDS, titled?: boolean): Publication[] {
         const wanted = TIMELINE_KINDS.filter(kind => kinds.includes(kind));
+        const article = (each: Publication) => typeof each.memeplex?.title === 'string' && each.memeplex.title.trim() !== '';
 
         return [...new Set(authors)]
             .flatMap(author => this.under(this.byAuthor, author))
-            .filter(each => each.state === 'published' && wanted.includes(kindOf(each) as typeof wanted[number]))
+            .filter(each => each.state === 'published' && wanted.includes(kindOf(each) as typeof wanted[number])
+                && (titled === undefined || kindOf(each) !== 'post' || article(each) === titled))
             .sort(newestFirst);
     }
 

@@ -96,13 +96,16 @@ export function createIndexerRouter({ index, status, version }: ApiOptions): exp
         // With `kind`, the kinds of object wanted, of those a timeline holds.
         const kinds = req.query.kind === undefined ? TIMELINE_KINDS : strings(req.query.kind);
 
-        if (!authors || authors.length === 0 || authors.length > MAX_AUTHORS || !limit || offset === undefined
+        // With `titled`, the posts that have a title, which are articles, or those that have none.
+        const titled = req.query.titled === undefined ? undefined : req.query.titled === 'true' ? true : req.query.titled === 'false' ? false : null;
+
+        if (!authors || authors.length === 0 || authors.length > MAX_AUTHORS || !limit || offset === undefined || titled === null
             || !kinds || kinds.length === 0 || kinds.some(kind => !(TIMELINE_KINDS as readonly string[]).includes(kind))) {
-            res.status(400).json({ error: `expected 1 to ${MAX_AUTHORS} author parameters, limit 1 to ${MAX_LIMIT}, offset, and any kind parameters among ${TIMELINE_KINDS.join(', ')}` });
+            res.status(400).json({ error: `expected 1 to ${MAX_AUTHORS} author parameters, limit 1 to ${MAX_LIMIT}, offset, any kind parameters among ${TIMELINE_KINDS.join(', ')}, and titled as true or false` });
             return;
         }
 
-        const timeline = index.timeline(authors, kinds);
+        const timeline = index.timeline(authors, kinds, titled);
 
         res.json({ total: timeline.length, publications: timeline.slice(offset, offset + limit) });
     });
