@@ -185,6 +185,7 @@ export async function startMemepool(
         registries: () => gatekeeper.listRegistries(),
         // The node's IPFS pins what is added to it.
         content: { add: text => gatekeeper.addText(text) },
+        files: { add: data => gatekeeper.addData(data) },
         // The node reads no more than the limit it is asked for, and refuses
         // what is larger. The CID is one a stranger wrote, so it is asked for
         // only where it has the shape of one.

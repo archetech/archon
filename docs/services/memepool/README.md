@@ -50,6 +50,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `GET /objects/:did/state` | Where an object the user published through this service stands: `{ state, registry? }`, with `pending` while it waits to be anchored and `none` when it never will be |
 | `GET /identities/:did` | What an identity says of itself: `{ did, name?, address? }`, with the address only when its domain confirms it |
 | `POST /images` | Stores an image the user means to embed, sent as `application/octet-stream`, and makes an image asset of it; returns its `did`, `versionId`, `type`, `bytes`, `width` and `height` |
+| `POST /files?kind=pdf\|source` | Stores a paper's PDF or its source, sent as `application/octet-stream`, 10 MB at most, and returns the reference `{ cid, type, bytes }` that a paper of the user's may carry within the hour. What it is comes from its bytes: a PDF, a gzip archive, or LaTeX as text. Counted with the user's images in the hour |
 | `GET /images/:did?versionId=` | An image asset at a version, as the image it is, for text that embeds it; 404 for anything else |
 | `GET /avatars/:did` | An identity's avatar, as the image it is, or 404 when it has none the service serves |
 

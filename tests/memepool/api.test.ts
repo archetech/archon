@@ -9,7 +9,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { parseGrantLink, readGrantRequest } from '@didcid/memeplex';
 import { MemeplexClient } from '@didcid/memeplex/client';
-import { AVATAR_LIMIT, BODY_LIMIT, IMAGE_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
+import { AVATAR_LIMIT, BODY_LIMIT, FILE_LIMIT, IMAGE_LIMIT, createMemepoolApp } from '../../services/memepool/src/api.ts';
 
 // The Memepool service: a Memeplex client whose key the service holds. Users
 // sign in with a wallet, grant the service, and publish through it. The
@@ -102,6 +102,8 @@ let stored = 0;
 const content = {
     add: (text: string) => { stored += 1; return gatekeeper.addText(text); },
 };
+// Where the service keeps a paper's files: its node's IPFS, as the service wires it.
+const files = { add: (data: Buffer) => gatekeeper.addData(data) };
 let limits: number[] = [];
 const images = {
     get: async (cid: string, limit: number) => {
@@ -151,7 +153,7 @@ beforeEach(async () => {
     client = new MemeplexClient({ keymaster: service, gatekeeper, identity: 'memepool' });
     app = createMemepoolApp({
         client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
-        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content, images, addresses,
+        sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, content, images, addresses, files,
     });
 });
 
@@ -1149,6 +1151,195 @@ describe('storing an image', () => {
         const { agent } = await granted(alice);
 
         expect((await send(agent, await picture().png().toBuffer())).status).toBe(501);
+    }, 120_000);
+});
+
+// A paper's PDF and its source are stored by the service, for the paper that will refer to them.
+describe('a paper\'s files', () => {
+    // As a PDF is: its opening, and bytes after it that are no text.
+    const PDF = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(200, 0xff)]);
+    const TEX = Buffer.from('\\documentclass{article}\n\\begin{document}Ünïcode.\\end{document}\n');
+    const GZIP = Buffer.concat([Buffer.from([0x1f, 0x8b, 0x08, 0x00]), Buffer.alloc(40, 3)]);
+    const BODY = '# A paper\n\nIts text.\n';
+    const send = (by: { post: (path: string) => request.Test }, kind: string | undefined, bytes: Buffer, type = 'application/octet-stream') =>
+        by.post('/api/v1/files').query(kind === undefined ? {} : { kind }).set('Content-Type', type).send(bytes);
+    const paper = (more: Record<string, unknown>) => ({ kind: 'paper', title: 'A paper', summary: 'About it.', authors: [aliceDid], body: BODY, ...more });
+
+    it('stores a PDF and a source for a user who has granted it, and publishes a paper that refers to them', async () => {
+        const { agent } = await granted(alice);
+        const pdf = await send(agent, 'pdf', PDF);
+        const source = await send(agent, 'source', TEX);
+
+        expect(pdf.status).toBe(200);
+        expect(pdf.body).toStrictEqual({ cid: expect.any(String), type: 'application/pdf', bytes: PDF.length });
+        expect(source.body).toStrictEqual({ cid: expect.any(String), type: 'application/x-tex', bytes: TEX.length });
+        // They are on the node, pinned, as they were sent.
+        expect(Buffer.compare((await gatekeeper.getData(pdf.body.cid))!, PDF)).toBe(0);
+
+        const made = await agent.post('/api/v1/objects').send(paper({ pdf: pdf.body, source: source.body }));
+
+        expect(made.status).toBe(200);
+        const published = (await gatekeeper.resolveDID(made.body.did)).didDocumentData as { memeplex: Record<string, unknown> };
+
+        expect(published.memeplex).toMatchObject({ kind: 'paper', pdf: pdf.body, source: source.body });
+
+        // An edit keeps the files the paper has, and may leave one off.
+        await anchor();
+        expect((await agent.put(`/api/v1/objects/${made.body.did}`).send({ kind: 'paper', title: 'A paper, revised', summary: 'About it.', authors: [aliceDid], content: published.memeplex.content, pdf: pdf.body })).status).toBe(200);
+    }, 120_000);
+
+    it('names a source that is an archive as one, by its bytes', async () => {
+        const { agent } = await granted(alice);
+
+        expect((await send(agent, 'source', GZIP)).body).toMatchObject({ type: 'application/gzip', bytes: GZIP.length });
+    }, 120_000);
+
+    it('stores nothing that is not what it is said to be', async () => {
+        const { agent } = await granted(alice);
+        const added = jest.spyOn(files, 'add');
+
+        for (const [kind, bytes, error] of [
+            ['pdf', TEX, /not a PDF/],
+            ['pdf', Buffer.from('<html>%PDF-'), /not a PDF/],
+            ['source', Buffer.concat([Buffer.from('text'), Buffer.from([0])]), /LaTeX, or a gzip archive/],
+            ['source', PDF, /LaTeX, or a gzip archive/],
+            // A PDF that is text throughout is still a PDF.
+            ['source', Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'), /LaTeX, or a gzip archive/],
+            ['source', Buffer.from([0xff, 0xfe, 0xfd]), /LaTeX, or a gzip archive/],
+            ['image', PDF, /say which with `kind`/],
+            [undefined, PDF, /say which with `kind`/],
+            ['pdf', Buffer.alloc(0), /expected the bytes/],
+        ] as const) {
+            const refused = await send(agent, kind, bytes);
+
+            expect([kind, refused.status]).toStrictEqual([kind, 400]);
+            expect(refused.body.error).toMatch(error);
+        }
+        // Bytes sent as another type do not arrive as bytes.
+        expect((await send(agent, 'pdf', PDF, 'application/pdf')).status).toBe(400);
+        // More than a file may be.
+        expect((await send(agent, 'pdf', Buffer.concat([PDF, Buffer.alloc(FILE_LIMIT)]))).status).toBe(413);
+        expect(added).not.toHaveBeenCalled();
+        added.mockRestore();
+    }, 120_000);
+
+    it('is for a user who has granted it, and counts a file with their images in the hour', async () => {
+        expect((await send(request(app), 'pdf', PDF)).status).toBe(401);
+        expect((await send(await signIn(bob), 'pdf', PDF)).status).toBe(403);
+
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files, imagesPerHour: 2,
+        });
+        const { agent } = await granted(alice);
+        const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 128, b: 0 } } }).png().toBuffer();
+
+        expect((await agent.post('/api/v1/images').set('Content-Type', 'application/octet-stream').send(image)).status).toBe(200);
+        expect((await send(agent, 'pdf', PDF)).status).toBe(200);
+        const third = await send(agent, 'source', TEX);
+
+        expect(third.status).toBe(429);
+        expect(third.body.error).toMatch(/within the hour/);
+    }, 120_000);
+
+    it('publishes no paper that refers to a file it did not store for its publisher, or stored as another thing', async () => {
+        // A session that outlasts the hour a file is kept for.
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files,
+        });
+        const { agent } = await granted(alice);
+        const pdf = (await send(agent, 'pdf', PDF)).body;
+        const source = (await send(agent, 'source', TEX)).body;
+        const elsewhere = { cid: await gatekeeper.addData(PDF.subarray(0, 100)), type: 'application/pdf', bytes: 100 };
+        const refused = async (more: Record<string, unknown>) => {
+            const answer = await agent.post('/api/v1/objects').send(paper(more));
+
+            expect([more, answer.status]).toStrictEqual([more, 400]);
+            expect(answer.body.error).toMatch(/has not stored what/);
+            // What to do about it is said of a file, and not of an article's text.
+            expect(answer.body.error).toMatch(/send the file to \/files/);
+        };
+
+        // Bytes on the node that the service did not store.
+        await refused({ pdf: elsewhere });
+        // What it stored, said to be of another size or kind, or in the other's place.
+        await refused({ pdf: { ...pdf, bytes: pdf.bytes + 1 } });
+        await refused({ source: { ...source, type: 'application/gzip' } });
+        await refused({ source: { ...pdf } });
+
+        // What is no reference at all is refused as one, and breaks nothing.
+        for (const odd of [{ cid: { toString: null }, type: 'application/pdf', bytes: 1 }, { cid: 7, type: 'application/pdf', bytes: 1 }, null, 'bafy', []]) {
+            expect([odd, (await agent.post('/api/v1/objects').send(paper({ pdf: odd }))).status]).toStrictEqual([odd, 400]);
+        }
+
+        // What another user had it store is not this one's to publish.
+        const other = await granted(bob);
+        const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;
+        const theirs = await other.agent.post('/api/v1/objects').send({ kind: 'paper', title: 'Bob\'s', summary: 'His.', authors: [bobDid], body: BODY, pdf });
+
+        expect(theirs.status).toBe(400);
+
+        // Nor is it the publisher's once the hour it is kept for has gone.
+        clock += 61 * 60_000;
+        await refused({ pdf });
+    }, 180_000);
+
+    it('stores no more than it can hold for their papers, and forgets none it has answered for', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files, filesHeld: 2,
+        });
+        const { agent } = await granted(alice);
+        const added = jest.spyOn(files, 'add');
+        const first = (await send(agent, 'pdf', PDF)).body;
+
+        expect((await send(agent, 'source', TEX)).status).toBe(200);
+        // A third would put out one of the two, so it is not stored at all.
+        const third = await send(agent, 'source', GZIP);
+
+        expect(third.status).toBe(503);
+        expect(added).toHaveBeenCalledTimes(2);
+        // The first is still the user's to publish.
+        expect((await agent.post('/api/v1/objects').send(paper({ pdf: first }))).status).toBe(200);
+
+        // Once those it holds are past their hour there is room.
+        clock += 61 * 60_000;
+        expect((await send(agent, 'source', GZIP)).status).toBe(200);
+        added.mockRestore();
+    }, 120_000);
+
+    it('gives the last place it has to one of two files sent at once', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY],
+            sessionLifetime: 60 * 60_000 * 3, challengeLifetime: 60_000, now: () => clock, content, images, files, filesHeld: 2,
+        });
+        const { agent } = await granted(alice);
+        const first = (await send(agent, 'pdf', PDF)).body;
+        const both = await Promise.all([send(agent, 'source', TEX), send(agent, 'source', GZIP)]);
+
+        expect(both.map(each => each.status).sort()).toStrictEqual([200, 503]);
+        // The one answered for before them is still the user's to publish.
+        expect((await agent.post('/api/v1/objects').send(paper({ pdf: first }))).status).toBe(200);
+
+        // A file that could not be stored gives its place back.
+        clock += 61 * 60_000;
+        const failing = jest.spyOn(files, 'add').mockRejectedValueOnce(new Error('no node'));
+
+        expect((await send(agent, 'pdf', PDF)).status).toBe(502);
+        failing.mockRestore();
+        expect((await send(agent, 'pdf', PDF)).status).toBe(200);
+        expect((await send(agent, 'source', TEX)).status).toBe(200);
+    }, 120_000);
+
+    it('stores none when it has nowhere to keep them', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, registries: [REGISTRY], now: () => clock,
+            sessionLifetime: 60_000, challengeLifetime: 60_000, content,
+        });
+        const { agent } = await granted(alice);
+
+        expect((await send(agent, 'pdf', PDF)).status).toBe(501);
     }, 120_000);
 });
 

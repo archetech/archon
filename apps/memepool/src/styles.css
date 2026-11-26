@@ -70,6 +70,9 @@ h3 { font-size: 1rem; margin: 0 0 0.25rem; }
 .verdict { margin: 0.25rem 0; font-weight: 600; }
 .verdict .badge { border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.8rem; font-weight: 400; margin-right: 0.4rem; }
 
+.downloads { font-size: 0.9rem; margin: 0.5rem 0; }
+.file { margin: 0.5rem 0; }
+
 .authors ul { list-style: none; margin: 0.25rem 0 0.5rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9rem; }
 .authors li { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
 

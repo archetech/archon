@@ -37,6 +37,11 @@ export interface ContentStore {
     add(text: string): Promise<string>;
 }
 
+// Where the service stores a file, which gives the CID it is stored under.
+export interface FileStore {
+    add(data: Buffer): Promise<string>;
+}
+
 // Where the service reads an image from: its node's IPFS. `get` gives the bytes
 // of a CID, or nothing when the node has none or they are more than `limit`.
 export interface ImageStore {
@@ -75,6 +80,12 @@ export interface MemepoolOptions {
     // body itself and takes no reference to bytes it has not stored. Without a
     // store it publishes no body.
     content?: ContentStore;
+    // Where a paper's PDF and source are stored: the node's IPFS, which pins
+    // them. Without it the service stores no file, and publishes no paper
+    // that has one.
+    files?: FileStore;
+    // How many files the service holds for papers yet to be published.
+    filesHeld?: number;
     // Where an author's avatar is read from. Without it the service serves no
     // avatar, and the pages show every author without one.
     images?: ImageStore;
@@ -123,6 +134,10 @@ const AVATAR_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/pn
 // bytes, and the pixels its asset says it has.
 const IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 export const IMAGE_LIMIT = 10_000_000;
+// The largest file of a paper the service stores, in bytes: its PDF, or its source.
+export const FILE_LIMIT = 10_000_000;
+// How long a file that has been stored may wait to be published in a paper.
+const FILE_KEPT = 60 * 60_000;
 const IMAGE_PIXELS = 40_000_000;
 // The longest name the service passes on, in characters, and the longest
 // address it asks a domain about.
@@ -156,15 +171,15 @@ const MAX_VERIFYING = 8;
 class Expiring<V> {
     private readonly held = new Map<string, { value: V; ends: number }>();
 
-    constructor(private readonly lifetime: number, private readonly now: () => number) { }
+    constructor(private readonly lifetime: number, private readonly now: () => number, private readonly most = MAX_HELD) { }
 
     set(key: string, value: V): void {
-        if (this.held.size >= MAX_HELD) {
+        if (this.held.size >= this.most) {
             for (const [each, { ends }] of this.held) {
                 if (ends <= this.now()) this.held.delete(each);
             }
         }
-        if (this.held.size >= MAX_HELD) {
+        if (this.held.size >= this.most) {
             this.held.delete(this.held.keys().next().value as string);
         }
         this.held.set(key, { value, ends: this.now() + this.lifetime });
@@ -179,6 +194,20 @@ class Expiring<V> {
         }
 
         return entry?.value;
+    }
+
+    // Whether there is room for one more without putting out one that has not
+    // ended. Asked by what may not lose an entry it has answered for.
+    //
+    // `coming` is how many are on their way in and not yet set.
+    room(coming = 0): boolean {
+        if (this.held.size + coming >= this.most) {
+            for (const [each, { ends }] of this.held) {
+                if (ends <= this.now()) this.held.delete(each);
+            }
+        }
+
+        return this.held.size + coming < this.most;
     }
 
     // Removes an entry, and says whether it was there and had not ended.
@@ -667,6 +696,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         return memeplexOf(versionId ? await keymaster.resolveDID(did, { versionId }) : latest);
     };
 
+    // The files stored for papers yet to be published, each by who stored it,
+    // what it is to be and its CID.
+    const filed = new Expiring<{ cid: string; type: string; bytes: number }>(FILE_KEPT, now, options.filesHeld);
+    // How many files are being stored, each of which will be one of them.
+    let filing = 0;
+
     // What is published for a request: its fields, with a `body` stored and
     // replaced by the reference to it.
     //
@@ -681,8 +716,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const held = did ? await publishedHere(did).catch(() => undefined) : undefined;
 
         for (const reference of REFERENCES) {
-            if (reference in stated && !sameReference(stated[reference], held?.[reference])) {
-                throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: send the text of an article as \`body\``);
+            // A paper's PDF and source are stored apart from it, by the one
+            // who publishes it, and are named by what the service gave for them.
+            const cid = (stated[reference] as { cid?: unknown } | null | undefined)?.cid;
+            const file = reference === 'content' || typeof cid !== 'string' ? undefined : filed.get(`${(req as Signed).user} ${reference} ${cid}`);
+
+            if (reference in stated && !sameReference(stated[reference], held?.[reference]) && !sameReference(stated[reference], file)) {
+                throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: ${reference === 'content'
+                    ? 'send the text of an article as `body`'
+                    : 'send the file to /files, and give the reference it answers with within the hour'}`);
             }
         }
         if (body === undefined) {
@@ -895,6 +937,119 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // may embed, by what the bytes themselves say.
     const stored = new Map<string, number[]>();
     const hourly = options.imagesPerHour ?? 30;
+    // Whether a user may have one thing more stored this hour, which counts it
+    // where they may. An image and a paper's file are counted together: each
+    // is pinned for good.
+    const room = (user: string): boolean => {
+        const since = now() - 60 * 60_000;
+        const recent = (stored.get(user) ?? []).filter(at => at > since);
+
+        if (recent.length >= hourly) {
+            return false;
+        }
+        stored.set(user, [...recent, now()]);
+        // Whoever has stored nothing lately is forgotten, so the list does not grow with every user there has been.
+        if (stored.size > MAX_HELD) {
+            for (const [each, times] of stored) {
+                if (times.every(at => at <= since)) stored.delete(each);
+            }
+        }
+
+        return true;
+    };
+
+    // What the bytes of a paper's file are, by the bytes themselves: a PDF
+    // begins as one does, and a source is an archive that begins as gzip does,
+    // or LaTeX, which is text. What a browser says a file is counts for nothing.
+    const fileType = (kind: unknown, data: Buffer): string | undefined => {
+        if (kind === 'pdf') {
+            return data.subarray(0, 5).toString('latin1') === '%PDF-' ? 'application/pdf' : undefined;
+        }
+        if (kind !== 'source') {
+            return undefined;
+        }
+        if (data[0] === 0x1f && data[1] === 0x8b) {
+            return 'application/gzip';
+        }
+        // A PDF may be text throughout, and is no source for being so.
+        if (data.subarray(0, 5).toString('latin1') === '%PDF-') {
+            return undefined;
+        }
+
+        try {
+            new TextDecoder('utf-8', { fatal: true }).decode(data);
+        }
+        catch {
+            return undefined;
+        }
+
+        return data.includes(0) ? undefined : 'application/x-tex';
+    };
+
+    // A paper's PDF or its source, stored for the paper that will refer to it.
+    // It is for a user who has granted the service, counted with their images,
+    // and is theirs to publish for an hour: the reference the service gives
+    // is the one a paper of theirs may then carry.
+    router.post('/files', express.raw({ type: 'application/octet-stream', limit: FILE_LIMIT }), async (req: Request, res: Response) => {
+        const { user } = req as Signed;
+        const refuse = (status: number, error: string) => { res.status(status).json({ error }); };
+        const kind = req.query.kind;
+
+        if (!options.files) {
+            refuse(501, 'this service stores no files');
+            return;
+        }
+        if (kind !== 'pdf' && kind !== 'source') {
+            refuse(400, 'a file is a paper\'s `pdf` or its `source`: say which with `kind`');
+            return;
+        }
+        if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+            refuse(400, 'expected the bytes of a file, as application/octet-stream');
+            return;
+        }
+
+        const type = fileType(kind, req.body);
+
+        if (!type) {
+            refuse(400, kind === 'pdf' ? 'not a PDF' : 'a source is LaTeX, or a gzip archive');
+            return;
+        }
+
+        try {
+            if (liveGrants(await client.grantsFrom(user), new Date(now())).length === 0) {
+                refuse(403, 'no grant to publish under');
+                return;
+            }
+            // A file the service has answered for is the user's to publish for
+            // the hour. Where it could keep no more without forgetting one, it
+            // stores no more, and nothing is pinned for a paper that could not carry it.
+            //
+            // One being stored has its place from here, so that two sent at
+            // once do not both take the last.
+            if (!filed.room(filing)) {
+                refuse(503, 'the service is holding as many files as it can; try again later');
+                return;
+            }
+            if (!room(user)) {
+                refuse(429, 'too many files and images; try again within the hour');
+                return;
+            }
+
+            filing += 1;
+            try {
+                const reference = { cid: await options.files.add(req.body), type, bytes: req.body.length };
+
+                filed.set(`${user} ${kind} ${reference.cid}`, reference);
+                res.json(reference);
+            }
+            finally {
+                filing -= 1;
+            }
+        }
+        catch {
+            refuse(502, 'the node did not store the file');
+        }
+    });
 
     router.post('/images', express.raw({ type: 'application/octet-stream', limit: IMAGE_LIMIT }), async (req: Request, res: Response) => {
         const { user } = req as Signed;
@@ -936,19 +1091,9 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 return;
             }
 
-            const since = now() - 60 * 60_000;
-            const recent = (stored.get(user) ?? []).filter(at => at > since);
-
-            if (recent.length >= hourly) {
+            if (!room(user)) {
                 refuse(429, 'too many images; try again within the hour');
                 return;
-            }
-            stored.set(user, [...recent, now()]);
-            // Whoever has stored nothing lately is forgotten, so the list does not grow with every user there has been.
-            if (stored.size > MAX_HELD) {
-                for (const [each, times] of stored) {
-                    if (times.every(at => at <= since)) stored.delete(each);
-                }
             }
 
             const did = await keymaster.createImage(req.body, { registry: options.imageRegistry ?? 'hyperswarm' });

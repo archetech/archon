@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { linkTo, pathOf, routeOf } from './route';
 import type { ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Api, Coauthor, Me, Person, Publication, Reply, Responses } from './api';
+import type { Api, Coauthor, FileRef, Me, Person, Publication, Reply, Responses } from './api';
 import Markdown, { Embeds } from './Markdown';
 import type { Embedding } from './Markdown';
 
@@ -765,6 +765,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader 
                 <Authors key={`${publication.did} ${shownVersion(publication)}`} publication={publication} api={full} reader={waiting ? undefined : reader} />
             )}
             <Body object={object} full={full} />
+            {object.kind === 'paper' && full && <Downloads object={object} api={full} />}
             <footer>
                 {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
@@ -778,6 +779,127 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader 
                 )}
             </footer>
         </article>
+    );
+}
+
+// The largest file of a paper the service stores.
+const FILE_BYTES = 10_000_000;
+
+// A size as a reader is told it.
+const sized = (bytes: number) => (bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1000))} kB`);
+
+// What a paper says of one of its files, where it is one that can be asked
+// for: the paper is a stranger's, and so is what it says.
+const fileOf = (value: unknown): FileRef | undefined => {
+    const file = value as { cid?: unknown; type?: unknown; bytes?: unknown } | undefined;
+
+    return file && typeof file.cid === 'string' && /^[A-Za-z0-9]{1,128}$/.test(file.cid) && typeof file.type === 'string' && typeof file.bytes === 'number'
+        ? { cid: file.cid, type: file.type, bytes: file.bytes }
+        : undefined;
+};
+
+// A paper's downloads: its PDF, and its source. They are offered and never
+// shown: a browser saves them, under the paper's name.
+function Downloads({ object, api }: { object: NonNullable<Publication['memeplex']>; api: Api }) {
+    const pdf = fileOf(object.pdf);
+    const source = fileOf(object.source);
+    const name = (object.title ?? 'paper').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'paper';
+
+    if (!pdf && !source) {
+        return null;
+    }
+
+    return (
+        <p className="downloads">
+            {pdf && <a href={api.download(pdf, `${name}.pdf`)} download={`${name}.pdf`}>PDF ({sized(pdf.bytes)})</a>}
+            {pdf && source && ' · '}
+            {source && (
+                <a
+                    href={api.download(source, `${name}${source.type === 'application/gzip' ? '.tar.gz' : '.tex'}`)}
+                    download={`${name}${source.type === 'application/gzip' ? '.tar.gz' : '.tex'}`}
+                >
+                    Source ({sized(source.bytes)})
+                </a>
+            )}
+        </p>
+    );
+}
+
+// A file chosen for a paper, which the service stores when it is chosen. It
+// is the paper's once it is published with it.
+function FileField({ label, kind, accept, value, onChange, store, disabled, onStoring }: {
+    label: string; kind: 'pdf' | 'source'; accept: string; value: (FileRef & { name: string }) | null;
+    onChange: (file: (FileRef & { name: string }) | null) => void;
+    store: (kind: 'pdf' | 'source', file: Blob) => Promise<FileRef>; disabled: boolean; onStoring: (storing: boolean) => void;
+}) {
+    const [storing, setStoring] = useState(false);
+    const [problem, setProblem] = useState('');
+    const here = useRef(true);
+
+    useEffect(() => {
+        here.current = true;
+
+        return () => { here.current = false; };
+    }, []);
+
+    const choose = async (file: File) => {
+        setProblem('');
+        if (file.size > FILE_BYTES) {
+            setProblem(`${label} may be 10 MB at most.`);
+            return;
+        }
+        setStoring(true);
+        onStoring(true);
+        try {
+            const stored = await store(kind, file);
+
+            if (here.current) {
+                onChange({ ...stored, name: file.name });
+            }
+        }
+        catch (failure) {
+            if (here.current) {
+                setProblem(`${label} was not stored: ${message(failure)}`);
+            }
+        }
+        finally {
+            if (here.current) {
+                setStoring(false);
+                onStoring(false);
+            }
+        }
+    };
+
+    return (
+        <div className="file">
+            {value
+                ? (
+                    <p>
+                        {label}: {value.name} ({sized(value.bytes)}){' '}
+                        <button className="quiet" disabled={disabled} onClick={() => onChange(null)}>Remove</button>
+                    </p>
+                )
+                : (
+                    <label>
+                        {label}
+                        <input
+                            type="file"
+                            accept={accept}
+                            disabled={disabled || storing}
+                            onChange={event => {
+                                const [file] = event.target.files ?? [];
+
+                                event.target.value = '';
+                                if (file) {
+                                    choose(file);
+                                }
+                            }}
+                        />
+                    </label>
+                )}
+            {storing && <p className="muted">Storing {label}…</p>}
+            {problem && <p role="alert" className="error">{problem}</p>}
+        </div>
     );
 }
 
@@ -1186,11 +1308,20 @@ const AUTHORS = 100;
 // An article, or a paper: a paper has an abstract, and lists who wrote it with
 // its publisher. Listing someone is the publisher's claim, which each of them
 // confirms for themselves.
-function ArticleComposer({ onPublish, onCancel, paper = false }: {
-    onPublish: (article: { title: string; subtitle?: string; body: string; summary?: string; coauthors?: string[] }) => Promise<void>;
+function ArticleComposer({ onPublish, onCancel, paper = false, store }: {
+    onPublish: (article: {
+        title: string; subtitle?: string; body: string; summary?: string; coauthors?: string[]; pdf?: FileRef; source?: FileRef;
+    }) => Promise<void>;
     onCancel: () => void;
     paper?: boolean;
+    // How a paper's files are stored, where the reader may have them stored.
+    store?: (kind: 'pdf' | 'source', file: Blob) => Promise<FileRef>;
 }) {
+    const [pdf, setPdf] = useState<(FileRef & { name: string }) | null>(null);
+    const [source, setSource] = useState<(FileRef & { name: string }) | null>(null);
+    // How many of the paper's files are being stored.
+    const [filing, setFiling] = useState(0);
+    const reference = (file: (FileRef & { name: string }) | null) => (file ? { cid: file.cid, type: file.type, bytes: file.bytes } : undefined);
     const [title, setTitle] = useState('');
     const [subtitle, setSubtitle] = useState('');
     const [summary, setSummary] = useState('');
@@ -1211,6 +1342,8 @@ function ArticleComposer({ onPublish, onCancel, paper = false }: {
                 ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
                 body,
                 ...(paper ? { summary: summary.trim(), coauthors: others.dids } : {}),
+                ...(paper && pdf ? { pdf: reference(pdf) } : {}),
+                ...(paper && source ? { source: reference(source) } : {}),
             });
         }
         catch (failure) {
@@ -1250,6 +1383,31 @@ function ArticleComposer({ onPublish, onCancel, paper = false }: {
                     {others.dids.length > 0 && (
                         <p className="muted">Each is listed by you until they confirm it, which they do from the paper.</p>
                     )}
+                    {/* A paper may carry its typeset PDF and its source, which readers download. */}
+                    {store && (
+                        <>
+                            <FileField
+                                label="PDF"
+                                kind="pdf"
+                                accept="application/pdf,.pdf"
+                                value={pdf}
+                                onChange={setPdf}
+                                store={store}
+                                disabled={busy}
+                                onStoring={storing => setFiling(count => count + (storing ? 1 : -1))}
+                            />
+                            <FileField
+                                label="Source"
+                                kind="source"
+                                accept=".tex,.gz,.tgz,application/x-tex,application/gzip"
+                                value={source}
+                                onChange={setSource}
+                                store={store}
+                                disabled={busy}
+                                onStoring={storing => setFiling(count => count + (storing ? 1 : -1))}
+                            />
+                        </>
+                    )}
                 </>
             )}
             <Draft
@@ -1263,7 +1421,7 @@ function ArticleComposer({ onPublish, onCancel, paper = false }: {
             />
             {error && <p role="alert" className="error">{error}</p>}
             <button
-                disabled={busy || storing || !title.trim() || !body.trim()
+                disabled={busy || storing || filing > 0 || !title.trim() || !body.trim()
                     || (paper && (!summary.trim() || others.others.length > 0 || others.dids.length >= AUTHORS))}
                 onClick={publish}
             >
@@ -2422,6 +2580,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                             <ArticleComposer
                                 key={writing}
                                 paper={writing === 'paper'}
+                                store={api.file}
                                 onCancel={() => setWriting(false)}
                                 onPublish={async ({ coauthors, ...article }) => {
                                     // A paper lists its authors, its publisher first.
