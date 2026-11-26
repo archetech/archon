@@ -1257,6 +1257,8 @@ describe('a paper\'s files', () => {
 
             expect([more, answer.status]).toStrictEqual([more, 400]);
             expect(answer.body.error).toMatch(/has not stored what/);
+            // What to do about it is said of a file, and not of an article's text.
+            expect(answer.body.error).toMatch(/send the file to \/files/);
         };
 
         // Bytes on the node that the service did not store.

@@ -722,7 +722,9 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             const file = reference === 'content' || typeof cid !== 'string' ? undefined : filed.get(`${(req as Signed).user} ${reference} ${cid}`);
 
             if (reference in stated && !sameReference(stated[reference], held?.[reference]) && !sameReference(stated[reference], file)) {
-                throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: send the text of an article as \`body\``);
+                throw new MemeplexClientError('invalid', `the service publishes content it has stored, and has not stored what \`${reference}\` refers to: ${reference === 'content'
+                    ? 'send the text of an article as `body`'
+                    : 'send the file to /files, and give the reference it answers with within the hour'}`);
             }
         }
         if (body === undefined) {
