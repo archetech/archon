@@ -50,7 +50,7 @@ All routes are `GET` and return JSON. A publication is the result of attribution
 | `/api/v1/threads/:did` | The replies to an object and the replies to those, as a flat list in reading order, each with its `depth`. A withdrawn reply stays as a tombstone. |
 | `/api/v1/boosts/:did` | The posts that name the object as their target. |
 | `/api/v1/ratings/:did` | `{ ratings, mean }`: the rating that counts for each author, and their mean on the scale from 0 to 1. |
-| `/api/v1/tags/:did` | `[{ tag, authors, applied }]`: each tag others have applied, with who applied it. `applied` is each object that applies it, `{ did, author, grant }`, which is what its author withdraws to take the tag away. |
+| `/api/v1/tags/:did` | `[{ tag, authors, applied }]`: each tag others have applied, with who applied it. `applied` is each object that applies it, `{ did, author, grant, version }`, which is what its author withdraws to take the tag away; `version` is the version of the object it was put on. |
 | `/api/v1/coauthors/:did` | For a paper, how each listed coauthor stands towards the revision shown: `confirmed`, `confirmed-other` or `listed`. |
 | `/metrics` | Prometheus exposition. Not reachable through Drawbridge. |
 

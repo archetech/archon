@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { coauthorsIn, tagWord } from '../App';
+import App, { coauthorsIn, responsesAt, tagWord } from '../App';
 import { ApiError, createApi } from '../api';
 import type { Api, Coauthor, Me, Publication, Responses } from '../api';
 import { linkTo, pathOf, routeOf, setRoot } from '../route';
@@ -3035,6 +3035,400 @@ describe('a paper', () => {
 
         expect((await screen.findByRole('alert')).textContent).toContain('no grant to publish under');
         expect(screen.getByRole('button', { name: 'Confirm this revision' })).toBeTruthy();
+    });
+});
+
+describe('the earlier versions of a post', () => {
+    const at = (block: number) => ({ block, time: `2026-11-2${block}T12:00:00Z` });
+    // A post edited twice, and once more after its grant had ended. That last
+    // edit was never attributed, and nothing after one that was not ever is.
+    const edited = (): Publication => ({
+        state: 'published',
+        did: 'did:cid:1',
+        current: 2,
+        versions: [
+            { opid: 'v1', type: 'create', outcome: 'attributed', position: at(1) },
+            { opid: 'v2', type: 'update', outcome: 'attributed', position: at(2) },
+            { opid: 'v3', type: 'update', outcome: 'attributed', position: at(3) },
+            { opid: 'vx', type: 'update', outcome: 'unattributed' },
+        ],
+        memeplex: { kind: 'post', author: BOB, text: 'As it is.' },
+    });
+    const then = (text: string, current: number): Publication => ({ ...edited(), current, memeplex: { kind: 'post', author: BOB, text } });
+    const answer = (did: string, text: string, version: string, depth = 1, target = 'did:cid:1') => ({
+        depth,
+        publication: { ...post(did, ALICE, text), memeplex: { kind: 'reply', author: ALICE, text, target, targetVersion: version } },
+    });
+    const made = (did: string, version: string, more: Record<string, unknown>) =>
+        ({ ...post(did, ALICE, ''), memeplex: { kind: 'post', author: ALICE, target: 'did:cid:1', targetVersion: version, ...more } }) as Publication;
+
+    // What is in sight: the latest is put out of sight while an earlier version is looked at.
+    const seen = (text: string | RegExp) => screen.queryAllByText(text).filter(each => !each.closest('[hidden]'));
+    const labelled = (label: string) => screen.queryAllByLabelText(label).filter(each => !each.closest('[hidden]'));
+
+    async function opened() {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const services_ = services({ me: granted, timeline: [edited()] });
+
+        services_.state.known['did:cid:1'] = edited();
+        services_.state.revisions['did:cid:1 v1'] = then('As it was first.', 0);
+        services_.state.revisions['did:cid:1 v2'] = then('As it was next.', 1);
+        vi.mocked(services_.api.thread).mockResolvedValue([
+            answer('did:cid:r1', 'To the first.', 'v1'),
+            answer('did:cid:r1a', 'To that answer.', 'op-did:cid:r1', 2, 'did:cid:r1'),
+            answer('did:cid:r2', 'To the second.', 'v2'),
+            answer('did:cid:r3', 'To the latest.', 'v3'),
+        ]);
+        services_.state.responses = {
+            boosts: [made('did:cid:b1', 'v1', {}), made('did:cid:b3', 'v3', {})],
+            ratings: {
+                ratings: [made('did:cid:g1', 'v1', { kind: 'rating', rating: 1, min: 0, max: 1 }), made('did:cid:g3', 'v3', { kind: 'rating', rating: 0, min: 0, max: 1 })],
+                mean: 0.5,
+            },
+            tags: [
+                { tag: 'draft', authors: [ALICE], applied: [{ did: 'did:cid:t1', author: ALICE, grant: 'did:cid:grant', version: 'v1' }] },
+                { tag: 'final', authors: [ALICE], applied: [{ did: 'did:cid:t3', author: ALICE, grant: 'did:cid:grant', version: 'v3' }] },
+            ],
+        };
+        render(<App api={services_.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByLabelText('Version');
+
+        return { ...services_, user };
+    }
+
+    it('are what was made of the post at one of them, of all that was made of it', () => {
+        const all: Responses = {
+            boosts: [made('did:cid:b1', 'v1', {}), made('did:cid:b3', 'v3', {})],
+            ratings: { ratings: [made('did:cid:g1', 'v1', { kind: 'rating', rating: 4, min: 1, max: 5 }), made('did:cid:g3', 'v3', { kind: 'rating', rating: 0, min: 0, max: 1 })], mean: 0.375 },
+            tags: [
+                { tag: 'a', authors: [ALICE, BOB], applied: [{ did: 'did:cid:t1', author: ALICE, grant: 'g', version: 'v1' }, { did: 'did:cid:t2', author: BOB, grant: 'g', version: 'v3' }] },
+                { tag: 'b', authors: [ALICE], applied: [{ did: 'did:cid:t3', author: ALICE, grant: 'g', version: 'v3' }] },
+                // A view that does not say which version tells nothing of one.
+                { tag: 'c', authors: [ALICE] },
+            ],
+        };
+        const first = responsesAt(all, 'v1');
+
+        expect(first.boosts.map(each => each.did)).toStrictEqual(['did:cid:b1']);
+        expect(first.ratings.ratings.map(each => each.did)).toStrictEqual(['did:cid:g1']);
+        expect(first.ratings.mean).toBe(0.75);
+        expect(first.tags).toStrictEqual([{ tag: 'a', authors: [ALICE], applied: [{ did: 'did:cid:t1', author: ALICE, grant: 'g', version: 'v1' }] }]);
+        expect(responsesAt(all, 'v2')).toStrictEqual({ boosts: [], ratings: { ratings: [] }, tags: [] });
+    });
+
+    it('are offered for a post that was edited, each that was published and none that was not', async () => {
+        await opened();
+
+        const options = within(screen.getByLabelText('Version')).getAllByRole('option') as HTMLOptionElement[];
+
+        expect(options.map(each => each.value)).toStrictEqual(['v1', 'v2', 'v3']);
+        expect(options[2].textContent).toMatch(/^3 of 3.*\(latest\)$/);
+        expect((screen.getByLabelText('Version') as HTMLSelectElement).value).toBe('v3');
+    });
+
+    it('show the post as it was, with the replies, ratings and tags made on that version and no others', async () => {
+        const { api, user } = await opened();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+
+        expect(await screen.findByText('As it was first.')).toBeTruthy();
+        expect(api.revision).toHaveBeenCalledWith('did:cid:1', 'v1');
+        expect(seen('As it is.')).toHaveLength(0);
+        // The answers to that version, with what was said in answer to them.
+        expect(screen.getByText('To the first.')).toBeTruthy();
+        expect(screen.getByText('To that answer.')).toBeTruthy();
+        expect(screen.queryByText('To the second.')).toBeNull();
+        expect(screen.queryByText('To the latest.')).toBeNull();
+        // What was made of it then.
+        expect(await screen.findByText(/1 boost · rated 100% by 1/)).toBeTruthy();
+        expect(screen.getByText(/draft 1/)).toBeTruthy();
+        expect(screen.queryByText(/final/)).toBeNull();
+        // Nothing is made of an earlier version from here, and nothing of it is changed.
+        for (const name of ['Boost', 'Undo boost', 'Thumb up', 'Like', 'Add tag', 'Edit', 'Publish']) {
+            expect([name, screen.queryByRole('button', { name })]).toStrictEqual([name, null]);
+        }
+        expect(labelled('Reply')).toHaveLength(0);
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v2');
+        expect(await screen.findByText('As it was next.')).toBeTruthy();
+        expect(screen.getByText('To the second.')).toBeTruthy();
+        expect(screen.queryByText('To the first.')).toBeNull();
+        expect(await screen.findByText(/0 boosts · no ratings/)).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+        expect(await screen.findByText('As it is.')).toBeTruthy();
+        expect(screen.getByLabelText('Reply')).toBeTruthy();
+    });
+
+    it('are all counted together where the latest is shown, until the reader asks for that version\'s alone', async () => {
+        const { user } = await opened();
+        const only = screen.getByLabelText('Only responses to this version') as HTMLInputElement;
+
+        // An edit puts nothing out of sight: every answer, and all that was made of the post.
+        expect(only.checked).toBe(false);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        for (const text of ['To the first.', 'To that answer.', 'To the second.', 'To the latest.']) {
+            expect([text, seen(text)]).toStrictEqual([text, [expect.anything()]]);
+        }
+        expect(screen.getByText(/draft 1/)).toBeTruthy();
+
+        await user.click(only);
+
+        // What was made of the latest, and no other: its one answer, boost, rating and tag.
+        expect(await screen.findByText(/1 boost · rated 0% by 1/)).toBeTruthy();
+        expect(seen('To the latest.')).toHaveLength(1);
+        for (const text of ['To the first.', 'To that answer.', 'To the second.']) {
+            expect([text, seen(text)]).toStrictEqual([text, []]);
+        }
+        expect(screen.getByText(/final 1/)).toBeTruthy();
+        // A tag of an earlier version is not counted, and is still the reader's to take off.
+        expect(screen.queryByText(/draft 1/)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Remove tag draft' })).toBeTruthy();
+        // It is still the latest: the reader may answer it and make of it what they will.
+        expect(labelled('Reply')).toHaveLength(1);
+        expect(screen.getByRole('button', { name: 'Boost' })).toBeTruthy();
+
+        await user.click(only);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        expect(seen('To the first.')).toHaveLength(1);
+    });
+
+    it('leave what the reader made of an earlier one theirs to change, though only the latest\'s are counted', async () => {
+        const { api, state, user } = await opened();
+        const mine = (did: string, version: string, more: Record<string, unknown>) => under(made(did, version, more), 'did:cid:grant');
+
+        // The reader rated, boosted and tagged the first version.
+        state.responses = {
+            boosts: [mine('did:cid:b1', 'v1', {})],
+            ratings: { ratings: [mine('did:cid:g1', 'v1', { kind: 'rating', rating: 1, min: 0, max: 1 })], mean: 1 },
+            tags: [{ tag: 'draft', authors: [ALICE], applied: [{ did: 'did:cid:t1', author: ALICE, grant: 'did:cid:grant', version: 'v1' }] }],
+        };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await screen.findByRole('button', { name: 'Undo boost' });
+
+        await user.click(screen.getByLabelText('Only responses to this version'));
+        // None of it is of the latest, so none is counted.
+        expect(await screen.findByText(/0 boosts · no ratings/)).toBeTruthy();
+        // It is still theirs: a thumb changes their rating and makes no second, and the rest is theirs to take back.
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+        await waitFor(() => expect(api.edit).toHaveBeenCalledWith('did:cid:g1', expect.objectContaining({ kind: 'rating', rating: 0 })));
+        expect(state.published).toHaveLength(0);
+        expect(screen.getByRole('button', { name: 'Undo boost' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Remove tag draft' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
+    });
+
+    it('are opened with what was made of them alone, and shown with all that was made of the post where the reader asks', async () => {
+        const { user } = await opened();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        const only = screen.getByLabelText('Only responses to this version') as HTMLInputElement;
+
+        await screen.findByText('As it was first.');
+        expect(only.checked).toBe(true);
+        expect(seen('To the second.')).toHaveLength(0);
+
+        await user.click(only);
+
+        // The post as it was, with every answer: one to another version says so.
+        expect(seen('As it was first.')).toHaveLength(1);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        const later = seen('To the latest.')[0].closest('article')!.parentElement!;
+
+        expect(within(later).getByText(/This answered another version/)).toBeTruthy();
+        expect(within(seen('To the first.')[0].closest('article')!.parentElement!).queryByText(/another version/)).toBeNull();
+        // Nothing is made of an earlier version, however its responses are shown.
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
+        expect(labelled('Reply')).toHaveLength(0);
+
+        // An answer to the latest leads to the latest, with all of them once more.
+        await user.click(within(later).getByRole('button', { name: 'See that version' }));
+        await waitFor(() => expect(seen('As it is.')).toHaveLength(1));
+        expect((screen.getByLabelText('Only responses to this version') as HTMLInputElement).checked).toBe(false);
+    });
+
+    it('are named on the answers made to them, where the latest is shown, and reached from there', async () => {
+        const { user } = await opened();
+
+        // Every answer is in the thread, whichever version it answered.
+        const first = (await screen.findByText('To the first.')).closest('article')!.parentElement!;
+        const latest = screen.getByText('To the latest.').closest('article')!.parentElement!;
+
+        expect(within(first).getByText(/This answered an earlier version/)).toBeTruthy();
+        expect(within(latest).queryByText(/This answered an earlier version/)).toBeNull();
+        // An answer to an answer is to that answer, and is marked as none.
+        expect(within(screen.getByText('To that answer.').closest('article')!.parentElement!).queryByText(/earlier version/)).toBeNull();
+
+        await user.click(within(first).getByRole('button', { name: 'See that version' }));
+        expect(await screen.findByText('As it was first.')).toBeTruthy();
+        expect((screen.getByLabelText('Version') as HTMLSelectElement).value).toBe('v1');
+    });
+
+    it('say when one is no longer in the history, or could not be read', async () => {
+        const { api, state, user } = await opened();
+
+        delete state.revisions['did:cid:1 v1'];
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        expect(await screen.findByText('That version is no longer in its history.')).toBeTruthy();
+
+        vi.mocked(api.revision).mockRejectedValueOnce(new Error('no indexer'));
+        await user.selectOptions(screen.getByLabelText('Version'), 'v2');
+        expect((await screen.findByRole('alert')).textContent).toBe('That version could not be read.');
+    });
+
+    it('say of a version an answer names that is not in the history that it is not, and show no other in its place', async () => {
+        const { api, user } = await opened();
+
+        vi.mocked(api.thread).mockResolvedValue([answer('did:cid:r9', 'To one that is gone.', 'vgone')]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        const gone = (await screen.findByText('To one that is gone.')).closest('article')!.parentElement!;
+
+        await user.click(within(gone).getByRole('button', { name: 'See that version' }));
+        expect(await screen.findByText('That version is no longer in its history.')).toBeTruthy();
+        // The latest is not shown as though it were that version, and nothing is made of it from here.
+        expect(seen('As it is.')).toHaveLength(0);
+        expect(labelled('Reply')).toHaveLength(0);
+        expect((screen.getByLabelText('Version') as HTMLSelectElement).value).toBe('vgone');
+    });
+
+    it('keep what the reader made of the latest while an earlier one is looked at', async () => {
+        const { api, state, user } = await opened();
+
+        // A rating of the latest, which waits to be anchored.
+        await user.click(await screen.findByRole('button', { name: 'Thumb up' }));
+        await waitFor(() => expect(state.published).toHaveLength(1));
+        expect(await screen.findByText('Your thumb up is waiting to be anchored.')).toBeTruthy();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+        await screen.findByText('As it is.');
+
+        // It is still the reader's rating: another thumb changes it, and makes no second.
+        expect(screen.getByText('Your thumb up is waiting to be anchored.')).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+        await waitFor(() => expect(api.edit).toHaveBeenCalledWith('did:cid:new1', expect.objectContaining({ kind: 'rating', rating: 0 })));
+        expect(state.published).toHaveLength(1);
+    });
+
+    it('show the reader\'s own answer to one as an edit of theirs that waits leaves it', async () => {
+        const { state, user } = await opened();
+
+        // The reader has edited their answer to the first version, and the edit waits.
+        state.unanchored['did:cid:r1'] = { versionId: 'op-edit', memeplex: { kind: 'reply', author: ALICE, text: 'To the first, reworded.', target: 'did:cid:1', targetVersion: 'v1' } };
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await screen.findByText('To the first, reworded.');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        const mine = (await screen.findByText('To the first, reworded.')).closest('article')!;
+
+        expect(within(mine).getByText('Edit waiting to be anchored')).toBeTruthy();
+        expect(screen.queryByText('To the first.')).toBeNull();
+    });
+
+    it('keep what the reader was writing of the latest, and what they confirmed, while an earlier one is looked at', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const authored = (current: number): Publication => ({
+            ...edited(), current,
+            memeplex: { kind: 'paper', author: BOB, title: 'The paper', summary: 'About it.', authors: [BOB, ALICE], content: { cid: 'bafypaper', type: 'text/markdown', bytes: 3 } },
+        });
+        const { api, state } = services({ me: granted, timeline: [authored(2)] });
+
+        state.known['did:cid:1'] = authored(2);
+        state.revisions['did:cid:1 v1'] = authored(0);
+        state.coauthors['did:cid:1'] = [{ did: ALICE, status: 'listed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        // A confirmation that waits, and a review half written.
+        await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
+        await screen.findByText('Your confirmation is waiting to be anchored.');
+        await user.type(screen.getByLabelText('Reply'), 'Half a review');
+        await user.type(screen.getByLabelText('Verdict'), 'accept');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await waitFor(() => expect(labelled('Reply')).toHaveLength(0));
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+
+        // Neither is lost, and the paper is not offered for confirming a second time.
+        expect((screen.getByLabelText('Reply') as HTMLTextAreaElement).value).toBe('Half a review');
+        expect((screen.getByLabelText('Verdict') as HTMLInputElement).value).toBe('accept');
+        expect(seen('Your confirmation is waiting to be anchored.')).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+        expect(state.published.filter(each => each.kind === 'tag')).toHaveLength(1);
+    });
+
+    it('keep an edit the reader was making of the latest while an earlier one is looked at', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([ALICE]));
+        const mine = { ...edited(), memeplex: { kind: 'post', author: ALICE, text: 'As it is.', grant: 'did:cid:grant' } };
+        const { api, state } = services({ me: granted, timeline: [mine] });
+
+        state.known['did:cid:1'] = mine;
+        state.revisions['did:cid:1 v1'] = { ...mine, current: 0, memeplex: { ...mine.memeplex, text: 'As it was first.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await user.type(screen.getByLabelText('Edit'), ' And more.');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        expect(labelled('Edit')).toHaveLength(0);
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('As it is. And more.');
+    });
+
+    it('say nothing of how a paper\'s coauthors stand on an earlier revision, which is known of its latest', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const authored = (text: string, current: number): Publication => ({
+            ...edited(), current,
+            memeplex: { kind: 'paper', author: BOB, title: text, summary: 'About it.', authors: [BOB, ALICE], content: { cid: 'bafypaper', type: 'text/markdown', bytes: 3 } },
+        });
+        const { api, state } = services({ me: granted, timeline: [authored('The paper', 2)] });
+
+        state.known['did:cid:1'] = authored('The paper', 2);
+        state.revisions['did:cid:1 v1'] = authored('The paper, first', 0);
+        state.coauthors['did:cid:1'] = [{ did: ALICE, status: 'confirmed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        expect(await screen.findByText('confirmed')).toBeTruthy();
+        const asked = vi.mocked(api.coauthors).mock.calls.length;
+
+        await user.selectOptions(await screen.findByLabelText('Version'), 'v1');
+        expect(await screen.findByText('The paper, first')).toBeTruthy();
+        // Its authors are named, and nothing is said or asked of what they confirmed.
+        expect([...document.querySelectorAll('.authors li')].filter(each => !each.closest('[hidden]'))).toHaveLength(2);
+        expect(seen('confirmed')).toHaveLength(0);
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+        expect(api.coauthors).toHaveBeenCalledTimes(asked);
+    });
+
+    it('are not offered for a post that was never edited, which is not marked as edited', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [post('did:cid:1', BOB, 'A post.'), edited()] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        // In a list, one that was edited says so.
+        const plain = (await screen.findByText('A post.')).closest('article')!;
+
+        expect(within(plain).queryByText('edited')).toBeNull();
+        expect(within(screen.getByText('As it is.').closest('article')!).getByText('edited')).toBeTruthy();
+
+        await user.click(within(plain).getByRole('button', { name: 'Open' }));
+        await screen.findByRole('button', { name: 'Back' });
+        await waitFor(() => expect(api.thread).toHaveBeenCalled());
+        expect(screen.queryByLabelText('Version')).toBeNull();
     });
 });
 

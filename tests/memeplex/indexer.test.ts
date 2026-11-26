@@ -435,7 +435,7 @@ describe('the HTTP views', () => {
             tag: 'archon',
             authors: [userDid],
             // The object that applies the tag, for its author to withdraw.
-            applied: [{ did: expect.stringMatching(/^did:/), author: userDid, grant: expect.stringMatching(/^did:/) }],
+            applied: [{ did: expect.stringMatching(/^did:/), author: userDid, grant: expect.stringMatching(/^did:/), version: expect.any(String) }],
         }]);
         expect((await request(app).get(`/api/v1/boosts/${first}`)).body).toStrictEqual([]);
         expect((await request(app).get(`/api/v1/coauthors/${first}`)).body).toStrictEqual([]);
