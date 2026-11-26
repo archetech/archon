@@ -367,6 +367,57 @@ const copying = (text: string, unable: string) => async () => {
 
 // `onChecked` asks the service anew, and answers whether the service said how
 // the reader stands: it did not where the request failed, which is said elsewhere.
+// What each action a grant may list lets Memepool do, in the reader's words.
+const ACTIONS: Record<string, string> = {
+    'memeplex:post': 'Post, boost, and write articles and papers',
+    'memeplex:reply': 'Reply and review',
+    'memeplex:rate': 'Rate',
+    'memeplex:tag': 'Tag and like',
+};
+
+// How long before a grant expires the reader is told that it is about to.
+const EXPIRES_SOON = 7 * 24 * 60 * 60 * 1000;
+
+// The grant Memepool publishes under for the reader: what it allows, the
+// chain what they publish is anchored on, and when it ends. It is shown and
+// not changed here: a grant is the reader's, made and changed in their wallet,
+// which holds their key.
+function Granted({ me }: { me: Me }) {
+    const allowed = me.actions ?? Object.keys(ACTIONS);
+    const expires = me.expiresAt ? new Date(me.expiresAt) : undefined;
+    const known = expires && !Number.isNaN(expires.getTime()) ? expires : undefined;
+    const soon = known !== undefined && known.getTime() - Date.now() < EXPIRES_SOON;
+
+    return (
+        <details className="granted">
+            <summary>
+                Publishing on {me.registry}
+                {soon && <span className="badge" role="status">Grant expires soon</span>}
+            </summary>
+            <p className="muted">You have let Memepool publish in your name. What it may do:</p>
+            <ul>
+                {allowed.map(action => <li key={action}>{ACTIONS[action] ?? <span className="mono">{action}</span>}</li>)}
+            </ul>
+            {allowed.length < Object.keys(ACTIONS).length && <p className="muted">What your grant does not allow is not offered here.</p>}
+            <dl>
+                <dt>Registry</dt>
+                <dd>{me.registry}: what you publish is anchored there</dd>
+                <dt>Expires</dt>
+                <dd>{known ? known.toLocaleString() : 'Never'}{soon && '. Change it in your wallet to go on publishing after that.'}</dd>
+                {me.others && me.others.length > 0 && (
+                    <>
+                        <dt>Other grants in force</dt>
+                        <dd>{me.others.length}. New posts go under the earliest of your grants.</dd>
+                    </>
+                )}
+                <dt>Grant</dt>
+                <dd><span className="mono" title={me.grant}>{short(me.grant!)}</span> <Copy text={me.grant!} label="Copy grant DID" unable={`Could not copy. The DID is ${me.grant}`} /></dd>
+            </dl>
+            <p className="muted">Change or revoke it in your wallet, under Auth, in Grants.</p>
+        </details>
+    );
+}
+
 function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => Promise<boolean> }) {
     const [checking, setChecking] = useState(false);
     // When the service was last asked and still had no grant to publish under.
@@ -2952,6 +3003,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                 {visitor && onSignedIn && (signing || (nowhere && !arriving)) && <SignIn api={api} onSignedIn={onSignedIn} onStarted={started} pollMs={pollMs ?? 3000} />}
                 {nowhere && arriving && <p className="muted">Loading…</p>}
                 {!visitor && !me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
+                {!visitor && me.grant && <Granted me={me} />}
                 {error && <p role="alert" className="error">{error}</p>}
                 {lost && <p role="alert" className="error">{lost}</p>}
 

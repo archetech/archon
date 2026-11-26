@@ -50,6 +50,8 @@ export interface UsableGrant {
     registry: string;
     // The actions the grant's scope lists. Absent means every core kind.
     actions?: string[];
+    // When the grant expires, where it does.
+    expiresAt?: string;
 }
 
 // Whether a grant's scope lets a client create an object of a kind. An object
@@ -301,7 +303,7 @@ export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableG
 
         if (expiresAt === undefined || now.getTime() < Date.parse(expiresAt)) {
             live.push({
-                usable: { did, user: grant.user, registry: grant.registry, ...(actions ? { actions } : {}) },
+                usable: { did, user: grant.user, registry: grant.registry, ...(actions ? { actions } : {}), ...(expiresAt ? { expiresAt } : {}) },
                 created: Date.parse(grant.versions[0].position.time),
             });
         }

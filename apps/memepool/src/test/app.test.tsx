@@ -710,6 +710,57 @@ describe('reading and publishing', () => {
         expect(await screen.findByLabelText('Post')).toBeTruthy();
     });
 
+    it('shows the reader the grant it publishes under: what it allows, its registry and when it expires', async () => {
+        const { api } = services({ me: { ...granted, others: ['did:cid:second'] } });
+        const view = render(<App api={api} />);
+
+        const shown = (await screen.findByText(/^Publishing on BTC:mainnet/)).closest('details') as HTMLElement;
+
+        // Put away until looked at, with nothing said of an expiry there is none of.
+        expect((shown as HTMLDetailsElement).open).toBe(false);
+        expect(within(shown).queryByText('Grant expires soon')).toBeNull();
+        expect([...shown.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual([
+            'Post, boost, and write articles and papers', 'Reply and review', 'Rate', 'Tag and like',
+        ]);
+        const said = (term: string) => [...shown.querySelectorAll('dt')].find(each => each.textContent === term)?.nextElementSibling?.textContent;
+
+        expect(said('Expires')).toBe('Never');
+        expect(said('Registry')).toMatch(/^BTC:mainnet/);
+        expect(said('Other grants in force')).toMatch(/^1\./);
+        expect(within(shown).getByTitle('did:cid:grant')).toBeTruthy();
+        expect(within(shown).getByText(/Change or revoke it in your wallet/)).toBeTruthy();
+        // Nothing here changes the grant.
+        expect(within(shown).getAllByRole('button').map(each => each.textContent)).toStrictEqual(['Copy grant DID']);
+        view.unmount();
+
+        // A narrowed grant lists what it allows, with an action the pages have no words for as it is written.
+        const soon = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+        const narrowed = services({ me: { ...granted, actions: ['memeplex:post', 'did:cid:schema?versionId=bafy'], expiresAt: soon } });
+        render(<App api={narrowed.api} />);
+        const narrow = (await screen.findByText(/^Publishing on BTC:mainnet/)).closest('details') as HTMLElement;
+
+        expect([...narrow.querySelectorAll('li')].map(each => each.textContent)).toStrictEqual(['Post, boost, and write articles and papers', 'did:cid:schema?versionId=bafy']);
+        expect(within(narrow).getByText('What your grant does not allow is not offered here.')).toBeTruthy();
+        expect(within(narrow).getByRole('status').textContent).toBe('Grant expires soon');
+        expect([...narrow.querySelectorAll('dt')].find(each => each.textContent === 'Expires')?.nextElementSibling?.textContent).toMatch(/Change it in your wallet/);
+    });
+
+    it('shows no grant to someone who has none, or who has not signed in', async () => {
+        const waiting = services({ me: { did: ALICE, link: 'archon://auth?grant=did:cid:request' } });
+        const view = render(<App api={waiting.api} />);
+
+        await screen.findByRole('button', { name: 'I have approved it' });
+        expect(screen.queryByText(/^Publishing on/)).toBeNull();
+        view.unmount();
+
+        const { api, state } = services({ timeline: [post('did:cid:1', BOB, 'From Bob.')] });
+        state.known['did:cid:1'] = state.timeline[0];
+        window.history.replaceState(null, '', '/p/did:cid:1');
+        render(<App api={api} />);
+        await screen.findByText('From Bob.');
+        expect(screen.queryByText(/^Publishing on/)).toBeNull();
+    });
+
     it('signs out', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
@@ -2162,8 +2213,8 @@ describe('a boost', () => {
         render(<App api={api} />);
 
         // A click on the boost opens the post, and the boost offers nothing to copy.
-        await screen.findByText('What Bob wrote.');
-        expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull();
+        const boost = (await screen.findByText('What Bob wrote.')).closest('article.boost') as HTMLElement;
+        expect(within(boost).queryByRole('button', { name: /Copy/ })).toBeNull();
 
         await user.click(await toOpen());
         // The thread is the post's own, as it is: that is what there is to answer.

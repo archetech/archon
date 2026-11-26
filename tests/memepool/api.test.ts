@@ -595,6 +595,14 @@ describe('a grant that allows some kinds', () => {
         expect((await agent.post('/api/v1/objects').send({ kind: ['rating'], target: posted.body.did, targetVersion, rating: 1, min: 0, max: 1 })).status).toBe(400);
     }, 120_000);
 
+    it('says when the grant it publishes under expires, where it does', async () => {
+        const agent = await signIn(alice);
+        const expiring = await grant(alice, (await agent.get('/api/v1/me')).body.link, { expiresAt: '2099-01-01T00:00:00Z' });
+        await anchor();
+
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: expiring, registry: REGISTRY, expiresAt: '2099-01-01T00:00:00Z' });
+    }, 120_000);
+
     it('publishes under whichever of the reader\'s grants allows the kind, and lists what they allow between them', async () => {
         const { agent, grantDid: posts } = await narrowed(['memeplex:post']);
         const ratings = await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid, actions: ['memeplex:rate'] } }, { registry: REGISTRY });

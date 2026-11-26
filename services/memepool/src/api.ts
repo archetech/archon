@@ -578,6 +578,8 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 registry: grant.registry,
                 ...(others.length ? { others: others.map(each => each.did) } : {}),
                 ...(actions ? { actions } : {}),
+                // Of the grant new objects go under, which is the one that ends first for the user.
+                ...(grant.expiresAt ? { expiresAt: grant.expiresAt } : {}),
             });
             return;
         }
