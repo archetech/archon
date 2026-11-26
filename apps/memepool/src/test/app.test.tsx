@@ -1578,6 +1578,11 @@ describe('a post that is listed, and what an open one offers', () => {
         await user.keyboard('{Escape}');
         expect(screen.queryByRole('menu')).toBeNull();
 
+        // And when the keyboard leaves it for something else.
+        await user.click(more);
+        await user.keyboard('{Shift>}{Tab}{Tab}{/Shift}');
+        expect(screen.queryByRole('menu')).toBeNull();
+
         // So does a click anywhere else, and a second one on the button.
         await user.click(more);
         await user.click(screen.getByRole('heading', { name: 'Memepool' }));
@@ -1664,6 +1669,22 @@ describe('a post that is listed, and what an open one offers', () => {
         fireEvent.click(screen.getByText('What Bob wrote.'));
         await new Promise(resolve => { setTimeout(resolve, 50); });
         expect(api.thread).not.toHaveBeenCalled();
+    });
+
+    it('goes from a boost that is open to the post it is of, which is where there is something to copy', async () => {
+        const original = post('did:cid:2', BOB, 'From Bob.');
+        const boost = post('did:cid:9', ALICE, '', { memeplex: { kind: 'post', author: ALICE, target: 'did:cid:2', targetVersion: 'op-did:cid:2' } });
+        const { api, state } = services({ me: granted });
+        state.known['did:cid:2'] = original;
+        state.known['did:cid:9'] = boost;
+        state.revisions['did:cid:2 op-did:cid:2'] = original;
+        window.history.replaceState(null, '', '/p/did:cid:9');
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click((await screen.findByText('From Bob.')).closest('article')!);
+        await waitFor(() => expect(window.location.pathname).toBe('/p/did:cid:2'));
+        expect(await offered(user)).toStrictEqual(['Copy link', 'Copy embed', 'Copy DID']);
     });
 
     it('opens a reply from the thread it is in, and what a reply answers from the card above it', async () => {

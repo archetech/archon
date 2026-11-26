@@ -316,6 +316,12 @@ function Menu({ items }: { items: { label: string; act: () => Promise<string | v
         <span
             className="more"
             ref={within}
+            onBlur={event => {
+                // The keyboard has left it for something else.
+                if (!within.current?.contains(event.relatedTarget as Node | null)) {
+                    setOpen(false);
+                }
+            }}
             onKeyDown={event => {
                 // From the button as from what is under it.
                 if (open && event.key === 'Escape') {
@@ -2284,6 +2290,8 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                         waiting={Boolean(waits)}
                         reader={me}
                         opened
+                        // A boost that is open is opened no further: a click on it goes to the post it is of.
+                        onOpen={root.memeplex && boosted(root.memeplex) ? open : undefined}
                         onWithdraw={mine && root.state === 'published' ? withdraw : undefined}
                     />
                 </Reads.Provider>
