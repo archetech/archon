@@ -3062,6 +3062,10 @@ describe('the earlier versions of a post', () => {
     const made = (did: string, version: string, more: Record<string, unknown>) =>
         ({ ...post(did, ALICE, ''), memeplex: { kind: 'post', author: ALICE, target: 'did:cid:1', targetVersion: version, ...more } }) as Publication;
 
+    // What is in sight: the latest is put out of sight while an earlier version is looked at.
+    const seen = (text: string | RegExp) => screen.queryAllByText(text).filter(each => !each.closest('[hidden]'));
+    const labelled = (label: string) => screen.queryAllByLabelText(label).filter(each => !each.closest('[hidden]'));
+
     async function opened() {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const services_ = services({ me: granted, timeline: [edited()] });
@@ -3132,7 +3136,7 @@ describe('the earlier versions of a post', () => {
 
         expect(await screen.findByText('As it was first.')).toBeTruthy();
         expect(api.revision).toHaveBeenCalledWith('did:cid:1', 'v1');
-        expect(screen.queryByText('As it is.')).toBeNull();
+        expect(seen('As it is.')).toHaveLength(0);
         // The answers to that version, with what was said in answer to them.
         expect(screen.getByText('To the first.')).toBeTruthy();
         expect(screen.getByText('To that answer.')).toBeTruthy();
@@ -3146,7 +3150,7 @@ describe('the earlier versions of a post', () => {
         for (const name of ['Boost', 'Undo boost', 'Thumb up', 'Like', 'Add tag', 'Edit', 'Publish']) {
             expect([name, screen.queryByRole('button', { name })]).toStrictEqual([name, null]);
         }
-        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(labelled('Reply')).toHaveLength(0);
 
         await user.selectOptions(screen.getByLabelText('Version'), 'v2');
         expect(await screen.findByText('As it was next.')).toBeTruthy();
@@ -3157,6 +3161,66 @@ describe('the earlier versions of a post', () => {
         await user.click(screen.getByRole('button', { name: 'Latest version' }));
         expect(await screen.findByText('As it is.')).toBeTruthy();
         expect(screen.getByLabelText('Reply')).toBeTruthy();
+    });
+
+    it('are all counted together where the latest is shown, until the reader asks for that version\'s alone', async () => {
+        const { user } = await opened();
+        const only = screen.getByLabelText('Only responses to this version') as HTMLInputElement;
+
+        // An edit puts nothing out of sight: every answer, and all that was made of the post.
+        expect(only.checked).toBe(false);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        for (const text of ['To the first.', 'To that answer.', 'To the second.', 'To the latest.']) {
+            expect([text, seen(text)]).toStrictEqual([text, [expect.anything()]]);
+        }
+        expect(screen.getByText(/draft 1/)).toBeTruthy();
+
+        await user.click(only);
+
+        // What was made of the latest, and no other: its one answer, boost, rating and tag.
+        expect(await screen.findByText(/1 boost · rated 0% by 1/)).toBeTruthy();
+        expect(seen('To the latest.')).toHaveLength(1);
+        for (const text of ['To the first.', 'To that answer.', 'To the second.']) {
+            expect([text, seen(text)]).toStrictEqual([text, []]);
+        }
+        expect(screen.getByText(/final 1/)).toBeTruthy();
+        expect(screen.queryByText(/draft/)).toBeNull();
+        // It is still the latest: the reader may answer it and make of it what they will.
+        expect(labelled('Reply')).toHaveLength(1);
+        expect(screen.getByRole('button', { name: 'Boost' })).toBeTruthy();
+
+        await user.click(only);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        expect(seen('To the first.')).toHaveLength(1);
+    });
+
+    it('are opened with what was made of them alone, and shown with all that was made of the post where the reader asks', async () => {
+        const { user } = await opened();
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        const only = screen.getByLabelText('Only responses to this version') as HTMLInputElement;
+
+        await screen.findByText('As it was first.');
+        expect(only.checked).toBe(true);
+        expect(seen('To the second.')).toHaveLength(0);
+
+        await user.click(only);
+
+        // The post as it was, with every answer: one to another version says so.
+        expect(seen('As it was first.')).toHaveLength(1);
+        expect(await screen.findByText(/2 boosts · rated 50% by 2/)).toBeTruthy();
+        const later = seen('To the latest.')[0].closest('article')!.parentElement!;
+
+        expect(within(later).getByText(/This answered another version/)).toBeTruthy();
+        expect(within(seen('To the first.')[0].closest('article')!.parentElement!).queryByText(/another version/)).toBeNull();
+        // Nothing is made of an earlier version, however its responses are shown.
+        expect(screen.queryByRole('button', { name: 'Boost' })).toBeNull();
+        expect(labelled('Reply')).toHaveLength(0);
+
+        // An answer to the latest leads to the latest, with all of them once more.
+        await user.click(within(later).getByRole('button', { name: 'See that version' }));
+        await waitFor(() => expect(seen('As it is.')).toHaveLength(1));
+        expect((screen.getByLabelText('Only responses to this version') as HTMLInputElement).checked).toBe(false);
     });
 
     it('are named on the answers made to them, where the latest is shown, and reached from there', async () => {
@@ -3199,8 +3263,8 @@ describe('the earlier versions of a post', () => {
         await user.click(within(gone).getByRole('button', { name: 'See that version' }));
         expect(await screen.findByText('That version is no longer in its history.')).toBeTruthy();
         // The latest is not shown as though it were that version, and nothing is made of it from here.
-        expect(screen.queryByText('As it is.')).toBeNull();
-        expect(screen.queryByLabelText('Reply')).toBeNull();
+        expect(seen('As it is.')).toHaveLength(0);
+        expect(labelled('Reply')).toHaveLength(0);
         expect((screen.getByLabelText('Version') as HTMLSelectElement).value).toBe('vgone');
     });
 
@@ -3240,6 +3304,61 @@ describe('the earlier versions of a post', () => {
         expect(screen.queryByText('To the first.')).toBeNull();
     });
 
+    it('keep what the reader was writing of the latest, and what they confirmed, while an earlier one is looked at', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const authored = (current: number): Publication => ({
+            ...edited(), current,
+            memeplex: { kind: 'paper', author: BOB, title: 'The paper', summary: 'About it.', authors: [BOB, ALICE], content: { cid: 'bafypaper', type: 'text/markdown', bytes: 3 } },
+        });
+        const { api, state } = services({ me: granted, timeline: [authored(2)] });
+
+        state.known['did:cid:1'] = authored(2);
+        state.revisions['did:cid:1 v1'] = authored(0);
+        state.coauthors['did:cid:1'] = [{ did: ALICE, status: 'listed' }];
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        // A confirmation that waits, and a review half written.
+        await user.click(await screen.findByRole('button', { name: 'Confirm this revision' }));
+        await screen.findByText('Your confirmation is waiting to be anchored.');
+        await user.type(screen.getByLabelText('Reply'), 'Half a review');
+        await user.type(screen.getByLabelText('Verdict'), 'accept');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await waitFor(() => expect(labelled('Reply')).toHaveLength(0));
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+
+        // Neither is lost, and the paper is not offered for confirming a second time.
+        expect((screen.getByLabelText('Reply') as HTMLTextAreaElement).value).toBe('Half a review');
+        expect((screen.getByLabelText('Verdict') as HTMLInputElement).value).toBe('accept');
+        expect(seen('Your confirmation is waiting to be anchored.')).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
+        expect(state.published.filter(each => each.kind === 'tag')).toHaveLength(1);
+    });
+
+    it('keep an edit the reader was making of the latest while an earlier one is looked at', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([ALICE]));
+        const mine = { ...edited(), memeplex: { kind: 'post', author: ALICE, text: 'As it is.', grant: 'did:cid:grant' } };
+        const { api, state } = services({ me: granted, timeline: [mine] });
+
+        state.known['did:cid:1'] = mine;
+        state.revisions['did:cid:1 v1'] = { ...mine, current: 0, memeplex: { ...mine.memeplex, text: 'As it was first.' } };
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await user.type(screen.getByLabelText('Edit'), ' And more.');
+
+        await user.selectOptions(screen.getByLabelText('Version'), 'v1');
+        await screen.findByText('As it was first.');
+        expect(labelled('Edit')).toHaveLength(0);
+        await user.click(screen.getByRole('button', { name: 'Latest version' }));
+
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('As it is. And more.');
+    });
+
     it('say nothing of how a paper\'s coauthors stand on an earlier revision, which is known of its latest', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         const authored = (text: string, current: number): Publication => ({
@@ -3261,8 +3380,8 @@ describe('the earlier versions of a post', () => {
         await user.selectOptions(await screen.findByLabelText('Version'), 'v1');
         expect(await screen.findByText('The paper, first')).toBeTruthy();
         // Its authors are named, and nothing is said or asked of what they confirmed.
-        expect(document.querySelectorAll('.authors li')).toHaveLength(2);
-        expect(screen.queryByText('confirmed')).toBeNull();
+        expect([...document.querySelectorAll('.authors li')].filter(each => !each.closest('[hidden]'))).toHaveLength(2);
+        expect(seen('confirmed')).toHaveLength(0);
         expect(screen.queryByRole('button', { name: 'Confirm this revision' })).toBeNull();
         expect(api.coauthors).toHaveBeenCalledTimes(asked);
     });

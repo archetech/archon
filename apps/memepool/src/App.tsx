@@ -1562,11 +1562,13 @@ export function responsesAt(all: Responses, version: string): Responses {
     };
 }
 
-function Respond({ api, me, grants, target, version }: {
+function Respond({ api, me, grants, target, version, past = false }: {
     api: Api; me: Me; grants: Set<string>; target: Publication;
-    // An earlier version being looked at: what was made of it is shown, and
-    // nothing more is made of it from here.
+    // A version whose responses alone are counted, where the reader asks for
+    // one version's and not all that were made of the object.
     version?: string;
+    // Whether an earlier version is looked at: nothing more is made of it from here.
+    past?: boolean;
 }) {
     const [all, setResponses] = useState<Responses | null>(null);
     const responses = all && version ? responsesAt(all, version) : all;
@@ -1736,7 +1738,7 @@ function Respond({ api, me, grants, target, version }: {
                 </p>
             )}
             {error && <p role="alert" className="error">{error}</p>}
-            {me.grant && !version && (
+            {me.grant && !past && (
                 <>
                     {boosts.length > 0
                         ? (
@@ -1984,6 +1986,15 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     // it was then: it is read from the indexer, which keeps every version.
     const [at, setAt] = useState<string | null>(null);
     const [earlier, setEarlier] = useState<{ of: string; found: Publication | 'no-revision' | null } | null>(null);
+    // Whether only what was made of the version shown is shown. What is shown
+    // otherwise is all that was made of the post, whichever version each was
+    // of: an edit puts nothing out of sight. An earlier version is opened with
+    // what was made of it alone, which is what it is opened for.
+    const [only, setOnly] = useState(false);
+    const see = (version: string | null) => {
+        setAt(version);
+        setOnly(version !== null);
+    };
     // The same for each reply of the reader's own that the thread shows.
     const [answers, setAnswers] = useState<Record<string, NonNullable<Publication['memeplex']>>>({});
 
@@ -2096,7 +2107,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
     const versions = (revisions.length > 1 || looking) && (
         <label className="inline versions">
             Version
-            <select value={looking ?? latest ?? ''} onChange={event => setAt(event.target.value === latest ? null : event.target.value)}>
+            <select value={looking ?? latest ?? ''} onChange={event => see(event.target.value === latest ? null : event.target.value)}>
                 {looking && !revisions.some(each => each.opid === looking) && <option value={looking}>not in the history</option>}
                 {revisions.map((each, index) => (
                     <option key={each.opid} value={each.opid}>
@@ -2117,38 +2128,47 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
         <section>
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             {looking
-                ? <button className="quiet" onClick={() => setAt(null)}>Latest version</button>
+                ? <button className="quiet" onClick={() => see(null)}>Latest version</button>
                 : <button className="quiet" onClick={load}>Refresh</button>}{' '}
             {versions}
-            {looking && <p className="muted note">An earlier version of this, with the replies, ratings and tags made on it.</p>}
+            {(revisions.length > 1 || looking) && (
+                <label className="inline">
+                    <input type="checkbox" checked={only} onChange={event => setOnly(event.target.checked)} />
+                    Only responses to this version
+                </label>
+            )}
+            {looking && <p className="muted note">An earlier version of this.</p>}
             {looking && then === undefined && <p className="muted">Reading that version.</p>}
             {looking && then === null && <p role="alert" className="error">That version could not be read.</p>}
             {looking && then === 'no-revision' && <p className="muted">That version is no longer in its history.</p>}
             {looking && then && then !== 'no-revision' && <Post publication={then} full={api} past />}
-            {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
-            {!looking && (
+            {/* The latest is put out of sight while an earlier version is looked at, and
+                not put away: what the reader was writing of it, and what they have
+                made of it that waits, is there when they come back. */}
+            <div hidden={Boolean(looking)}>
+                {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
                 <Reads.Provider value={loads}>
                     <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} reader={me} />
                 </Reads.Provider>
-            )}
-            {/* One edit at a time: the next is of the post as the last one left it. */}
-            {!looking && mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
-                <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
-            )}
-            {/* An editor is of one version. When another is shown it starts again from that one,
-                so that what is saved was written against what the reader saw. */}
-            {!looking && editing && <Edit key={versionKey(root)} api={api} publication={root} blocked={waits !== null} onDone={saved => { setEditing(false); if (saved) { setEdited(versionKey(root)); load(); } }} />}
-            {!looking && (edited !== undefined || waits) && <p className="muted">Your edit is waiting to be anchored. Until it is, others see this as it was.</p>}
-            <Respond api={api} me={me} grants={grants} target={root} version={looking ?? undefined} />
+                {/* One edit at a time: the next is of the post as the last one left it. */}
+                {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
+                    <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
+                )}
+                {/* An editor is of one version. When another is shown it starts again from that one,
+                    so that what is saved was written against what the reader saw. */}
+                {editing && <Edit key={versionKey(root)} api={api} publication={root} blocked={waits !== null} onDone={saved => { setEditing(false); if (saved) { setEdited(versionKey(root)); load(); } }} />}
+                {(edited !== undefined || waits) && <p className="muted">Your edit is waiting to be anchored. Until it is, others see this as it was.</p>}
+            </div>
+            <Respond api={api} me={me} grants={grants} target={root} version={only ? (looking ?? latest) : undefined} past={Boolean(looking)} />
             {!looking && error && <p role="alert" className="error">{error}</p>}
             {replies === null && !error && <p className="muted">Loading replies…</p>}
-            {(looking ? answering(looking) : replies ?? []).map(each => (
+            {(only && (looking ?? latest) ? answering((looking ?? latest) as string) : replies ?? []).map(each => (
                 <div key={each.publication.did} style={{ marginLeft: `${Math.min(each.depth, 6)}rem` }}>
                     {/* An answer is to the version it names, which may not be the one shown. */}
-                    {!looking && each.depth === 1 && typeof each.publication.memeplex?.targetVersion === 'string' && each.publication.memeplex.targetVersion !== latest && (
+                    {each.depth === 1 && typeof each.publication.memeplex?.targetVersion === 'string' && each.publication.memeplex.targetVersion !== (looking ?? latest) && (
                         <p className="muted note">
-                            This answered an earlier version.{' '}
-                            <button className="quiet" onClick={() => setAt(String(each.publication.memeplex?.targetVersion))}>See that version</button>
+                            This answered {looking ? 'another' : 'an earlier'} version.{' '}
+                            <button className="quiet" onClick={() => see(each.publication.memeplex?.targetVersion === latest ? null : String(each.publication.memeplex?.targetVersion))}>See that version</button>
                         </p>
                     )}
                     <Post
@@ -2157,10 +2177,12 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                     />
                 </div>
             ))}
-            {!looking && waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
-                <Awaited key={each.did} entry={each} author={me.did} onDismiss={onDismiss} />
-            ))}
-            {!looking && may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} reviewing={root.memeplex?.kind === 'paper'} />}
+            <div hidden={Boolean(looking)}>
+                {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
+                    <Awaited key={each.did} entry={each} author={me.did} onDismiss={onDismiss} />
+                ))}
+                {may(me, 'memeplex:reply') && <Composer label="Reply" onPublish={reply} reviewing={root.memeplex?.kind === 'paper'} />}
+            </div>
         </section>
     );
 }
