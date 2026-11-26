@@ -193,6 +193,23 @@ button {
     cursor: pointer;
 }
 
+/* A publication that a click opens. */
+.opens { cursor: pointer; }
+.post.opens:hover, .quoted.opens:hover { border-color: var(--soft); }
+/* A card's own click reaches its edges. */
+.embed.card > .quoted { margin: -0.75rem; padding: 0.75rem; border-radius: 0.5rem; }
+/* What else can be done with a post, under one button at the end of its header. */
+.more { position: relative; white-space: nowrap; }
+.post header > .when:has(+ .more), .post header > time:has(+ .more) { margin-left: auto; }
+.more > button { font-size: 1.25rem; line-height: 1; font-weight: 700; padding: 0 0.4rem 0.2rem; color: var(--soft); }
+.more > button:hover, .more > button[aria-expanded="true"] { color: var(--ink); background: var(--ground); }
+.more [role="menu"] {
+    position: absolute; right: 0; top: 100%; z-index: 2; display: flex; flex-direction: column; align-items: stretch;
+    min-width: 9rem; padding: 0.25rem; background: var(--paper); border: 1px solid var(--line); border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+.more [role="menu"] button { text-align: left; white-space: nowrap; color: var(--ink); }
+.more [role="menu"] button:hover, .more [role="menu"] button:focus-visible { background: var(--ground); }
 button.quiet { background: transparent; color: var(--accent); border-color: transparent; padding: 0.2rem 0.4rem; }
 button:disabled { opacity: 0.5; cursor: default; }
 a { color: var(--accent); }

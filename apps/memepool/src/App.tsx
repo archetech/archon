@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { linkTo, pathOf, routeOf } from './route';
 import type { Listing } from './route';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Coauthor, FileRef, Me, Person, Publication, Reply, Responses } from './api';
 import Markdown, { Embeds } from './Markdown';
@@ -271,6 +271,88 @@ function Copy({ text, label, unable = 'Could not copy. Select the link and copy 
     );
 }
 
+// Whether a click was on a publication itself: not on something in it that
+// does something of its own, and not the end of selecting some of its text.
+const onItself = (event: MouseEvent<HTMLElement>) =>
+    event.button === 0
+    && !(event.target as Element).closest('a, button, input, textarea, select, label, summary, [role="menu"]')
+    && !window.getSelection()?.toString();
+
+// What else can be done with a publication, behind one button: each thing is
+// done when chosen, and what it has to say of how that went is said beside
+// the button.
+function Menu({ items }: { items: { label: string; act: () => Promise<string | void> | string | void }[] }) {
+    const [open, setOpen] = useState(false);
+    const [said, setSaid] = useState('');
+    const within = useRef<HTMLSpanElement>(null);
+    const button = useRef<HTMLButtonElement>(null);
+    const list = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) {
+            return undefined;
+        }
+
+        list.current?.querySelector('button')?.focus();
+
+        const outside = (event: Event) => {
+            if (!within.current?.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', outside);
+
+        return () => document.removeEventListener('mousedown', outside);
+    }, [open]);
+
+    const choose = async (act: () => Promise<string | void> | string | void) => {
+        setOpen(false);
+        button.current?.focus();
+        setSaid((await act()) || '');
+    };
+
+    return (
+        <span className="more" ref={within}>
+            {said && <span className="muted" role="status">{said} </span>}
+            <button ref={button} className="quiet" aria-label="More" aria-haspopup="menu" aria-expanded={open} onClick={() => { setSaid(''); setOpen(!open); }}>⋯</button>
+            {open && (
+                <div
+                    ref={list}
+                    role="menu"
+                    onKeyDown={event => {
+                        const each = [...list.current!.querySelectorAll('button')];
+                        const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+
+                        if (event.key === 'Escape') {
+                            setOpen(false);
+                            button.current?.focus();
+                        }
+                        else if (step) {
+                            event.preventDefault();
+                            each[(each.indexOf(document.activeElement as HTMLButtonElement) + step + each.length) % each.length].focus();
+                        }
+                    }}
+                >
+                    {items.map(item => <button key={item.label} role="menuitem" className="quiet" onClick={() => choose(item.act)}>{item.label}</button>)}
+                </div>
+            )}
+        </span>
+    );
+}
+
+// What copies a text when it is chosen, and says how that went.
+const copying = (text: string, unable: string) => async () => {
+    try {
+        await navigator.clipboard.writeText(text);
+
+        return 'Copied';
+    }
+    catch {
+        return unable;
+    }
+};
+
 function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
     return (
         <section className="card">
@@ -504,8 +586,21 @@ function Quoted({ publication }: { publication: Publication }) {
         }
     };
 
+    const opens = Boolean(onOpen && !withdrawn && publication.did);
+
+    // A click on the card opens what it shows, and not what the card is in.
     return (
-        <>
+        <div
+            className={opens ? 'quoted opens' : 'quoted'}
+            onClick={event => {
+                if (opens && onItself(event)) {
+                    event.stopPropagation();
+                    if (!opening) {
+                        open();
+                    }
+                }
+            }}
+        >
             <header>
                 <Identity did={object.author} />
                 <time>{when(publication)}</time>
@@ -514,8 +609,7 @@ function Quoted({ publication }: { publication: Publication }) {
             <Body object={object} embeds={false} />
             {withdrawn && <p className="muted note">Its author has since withdrawn this.</p>}
             {unopened && <p role="alert" className="error">It cannot be opened as it is. Refresh, and try once more.</p>}
-            {onOpen && !withdrawn && publication.did && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
-        </>
+        </div>
     );
 }
 
@@ -615,8 +709,10 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
         }
     };
 
+    const opens = Boolean(onOpen && shown && !withdrawn);
+
     return (
-        <article className="post boost">
+        <article className={opens ? 'post boost opens' : 'post boost'} onClick={event => { if (opens && !opening && onItself(event)) { open(); } }}>
             <p className="boosted">
                 <Identity did={author} />
                 <span>boosted</span>
@@ -641,13 +737,7 @@ function Boost({ publication, target, onOpen, onWithdraw }: {
                 </div>
             )}
             {unopened && <p role="alert" className="error">The post cannot be opened as it is. Refresh, and try once more.</p>}
-            <footer>
-                {onOpen && shown && !withdrawn && <button className="quiet" disabled={opening} onClick={open}>Open</button>}
-                {onWithdraw && <button className="quiet" onClick={onWithdraw}>Undo boost</button>}
-                {/* The link and the DID are the post's, which is what a boost is of. */}
-                <Copy text={linkTo({ publication: address })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ publication: address })}`} />
-                <Copy text={address} label="Copy DID" unable={`Could not copy. The DID is ${address}`} />
-            </footer>
+            {onWithdraw && <footer><button className="quiet" onClick={onWithdraw}>Undo boost</button></footer>}
         </article>
     );
 }
@@ -725,8 +815,10 @@ function Answered({ did, version }: { did: string; version?: string }) {
 
 // `answers` says whether a reply is shown with what it answers: it is where a
 // reply is read apart from its thread, and not in the thread itself.
-function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader, past }: {
-    publication: Publication; onOpen?: (publication: Publication) => void; onWithdraw?: () => void; full?: Api; answers?: boolean;
+function Post({ publication, onOpen, opened, onWithdraw, undo, full, answers, waiting, reader, past }: {
+    publication: Publication; onOpen?: (publication: Publication) => void; opened?: boolean; onWithdraw?: () => Promise<string | void>;
+    // How a boost of the reader's own is undone, where it is listed.
+    undo?: () => void; full?: Api; answers?: boolean;
     // Who is reading, where the post is open to them: a paper that lists them
     // is theirs to confirm.
     reader?: Me;
@@ -746,11 +838,28 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader,
     const target = boosted(object);
 
     if (target) {
-        return <Boost publication={publication} target={target} onOpen={onOpen} onWithdraw={onWithdraw} />;
+        return <Boost publication={publication} target={target} onOpen={onOpen} onWithdraw={undo} />;
     }
 
+    // What else there is to do with a post is offered where it is open: to
+    // withdraw it where that is the reader's to do, and to copy its address
+    // in these pages, its DID, which another wallet or node resolves it by,
+    // and what another text is given to show this version of it.
+    const link = publication.did ? linkTo({ publication: publication.did }) : '';
+    const more = opened && publication.did ? [
+        ...(onWithdraw ? [{ label: 'Withdraw', act: onWithdraw }] : []),
+        { label: 'Copy link', act: copying(link, `Could not copy. The link is ${link}`) },
+        ...(shownVersion(publication) && !waiting
+            ? [{ label: 'Copy embed', act: copying(embedFor(publication), `Could not copy. The embed is ${embedFor(publication)}`) }]
+            : []),
+        { label: 'Copy DID', act: copying(publication.did, `Could not copy. The DID is ${publication.did}`) },
+    ] : null;
+
     return (
-        <article className={waiting ? 'post waiting' : 'post'}>
+        <article
+            className={['post', ...(waiting ? ['waiting'] : []), ...(onOpen ? ['opens'] : [])].join(' ')}
+            onClick={event => { if (onOpen && onItself(event)) { onOpen(publication); } }}
+        >
             <header>
                 <Identity did={object.author} />
                 {waiting && <span className="badge" role="status">Edit waiting to be anchored</span>}
@@ -760,6 +869,7 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader,
                 {publication.did
                     ? <a className="when" href={pathOf({ publication: publication.did })} title="Link to this"><time>{when(publication)}</time></a>
                     : <time>{when(publication)}</time>}
+                {more && <Menu items={more} />}
             </header>
             {answers && object.kind === 'reply' && typeof object.target === 'string' && (
                 <Answered did={object.target} version={typeof object.targetVersion === 'string' ? object.targetVersion : undefined} />
@@ -772,18 +882,6 @@ function Post({ publication, onOpen, onWithdraw, full, answers, waiting, reader,
             )}
             <Body object={object} full={full} />
             {object.kind === 'paper' && full && <Downloads object={object} api={full} />}
-            <footer>
-                {onOpen && <button className="quiet" onClick={() => onOpen(publication)}>Open</button>}
-                {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}
-                {/* The address of this publication in these pages, to give to someone else. */}
-                {publication.did && <Copy text={linkTo({ publication: publication.did })} label="Copy link" unable={`Could not copy. The link is ${linkTo({ publication: publication.did })}`} />}
-                {/* A post's DID is its address: what another wallet or node resolves it by. */}
-                {publication.did && <Copy text={publication.did} label="Copy DID" unable={`Could not copy. The DID is ${publication.did}`} />}
-                {/* What another text is given to show this version of the post inside it. */}
-                {publication.did && shownVersion(publication) && !waiting && (
-                    <Copy text={embedFor(publication)} label="Copy embed" unable={`Could not copy. The embed is ${embedFor(publication)}`} />
-                )}
-            </footer>
         </article>
     );
 }
@@ -1962,13 +2060,16 @@ function Edit({ api, publication, blocked = false, onDone }: {
     );
 }
 
-function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onDismiss, onBack, onRead }: {
+function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onDismiss, onBack, onWithdrawn, onRead }: {
     api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
     onPublished: (waiting: Waiting) => void; onDismiss: (did: string) => void; onBack: () => void;
+    // Told that the reader withdrew the post, which is then no longer there to show.
+    onWithdrawn: () => void;
     // Told each time the thread has been read, with the replies it shows: what its
     // texts embed is read anew, and a reply of the reader's that is shown waits no more.
     onRead?: (shown: string[]) => void;
 }) {
+    const open = useContext(Opens);
     // The post as the indexer last showed it, which an edit changes once it is anchored.
     const [root, setRoot] = useState(opened);
 
@@ -2127,6 +2228,18 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
         </label>
     );
 
+    const withdraw = async () => {
+        try {
+            await api.withdraw(root.did!);
+            onWithdrawn();
+
+            return undefined;
+        }
+        catch (failure) {
+            return message(failure);
+        }
+    };
+
     // The latest version, with all that is made of it; or an earlier one: the
     // post as it was and what was made of it then, of which nothing is made
     // from here and nothing is changed. What the reader has made of the post
@@ -2148,14 +2261,21 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
             {looking && then === undefined && <p className="muted">Reading that version.</p>}
             {looking && then === null && <p role="alert" className="error">That version could not be read.</p>}
             {looking && then === 'no-revision' && <p className="muted">That version is no longer in its history.</p>}
-            {looking && then && then !== 'no-revision' && <Post publication={then} full={api} past />}
+            {looking && then && then !== 'no-revision' && <Post publication={then} full={api} past opened />}
             {/* The latest is put out of sight while an earlier version is looked at, and
                 not put away: what the reader was writing of it, and what they have
                 made of it that waits, is there when they come back. */}
             <div hidden={Boolean(looking)}>
                 {/* The reader's own post is shown as their edit leaves it, marked as waiting. */}
                 <Reads.Provider value={loads}>
-                    <Post publication={waits ? { ...root, memeplex: waits } : root} full={api} waiting={Boolean(waits)} reader={me} />
+                    <Post
+                        publication={waits ? { ...root, memeplex: waits } : root}
+                        full={api}
+                        waiting={Boolean(waits)}
+                        reader={me}
+                        opened
+                        onWithdraw={mine && root.state === 'published' ? withdraw : undefined}
+                    />
                 </Reads.Provider>
                 {/* One edit at a time: the next is of the post as the last one left it. */}
                 {mine && root.state === 'published' && (root.memeplex?.text !== undefined || root.memeplex?.content !== undefined) && !editing && edited === undefined && waits === null && (
@@ -2181,6 +2301,7 @@ function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onD
                     <Post
                         publication={answers[each.publication.did ?? ''] ? { ...each.publication, memeplex: answers[each.publication.did ?? ''] } : each.publication}
                         waiting={Boolean(answers[each.publication.did ?? ''])}
+                        onOpen={open && each.publication.did ? () => open(each.publication) : undefined}
                     />
                 </div>
             ))}
@@ -2690,6 +2811,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                         onPublished={published => setWaiting(current => [...current, published])}
                         onDismiss={dismiss}
                         onBack={() => { setOpen(null); loadTimeline(); }}
+                        onWithdrawn={() => { withdrawals.add(open.did!); setOpen(null); loadTimeline(); }}
                         onRead={read}
                     />
                 ) : (
@@ -2760,7 +2882,7 @@ function Reader({ api, me, onCheck, onSignedOut, onSignedIn, pollMs }: {
                                     waiting={Boolean(each.did && edits[each.did])}
                                     answers
                                     onOpen={opened => setOpen(opened.did === each.did ? each : opened)}
-                                    onWithdraw={changeable(each)
+                                    undo={changeable(each) && each.memeplex && boosted(each.memeplex)
                                         ? async () => {
                                             try {
                                                 await api.withdraw(each.did!);
