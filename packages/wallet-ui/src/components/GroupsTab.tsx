@@ -317,11 +317,11 @@ const GroupsTab = () => {
                             Add
                         </Button>
                     </Box>
-                    {selectedGroup.members.map((did: string, index: number) => {
+                    {selectedGroup.members.map((did: string) => {
                         const alias = Object.keys(aliasList).find((n) => aliasList[n] === did) ?? undefined;
 
                         return (
-                            <Box key={index}>
+                            <Box key={did}>
                                 <Box display="flex" alignItems="center" justifyContent="space-between" sx={{my: 1}}>
                                     <Box display="flex" flexDirection="row">
                                         <CopyResolveDID did={did} />

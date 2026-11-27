@@ -55,6 +55,7 @@ beforeEach(() => {
 // first renders the list.
 afterEach(() => {
     const keyWarnings = consoleError.mock.calls.filter((args) => String(args[0]).includes('unique "key"'));
+    consoleError.mockRestore();
     expect(keyWarnings).toEqual([]);
 });
 
