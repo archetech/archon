@@ -227,7 +227,7 @@ const GroupsTab = () => {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createGroup}
-                        disabled={!groupName}
+                        disabled={!groupName.trim()}
                     >
                         Create
                     </Button>

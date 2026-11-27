@@ -103,6 +103,14 @@ describe('creating a vault', () => {
         expect(create).toBeEnabled();
     });
 
+    it('does not offer Create for a name of only spaces', async () => {
+        const user = userEvent.setup();
+        render(<VaultTab />);
+
+        await user.type(screen.getByLabelText('Vault Name'), '   ');
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
     it('creates the vault on the chosen registry and opens it', async () => {
         const user = userEvent.setup();
         walletData.refreshAliases.mockImplementation(async () => {

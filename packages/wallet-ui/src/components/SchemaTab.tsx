@@ -169,7 +169,7 @@ const SchemaTab = ()=> {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createSchema}
-                        disabled={!schemaName}
+                        disabled={!schemaName.trim()}
                     >
                         Create
                     </Button>
