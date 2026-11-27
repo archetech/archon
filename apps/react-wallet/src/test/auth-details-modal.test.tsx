@@ -94,8 +94,16 @@ describe('the login details dialog', () => {
         await user.clear(field('Username'));
         await user.type(field('Username'), 'edited');
 
+        // Closed and opened again with the same login: what was typed is gone and the password is hidden.
+        const onClose = vi.fn();
+        shown.rerender(<AuthDetailsModal open={false} onClose={onClose} login={login} />);
+        shown.rerender(<AuthDetailsModal open onClose={onClose} login={login} />);
+
+        expect(field('Username').value).toBe('alice');
+        expect(field('Password').type).toBe('password');
+
         const other = { service: 'other.org', username: 'bob', password: 'secret' };
-        shown.rerender(<AuthDetailsModal open onClose={vi.fn()} login={other} />);
+        shown.rerender(<AuthDetailsModal open onClose={onClose} login={other} />);
 
         expect(field('Service').value).toBe('other.org');
         expect(field('Username').value).toBe('bob');
