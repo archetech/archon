@@ -140,6 +140,11 @@ async function openPoll(user: UserEvent, name = 'lunch') {
     await screen.findByText('Where do we eat?');
 }
 
+// Makes the current identity the poll's owner. The view of the poll is left
+// as each test sets it, without results: Keymaster always gives an owner the
+// results, and the tab then takes an unpublished poll for a published one
+// (#1804). These tests cover what the tab does once it is told a poll is not
+// published, not that first reading.
 function ownPoll() {
     keymaster.resolveDID.mockResolvedValue({ didDocument: { controller: ME } });
 }
