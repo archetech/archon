@@ -136,10 +136,10 @@ function IdentitiesTab() {
         return "";
     }, [aliasList]);
 
-    async function getImagePreviewDataUrl(doc: Record<string, unknown>): Promise<string> {
-        const docAsset = doc as { file?: FileAsset; image?: ImageAsset };
+    async function getImagePreviewDataUrl(doc: unknown): Promise<string> {
+        const docAsset = doc as { file?: FileAsset; image?: ImageAsset } | undefined;
 
-        if (!docAsset.file?.cid || !docAsset.file?.type || !docAsset.image) {
+        if (!docAsset?.file?.cid || !docAsset.file?.type || !docAsset.image) {
             return "";
         }
 
@@ -183,7 +183,7 @@ function IdentitiesTab() {
         try {
             const doc = await keymaster.resolveDID(value);
             const did = doc.didDocument?.id || "";
-            const previewUrl = await getImagePreviewDataUrl(doc.didDocumentData as Record<string, unknown>);
+            const previewUrl = await getImagePreviewDataUrl(doc.didDocumentData);
 
             if (!did) {
                 setError("Unable to resolve avatar DID");
@@ -228,8 +228,8 @@ function IdentitiesTab() {
 
         try {
             const identityDoc = await keymaster.resolveDID(currentDID);
-            const data = identityDoc.didDocumentData as Record<string, unknown>;
-            const rawAvatar = data.avatar;
+            const data = identityDoc.didDocumentData as Record<string, unknown> | undefined;
+            const rawAvatar = data?.avatar;
             const nextDid = typeof rawAvatar === "string" ? rawAvatar.trim() : "";
 
             if (!nextDid) {
@@ -246,7 +246,7 @@ function IdentitiesTab() {
 
             try {
                 const avatarDoc = await keymaster.resolveDID(nextDid);
-                const previewUrl = await getImagePreviewDataUrl(avatarDoc.didDocumentData as Record<string, unknown>);
+                const previewUrl = await getImagePreviewDataUrl(avatarDoc.didDocumentData);
 
                 if (previewUrl) {
                     setAvatarPreviewUrl(previewUrl);
@@ -358,17 +358,17 @@ function IdentitiesTab() {
                     await previewAvatarCandidate(did, { alias });
                     setSuccess(`Avatar image uploaded successfully: ${alias}. Review the preview, then set the avatar.`);
                 } catch (error: any) {
-                    setError(`Error processing avatar image: ${error}`);
+                    setError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
+            reader.onerror = () => {
+                setError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading avatar image: ${error}`);
+            setError(error);
         }
     }
 
