@@ -91,7 +91,6 @@ async function decrypt(user: UserEvent, row = 0) {
     return screen.findByRole('textbox');
 }
 
-// Replaced in one step: the editor is only drawn while it holds some text.
 function retype(text: string) {
     fireEvent.change(editor(), { target: { value: text } });
 }
@@ -197,17 +196,33 @@ describe('editing an issued credential', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
-    it('reports text that is not JSON and updates nothing', async () => {
+    it('keeps the editor when its text is cleared, so that it can be typed again', async () => {
         const user = userEvent.setup({ delay: null });
         render(<IssuedTab />);
         await decrypt(user);
 
-        retype('not json');
-        await user.click(button('Update'));
+        await user.clear(editor());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.any(SyntaxError)));
-        expect(keymaster.updateCredential).not.toHaveBeenCalled();
-        expect(editor()).toHaveValue('not json');
+        expect(editor()).toHaveValue('');
+        expect(screen.queryByTestId('viewer')).toBeNull();
+        expect(button('Update')).toBeDisabled();
+
+        await user.click(editor());
+        await user.paste(JSON.stringify(amended));
+        expect(editor()).toHaveValue(JSON.stringify(amended));
+        expect(button('Update')).toBeEnabled();
+    });
+
+    it('offers no Update for text that is not a JSON object', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssuedTab />);
+        await decrypt(user);
+
+        for (const text of ['not json', '[]', 'null', '"text"']) {
+            retype(text);
+            expect(button('Update')).toBeDisabled();
+        }
+        expect(editor()).toHaveValue('"text"');
     });
 
     it('reports a failure to update and keeps the edit', async () => {

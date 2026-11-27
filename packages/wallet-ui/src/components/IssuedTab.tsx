@@ -13,6 +13,16 @@ import JsonViewer from "./JsonViewer";
 import DisplayDID from "./DisplayDID";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
+// A credential is a JSON object; other text cannot be saved as one.
+function isJsonObject(text: string): boolean {
+    try {
+        const value = JSON.parse(text);
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+    } catch {
+        return false;
+    }
+}
+
 function IssuedTab() {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
@@ -193,7 +203,7 @@ function IssuedTab() {
                                 color="primary"
                                 className="button large regular"
                                 onClick={() => updateIssued(did)}
-                                disabled={did !== selectedIssued || !issuedEdit || issuedString === issuedStringOriginal}
+                                disabled={did !== selectedIssued || !issuedEdit || issuedString === issuedStringOriginal || !isJsonObject(issuedString)}
                             >
                                 Update
                             </Button>
@@ -226,7 +236,7 @@ function IssuedTab() {
             </Box>
             {selectedIssued &&
                 <Box>
-                    {(issuedEdit && issuedString) ? (
+                    {issuedEdit ? (
                         <TextField
                             value={issuedString}
                             onChange={(e) => setIssuedString(e.target.value)}

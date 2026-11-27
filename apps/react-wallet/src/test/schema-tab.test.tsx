@@ -63,7 +63,6 @@ async function openSchema(user: UserEvent, name = 'degree') {
     await screen.findByRole('button', { name: 'Save Schema' });
 }
 
-// Replaced in one step: the editor is only drawn while it holds some text.
 function retype(text: string) {
     fireEvent.change(editor(), { target: { value: text } });
 }
@@ -224,17 +223,35 @@ describe('saving a schema', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
-    it('reports text that is not JSON and saves nothing', async () => {
+    it('keeps the editor when its text is cleared, so that it can be typed again', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<SchemaTab />);
+        await openSchema(user);
+
+        await user.clear(editor());
+
+        expect(editor()).toHaveValue('');
+        expect(saveButton()).toBeDisabled();
+
+        await user.click(editor());
+        await user.paste(JSON.stringify(amended));
+        expect(editor()).toHaveValue(JSON.stringify(amended));
+        expect(saveButton()).toBeEnabled();
+    });
+
+    it('offers no Save for text that is not a JSON object', async () => {
         const user = userEvent.setup({ delay: null });
         render(<SchemaTab />);
         await openSchema(user);
 
         await user.type(editor(), ' oops');
-        await user.click(saveButton());
+        expect(saveButton()).toBeDisabled();
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.any(SyntaxError)));
+        for (const text of ['[]', 'null', '"text"']) {
+            retype(text);
+            expect(saveButton()).toBeDisabled();
+        }
         expect(keymaster.setSchema).not.toHaveBeenCalled();
-        expect(setSuccess).not.toHaveBeenCalled();
     });
 
     it('reports a failure to save and keeps the edit', async () => {
