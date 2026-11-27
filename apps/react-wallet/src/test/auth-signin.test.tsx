@@ -264,6 +264,28 @@ describe('answering a challenge by hand', () => {
         expect(button('Send').disabled).toBe(true);
     });
 
+    it('offers no send for a later challenge with no callback when an earlier send fails after it was answered', async () => {
+        let fail!: (error: Error) => void;
+        axiosPost.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+        const user = await respondTo();
+        await waitFor(() => expect(button('Send').disabled).toBe(false));
+        await user.click(button('Send'));
+
+        // The second challenge is answered while the first response is still being sent.
+        keymaster.resolveAsset.mockResolvedValue(challengeAsset({}));
+        keymaster.createResponse.mockResolvedValue('did:cid:second-response');
+        await user.clear(input('Challenge'));
+        await user.type(input('Challenge'), 'did:cid:second-challenge');
+        await user.click(button('Respond'));
+        await waitFor(() => expect(input('Response').value).toBe('did:cid:second-response'));
+
+        fail(new Error('Network Error'));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Network Error' })));
+        expect(button('Send').disabled).toBe(true);
+        expect(axiosPost).toHaveBeenCalledTimes(1);
+    });
+
     it('offers no send for a challenge with no callback answered after one with a callback', async () => {
         const user = await respondTo();
         await waitFor(() => expect(button('Send').disabled).toBe(false));

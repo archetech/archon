@@ -328,14 +328,27 @@ function SignIn() {
         await setResponse("");
     }
 
+    // The response and callback on screen, for a send to compare against once
+    // its request has settled: another challenge may have been answered by then.
+    const shown = useRef({ response, callback });
+    shown.current = { response, callback };
+
     async function sendResponse() {
+        const sent = { response, callback };
+        const stillShown = () => shown.current.response === sent.response && shown.current.callback === sent.callback;
+
         try {
             await setDisableSendResponse(true);
-            await axios.post(callback, { response });
+            await axios.post(sent.callback, { response: sent.response });
             setSuccess("Response sent successfully");
-            await setCallback("");
+            if (stillShown()) {
+                await setCallback("");
+            }
         } catch (error: any) {
-            setDisableSendResponse(false);
+            // Only the response that failed to send is offered again.
+            if (stillShown()) {
+                setDisableSendResponse(false);
+            }
             setError(error);
         }
     }
