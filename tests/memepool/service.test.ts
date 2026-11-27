@@ -190,8 +190,12 @@ describe('a started service', () => {
         }, { registry: 'hyperswarm' });
         await wallet.mergeData('Alice', { avatar: forged });
         const { url } = await start();
+        // A read the node refused would be no avatar as well, so what is checked is that the node is not asked.
+        const read = jest.spyOn(GatekeeperClient.prototype, 'getData');
 
         expect((await request(url).get(`/api/v1/avatars/${alice}`)).status).toBe(404);
+        expect(read).not.toHaveBeenCalled();
+        read.mockRestore();
     }, 60_000);
 
     it('says what a publication is in the page at its address, as the node\'s indexer has it', async () => {
