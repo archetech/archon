@@ -1019,7 +1019,7 @@ function IdentitiesTab() {
                                 closeCreateModal();
                             }
                         }}
-                        disabled={!name.trim() || !registry}
+                        disabled={!name.trim() || !registries.includes(registry)}
                     >
                         Create
                     </Button>
@@ -1367,7 +1367,7 @@ function IdentitiesTab() {
                                             <Button
                                                 variant="contained"
                                                 onClick={() => document.getElementById("avatarUpload")?.click()}
-                                                disabled={!registry}
+                                                disabled={!registries.includes(registry)}
                                             >
                                             Upload Image...
                                             </Button>
