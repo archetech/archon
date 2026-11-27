@@ -350,8 +350,17 @@ export function useWalletData() {
         // read-modify-write.
         resetCredentialState();
         setCurrentDID("");
+        setValidId(false);
+        setIdList([]);
+        setUnresolvedIdList([]);
         setManifest({});
         setAliasList({});
+        setUnresolvedList({});
+        setAliasRegistry({});
+        setGroupList([]);
+        setImageList([]);
+        setFileList([]);
+        setDmailList({});
         setSchemaList([]);
         setAgentList([]);
         setHeldList([]);
