@@ -2893,8 +2893,12 @@ export default class Keymaster implements KeymasterInterface {
                 ...doc.didDocument,
                 verificationMethod: doc.didDocument.verificationMethod.map(
                     vm => isRotated(vm.id) ? vmethod : vm),
-                authentication: retitle(doc.didDocument.authentication),
-                assertionMethod: retitle(doc.didDocument.assertionMethod),
+                ...(doc.didDocument.authentication !== undefined && {
+                    authentication: retitle(doc.didDocument.authentication),
+                }),
+                ...(doc.didDocument.assertionMethod !== undefined && {
+                    assertionMethod: retitle(doc.didDocument.assertionMethod),
+                }),
                 ...(doc.didDocument.capabilityInvocation !== undefined && {
                     capabilityInvocation: retitle(doc.didDocument.capabilityInvocation),
                 }),
