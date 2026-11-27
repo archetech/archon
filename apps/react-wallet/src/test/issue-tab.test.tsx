@@ -254,6 +254,57 @@ describe('issuing the credential', () => {
         expect(keymaster.getSchema).toHaveBeenCalledTimes(1);
     });
 
+    describe('when a credential of another schema is bound', () => {
+        const OTHER = 'did:cid:licence-schema';
+        const licence = { properties: { number: { type: 'string' } }, required: ['number'] };
+
+        async function bindLicence(user: ReturnType<typeof userEvent.setup>) {
+            keymaster.bindCredential.mockResolvedValue({
+                ...bound,
+                credentialSchema: { id: OTHER, type: 'JsonSchema' },
+                credentialSubject: { id: BOB, number: 'TBD' },
+            });
+            await pick(user, schemaPicker(), 'licence');
+            await user.click(editButton());
+        }
+
+        it('shows no form, and no Issue, when its schema cannot be read', async () => {
+            const user = userEvent.setup({ delay: null });
+            render(<IssueTab />);
+            const grade = await openForm(user);
+            await user.type(grade, 'A');
+            const failure = new Error('unknown schema');
+            keymaster.getSchema.mockRejectedValue(failure);
+
+            await bindLicence(user);
+
+            await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+            expect(screen.queryByLabelText(/^grade/)).toBeNull();
+            expect(screen.queryByRole('button', { name: 'Issue' })).toBeNull();
+        });
+
+        it('shows its form when the schema bound before it is read late', async () => {
+            const user = userEvent.setup({ delay: null });
+            let late!: (value: unknown) => void;
+            keymaster.getSchema.mockImplementation(async (did: string) => did === OTHER
+                ? structuredClone(licence)
+                : new Promise(resolve => { late = resolve; }));
+            render(<IssueTab />);
+            await user.type(subjectField(), 'Bob');
+            await pick(user, schemaPicker(), 'degree');
+            await user.click(editButton());
+            await waitFor(() => expect(keymaster.getSchema).toHaveBeenCalledWith(SCHEMA));
+
+            await bindLicence(user);
+            await screen.findByLabelText(/^number/);
+            late(structuredClone(schema));
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            expect(screen.getByLabelText(/^number/)).toBeTruthy();
+            expect(screen.queryByLabelText(/^grade/)).toBeNull();
+        });
+    });
+
     it('reads the schema again when the credential is bound again', async () => {
         const user = userEvent.setup({ delay: null });
         render(<IssueTab />);
