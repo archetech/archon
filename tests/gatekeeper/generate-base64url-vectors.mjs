@@ -51,6 +51,11 @@ const paddedX = { ...key.publicJwk, x: `${key.publicJwk.x}=` };
 const paddedY = { ...key.publicJwk, y: `${key.publicJwk.y}=` };
 const installsPaddedKey = update(agent, { didDocument: documentWith(paddedX) });
 const installsSameKey = update(agent, { didDocument: documentWith(key.publicJwk) });
+// 32 bytes each, as a coordinate must be, but no point on the curve: x = 0 has
+// no y, and x = 2^256 - 1 is beyond the field.
+const zeroX = { ...key.publicJwk, x: Buffer.alloc(32).toString('base64url') };
+const fieldX = { ...key.publicJwk, x: Buffer.alloc(32, 0xff).toString('base64url') };
+const installsZeroX = update(agent, { didDocument: documentWith(zeroX) });
 
 // `operation` is applied after `agent` and `prior`, when the case has them. A case
 // without an agent is a creation. `imported` is what importing the operation
@@ -62,12 +67,17 @@ const cases = [
     { name: 'padded_proof_one_sign', imported: 'deferred', agent, operation: padProof(plain, '='), accepted: false },
     { name: 'padded_proof_on_delete', imported: 'deferred', agent, operation: padProof(sign({ type: 'delete', did, previd: canonical(agent) }, `${did}#key-1`), '=='), accepted: false },
     { name: 'proof_not_base64url', imported: 'deferred', agent, operation: withProofValue(plain, `${plain.proof.proofValue.slice(0, -1)}!`), accepted: false },
+    // 64 bytes, as a signature must be, but r and s out of range: zero, or beyond the order.
+    { name: 'proof_scalars_zero', imported: 'deferred', agent, operation: withProofValue(plain, Buffer.alloc(64).toString('base64url')), accepted: false },
+    { name: 'proof_scalars_beyond_order', imported: 'deferred', agent, operation: withProofValue(plain, Buffer.alloc(64, 0xff).toString('base64url')), accepted: false },
     { name: 'proof_too_short', imported: 'deferred', agent, operation: withProofValue(plain, plain.proof.proofValue.slice(0, 40)), accepted: false },
     // No proofValue at all is a malformed proof, which both ports reject outright.
     { name: 'proof_empty', imported: 'rejected', agent, operation: withProofValue(plain, ''), accepted: false },
     { name: 'unpadded_creation_key', imported: 'added', operation: agent, accepted: true },
     { name: 'padded_creation_key_x', imported: 'deferred', operation: genesis(paddedX), accepted: false },
     { name: 'padded_creation_key_y', imported: 'deferred', operation: genesis(paddedY), accepted: false },
+    { name: 'creation_key_x_not_on_curve', imported: 'deferred', operation: genesis(zeroX), accepted: false },
+    { name: 'creation_key_x_beyond_field', imported: 'deferred', operation: genesis(fieldX), accepted: false },
     { name: 'padded_creation_proof', imported: 'deferred', operation: padProof(genesis(key.publicJwk), '=='), accepted: false },
     {
         name: 'signed_by_replaced_unpadded_key', imported: 'added', agent, prior: installsSameKey, accepted: true,
@@ -76,6 +86,10 @@ const cases = [
     {
         name: 'signed_by_padded_method_key', imported: 'deferred', agent, prior: installsPaddedKey, accepted: false,
         operation: update(installsPaddedKey, { didDocumentData: { case: 'padded method' } }, '2026-11-18T12:00:01.000Z'),
+    },
+    {
+        name: 'signed_by_method_key_not_on_curve', imported: 'deferred', agent, prior: installsZeroX, accepted: false,
+        operation: update(installsZeroX, { didDocumentData: { case: 'key not on curve' } }, '2026-11-18T12:00:01.000Z'),
     },
 ].map(item => ({ ...item, did: item.agent ? did : `did:cid:${canonical(item.operation)}` }));
 

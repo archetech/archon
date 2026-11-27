@@ -1,5 +1,6 @@
 import { historyEntries, expectedRegistryForIndex, hasAnchoredPrefix, applyComponents } from './history-view.js';
 import { hasChainMetadata, isValidUnanchoredOrdinal, isValidEventOrdinal, PIN_QUEUE, isLocallyStampedRegistry, isUnanchoredRegistry, normalizeEventTime, candidateKey, preferredCandidates, relayHints, queueKey } from './event-policy.js';
+import { createPublicKey } from 'crypto';
 import CipherNode from '@didcid/cipher/node';
 import { copyJSON, compareOrdinals } from '@didcid/common/utils';
 import { isValidDID, generateCID } from '@didcid/ipfs/utils';
@@ -75,9 +76,15 @@ function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
     return true;
 }
 
+const SECP256K1_ORDER = BigInt('0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141');
+
+// SubjectPublicKeyInfo for id-ecPublicKey / secp256k1, with a compressed point.
+const SECP256K1_SPKI = Buffer.from('3036301006072a8648ce3d020106052b8104000a032200', 'hex');
+
 // The signature a proofValue carries, as hex. One that cannot be read as a
 // signature is an invalid operation, which is how the Rust port reports it, and
-// not an internal fault: the two are classified differently on import.
+// not an internal fault: the two are classified differently on import. That
+// includes 64 bytes whose r or s is zero or not below the curve order.
 function proofSignatureHex(proofValue: unknown): string {
     try {
         const bytes = decodeBase64url(proofValue as string);
@@ -86,10 +93,31 @@ function proofSignatureHex(proofValue: unknown): string {
             throw new Error('signature length');
         }
 
-        return Buffer.from(bytes).toString('hex');
+        const hex = Buffer.from(bytes).toString('hex');
+
+        for (const scalar of [hex.slice(0, 64), hex.slice(64)]) {
+            const value = BigInt(`0x${scalar}`);
+            if (value === 0n || value >= SECP256K1_ORDER) {
+                throw new Error('signature scalar');
+            }
+        }
+
+        return hex;
     }
     catch {
         throw new InvalidOperationError('proof');
+    }
+}
+
+// Whether `x` names a point on the curve, which a well-formed key's 32 bytes
+// need not: the Rust port refuses such a key as `publicJwk`.
+function isCurvePoint(compressed: Uint8Array): boolean {
+    try {
+        createPublicKey({ key: Buffer.concat([SECP256K1_SPKI, compressed]), format: 'der', type: 'spki' });
+        return true;
+    }
+    catch {
+        return false;
     }
 }
 
@@ -952,8 +980,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const message = this.operationSigningBytes(operation);
-            const signatureHex = proofSignatureHex(operation.proof!.proofValue);
-            return this.cipher.verifyMessage(message, signatureHex, operation.publicJwk);
+            return this.verifySignature(message, operation.proof!.proofValue, operation.publicJwk);
         }
 
         if (operation.registration.type === 'asset') {
@@ -984,8 +1011,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return false;
             }
 
-            const signatureHex = proofSignatureHex(operation.proof!.proofValue);
-            return this.cipher.verifyMessage(message, signatureHex, publicJwk);
+            return this.verifySignature(message, operation.proof!.proofValue, publicJwk);
         }
 
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
@@ -1021,8 +1047,25 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        const signatureHex = proofSignatureHex(proof.proofValue);
-        return this.cipher.verifyMessage(message, signatureHex, publicJwk);
+        return this.verifySignature(message, proof.proofValue, publicJwk);
+    }
+
+    // A signature and key that can be read but do not verify are a failed
+    // verification. A signature or key that cannot be used at all is an
+    // invalid operation, as the Rust port reports it. The key is examined only
+    // after a failure, since one that verified is on the curve.
+    private async verifySignature(message: string | Uint8Array, proofValue: unknown, publicJwk: EcdsaJwkPublic): Promise<boolean> {
+        const signatureHex = proofSignatureHex(proofValue);
+
+        if (await this.cipher.verifyMessage(message, signatureHex, publicJwk)) {
+            return true;
+        }
+
+        if (!isCurvePoint(this.cipher.convertJwkToCompressedBytes(publicJwk))) {
+            throw new InvalidOperationError('publicJwk');
+        }
+
+        return false;
     }
 
     async queueOperation(registry: string, operation: Operation, options: { skipPin?: boolean } = {}) {
