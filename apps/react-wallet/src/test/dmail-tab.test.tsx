@@ -1519,7 +1519,8 @@ describe('searching', () => {
         render(<DmailTab />);
 
         await advanced(user, dialog => {
-            fireEvent.change(within(dialog).getByLabelText('Date to'), { target: { value: '2024-01-05' } });
+            // Two days after the message, so the cutoff falls after it in every time zone.
+            fireEvent.change(within(dialog).getByLabelText('Date to'), { target: { value: '2024-01-07' } });
         });
 
         expect(shown()).toEqual(['Hello from afar']);
