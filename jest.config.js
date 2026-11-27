@@ -74,6 +74,8 @@ const config = {
         'services/herald/server/src/**/*.{ts,js}',
         'services/didcomm/server/src/**/*.{ts,js}',
         'services/node-runner/server/src/**/*.{ts,js}',
+        'services/memepool/src/**/*.ts',
+        'services/memeplex-indexer/src/**/*.ts',
 
         '!**/*.d.ts',
         // Type-only modules and barrel re-exports: no meaningful runtime code.
@@ -105,6 +107,11 @@ const config = {
         // in-process. Its routes live in the extracted routers, which are measured.
         '!services/*/server/src/index.ts',
         '!services/*/server/src/*-api.ts',
+        // The same for the two services whose source is not under server/: each
+        // entry file reads the environment and starts the service, which the
+        // tests do through startMemepool and createIndexerApp instead.
+        '!services/memepool/src/memepool.ts',
+        '!services/memeplex-indexer/src/memeplex-indexer.ts',
     ],
     testPathIgnorePatterns: [
         "/node_modules/",
