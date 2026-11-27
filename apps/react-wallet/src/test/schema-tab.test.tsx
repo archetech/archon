@@ -205,6 +205,23 @@ describe('picking a schema', () => {
         await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
         expect(screen.queryByRole('button', { name: 'Save Schema' })).toBeNull();
     });
+
+    it('shows no editor when the schema picked next cannot be read', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.aliasList = { ...variables.aliasList, licence: 'did:cid:licence-schema' };
+        variables.schemaList = ['degree', 'licence'];
+        render(<SchemaTab />);
+        await openSchema(user);
+        expect(saveButton()).toBeInTheDocument();
+
+        const failure = new Error('unknown schema');
+        keymaster.getSchema.mockRejectedValue(failure);
+        await user.click(schemaPicker());
+        await user.click(await screen.findByRole('option', { name: 'licence' }));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(screen.queryByRole('button', { name: 'Save Schema' })).toBeNull();
+    });
 });
 
 describe('saving a schema', () => {

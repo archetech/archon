@@ -62,6 +62,9 @@ const SchemaTab = ()=> {
             setSchemaString(JSON.stringify(schema, null, 4));
             setSchemaEdit(true);
         } catch (error: any) {
+            // No schema is shown under a name whose own could not be read.
+            setSchemaEdit(false);
+            setSchemaString('');
             setError(error);
         }
     };
