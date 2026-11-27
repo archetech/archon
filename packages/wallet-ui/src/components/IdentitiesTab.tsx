@@ -409,6 +409,7 @@ function IdentitiesTab() {
 
     function closeCreateModal() {
         setCreateModalOpen(false);
+        setName("");
     }
 
     function handleRenameId() {
@@ -541,6 +542,21 @@ function IdentitiesTab() {
         refreshNostr();
     }, [refreshNostr]);
 
+    // Runs before the effect that loads the document, which clears the flag
+    // again when it finishes, including when there is nothing to load.
+    useEffect(() => {
+        if (!currentDID) {
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("");
+            setIdentityNameLoading(false);
+            return;
+        }
+
+        setIdentityNameLoading(true);
+        setIdentityNameError("");
+    }, [currentDID]);
+
     const refreshCurrentIdDocs = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setCurrentIdDocs(null);
@@ -572,19 +588,6 @@ function IdentitiesTab() {
     useEffect(() => {
         refreshCurrentIdDocs();
     }, [refreshCurrentIdDocs]);
-
-    useEffect(() => {
-        if (!currentDID) {
-            setIdentityNameValue("");
-            setIdentityNameInput("");
-            setIdentityNameError("");
-            setIdentityNameLoading(false);
-            return;
-        }
-
-        setIdentityNameLoading(true);
-        setIdentityNameError("");
-    }, [currentDID]);
 
     const refreshAddresses = useCallback(async () => {
         if (!keymaster || !currentId) {
@@ -624,6 +627,7 @@ function IdentitiesTab() {
         try {
             const nostr = await keymaster.addNostr();
             setNostrKeys(nostr);
+            await refreshCurrentIdDocs();
             setSuccess("Nostr keys added");
         } catch (error: any) {
             setError(error);
@@ -639,6 +643,7 @@ function IdentitiesTab() {
             await keymaster.removeNostr();
             setNostrKeys(null);
             setNsecValue(null);
+            await refreshCurrentIdDocs();
             setSuccess("Nostr keys removed");
         } catch (error: any) {
             setError(error);
@@ -657,6 +662,7 @@ function IdentitiesTab() {
             const nostr = await keymaster.importNostr(nsec);
             setNostrKeys(nostr);
             setNsecValue(null);
+            await refreshCurrentIdDocs();
             setSuccess("Nostr keys imported");
         } catch (error: any) {
             setError(error);
