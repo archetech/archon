@@ -39,7 +39,6 @@ const GroupsTab = () => {
     const [selectedGroupName, setSelectedGroupName] = useState<string>('');
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
     const [memberDID, setMemberDID] = useState<string>('');
-    const [jsonDID, setJsonDID] = useState<string>('');
     const [removeDID, setRemoveDID] = useState<string>('');
     const [open, setOpen] = useState<boolean>(false);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
@@ -83,6 +82,8 @@ const GroupsTab = () => {
                 tab: "groups",
             });
         } catch (error: any) {
+            setSelectedGroupName('');
+            setSelectedGroup(null);
             setError(error);
         }
     }
@@ -100,6 +101,8 @@ const GroupsTab = () => {
     }
 
     async function removeMember() {
+        setOpen(false);
+        setRemoveDID("");
         if (!keymaster) {
             return;
         }
@@ -109,14 +112,6 @@ const GroupsTab = () => {
         } catch (error: any) {
             setError(error);
         }
-        if (removeDID === jsonDID) {
-            setJsonDID('');
-            openView({
-                tab: "groups",
-            });
-        }
-        setOpen(false);
-        setRemoveDID("");
     }
 
     async function handleRemoveMember(did: string) {
@@ -172,7 +167,7 @@ const GroupsTab = () => {
             />
 
             <WarningModal
-                title="Overwrite wallet"
+                title="Remove Member"
                 warningText={`Remove member from ${selectedGroupName}?`}
                 isOpen={open}
                 onClose={handleClose}
@@ -326,8 +321,8 @@ const GroupsTab = () => {
                         const alias = Object.keys(aliasList).find((n) => aliasList[n] === did) ?? undefined;
 
                         return (
-                            <Box>
-                                <Box key={index} display="flex" alignItems="center" justifyContent="space-between" sx={{my: 1}}>
+                            <Box key={index}>
+                                <Box display="flex" alignItems="center" justifyContent="space-between" sx={{my: 1}}>
                                     <Box display="flex" flexDirection="row">
                                         <CopyResolveDID did={did} />
                                         <Tooltip title="Delete">
