@@ -46,7 +46,6 @@ vi.mock('../../../../packages/wallet-ui/src/components/JsonViewer', () => ({ def
 
 const DEGREE = 'did:cid:degree';
 const LICENCE = 'did:cid:licence';
-const PASSPORT = 'did:cid:passport';
 const OFFERED = 'did:cid:offered';
 const credential = { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice' } };
 
@@ -296,31 +295,22 @@ describe('the credentials held', () => {
         expect(within(menu).getByRole('menuitem', { name: 'Remove' })).not.toHaveAttribute('aria-disabled');
     });
 
-    it('offers what a credential published without its contents allows', async () => {
+    // Keymaster puts the credential itself in the manifest, with its claims
+    // taken out unless it was published revealed. The tab does not read that
+    // form: it looks for a `credential` member the manifest never has, and so
+    // gets Publish and Reveal wrong for every published credential (#1811).
+    // These check what it does get right, with the manifest as Keymaster writes it.
+    it.each([
+        ['published without its contents', { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice' } }],
+        ['published with its contents', { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice', grade: 'A' } }],
+    ])('lets a credential that is %s be unpublished, and not removed until it is', async (_how, published) => {
         const user = userEvent.setup({ delay: null });
         variables.heldList = [DEGREE, LICENCE];
-        variables.manifest = { [LICENCE]: { credential: null } };
+        variables.manifest = { [LICENCE]: published };
         render(<HeldTab />);
 
         const menu = await openMenu(user, 1);
 
-        expect(within(menu).getByRole('menuitem', { name: 'Publish' })).toHaveAttribute('aria-disabled', 'true');
-        expect(within(menu).getByRole('menuitem', { name: 'Reveal' })).not.toHaveAttribute('aria-disabled');
-        expect(within(menu).getByRole('menuitem', { name: 'Unpublish' })).not.toHaveAttribute('aria-disabled');
-        // A published credential has to be unpublished before it is removed.
-        expect(within(menu).getByRole('menuitem', { name: 'Remove' })).toHaveAttribute('aria-disabled', 'true');
-    });
-
-    it('offers what a revealed credential allows', async () => {
-        const user = userEvent.setup({ delay: null });
-        variables.heldList = [DEGREE, PASSPORT];
-        variables.manifest = { [PASSPORT]: { credential } };
-        render(<HeldTab />);
-
-        const menu = await openMenu(user, 1);
-
-        expect(within(menu).getByRole('menuitem', { name: 'Publish' })).not.toHaveAttribute('aria-disabled');
-        expect(within(menu).getByRole('menuitem', { name: 'Reveal' })).toHaveAttribute('aria-disabled', 'true');
         expect(within(menu).getByRole('menuitem', { name: 'Unpublish' })).not.toHaveAttribute('aria-disabled');
         expect(within(menu).getByRole('menuitem', { name: 'Remove' })).toHaveAttribute('aria-disabled', 'true');
     });

@@ -34,8 +34,10 @@ vi.mock('../../../../packages/wallet-ui/src/contexts/WalletNavigation', () => ({
 vi.mock('../../../../packages/wallet-ui/src/hooks/useWalletData', () => ({ useWalletData: () => walletData }));
 
 const DEGREE = 'did:cid:degree-schema';
-const schema = { type: 'object', properties: { grade: { type: 'string' } }, required: ['grade'] };
-const amended = { type: 'object', properties: { grade: { type: 'string' }, year: { type: 'integer' } } };
+// With `$schema`, as Keymaster requires of a schema it is given.
+const DRAFT = 'http://json-schema.org/draft-07/schema#';
+const schema = { $schema: DRAFT, type: 'object', properties: { grade: { type: 'string' } }, required: ['grade'] };
+const amended = { $schema: DRAFT, type: 'object', properties: { grade: { type: 'string' }, year: { type: 'integer' } } };
 
 beforeEach(() => {
     vi.resetAllMocks();
