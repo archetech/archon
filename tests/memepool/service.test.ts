@@ -1,4 +1,6 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { jest } from '@jest/globals';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -134,6 +136,99 @@ it('does not start with no passphrase, or with the wrong one for its wallet', as
     await expect(start({ passphrase: 'another passphrase' })).rejects.toThrow();
 }, 60_000);
 
+describe('a started service', () => {
+    // The smallest PNG there is: one transparent pixel.
+    const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+    // A wallet of a user's own, on the same node as the service.
+    async function userWallet() {
+        const wallet = new Keymaster({
+            gatekeeper: await connected(), wallet: new WalletJson('wallet.json', dataDir()), cipher: new CipherNode(), passphrase: 'another passphrase',
+        });
+
+        await wallet.newWallet();
+        await wallet.createId('Alice', { registry: 'hyperswarm' });
+
+        return wallet;
+    }
+
+    // An indexer that says the same of every publication, and keeps what it was asked.
+    async function indexerSaying(publication: unknown) {
+        const asked: string[] = [];
+        const server = createServer((req, res) => {
+            asked.push(decodeURIComponent(req.url ?? ''));
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(publication));
+        });
+
+        await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', () => resolve()); });
+        running.push(server);
+
+        return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, asked };
+    }
+
+    it('serves the avatar an identity names, read from its node', async () => {
+        const wallet = await userWallet();
+        const alice = (await wallet.resolveDID('Alice')).didDocument!.id!;
+        const image = await wallet.createImage(PIXEL, { registry: 'hyperswarm' });
+        await wallet.mergeData('Alice', { avatar: image });
+        const { url } = await start();
+
+        const served = await request(url).get(`/api/v1/avatars/${alice}`);
+
+        expect(served.status).toBe(200);
+        expect(served.headers['content-type']).toBe('image/png');
+        expect(Buffer.compare(served.body, PIXEL)).toBe(0);
+    }, 60_000);
+
+    it('serves no avatar whose image names content by something that is not a CID', async () => {
+        const wallet = await userWallet();
+        const alice = (await wallet.resolveDID('Alice')).didDocument!.id!;
+        // An image asset as a stranger could write one, pointing at a path on the node.
+        const forged = await wallet.createAsset({
+            file: { cid: '../../api/v1/ready', type: 'image/png', bytes: 10 }, image: { width: 1, height: 1 },
+        }, { registry: 'hyperswarm' });
+        await wallet.mergeData('Alice', { avatar: forged });
+        const { url } = await start();
+        // A read the node refused would be no avatar as well, so what is checked is that the node is not asked.
+        const read = jest.spyOn(GatekeeperClient.prototype, 'getData');
+
+        expect((await request(url).get(`/api/v1/avatars/${alice}`)).status).toBe(404);
+        expect(read).not.toHaveBeenCalled();
+        read.mockRestore();
+    }, 60_000);
+
+    it('says what a publication is in the page at its address, as the node\'s indexer has it', async () => {
+        const wallet = await userWallet();
+        const alice = (await wallet.resolveDID('Alice')).didDocument!.id!;
+        await wallet.mergeData('Alice', { name: 'Alice A.' });
+        const indexer = await indexerSaying({ state: 'published', memeplex: { kind: 'post', author: alice, text: 'A post about DIDs.' } });
+        const pages = dataDir();
+        writeFileSync(join(pages, 'index.html'), '<!doctype html><html><head><title>Memepool</title></head><body></body></html>');
+        const { url } = await start({ indexerURL: indexer.url, pagesDir: pages });
+
+        const page = await request(url).get(`/p/${alice}`);
+
+        expect(page.status).toBe(200);
+        expect(indexer.asked).toStrictEqual([`/api/v1/publications/${alice}`]);
+        expect(page.text).toContain('A post about DIDs.');
+        // The author is named as the identity names itself on the node.
+        expect(page.text).toContain('Alice A.');
+    }, 60_000);
+
+    it('serves the page with nothing said of the publication where the node runs no indexer', async () => {
+        const pages = dataDir();
+        writeFileSync(join(pages, 'index.html'), '<!doctype html><html><head><title>Memepool</title></head><body></body></html>');
+        const { did, url } = await start({ pagesDir: pages });
+
+        const page = await request(url).get(`/p/${did}`);
+
+        expect(page.status).toBe(200);
+        expect(page.text).toContain('<title>Memepool</title>');
+        expect(page.text).not.toContain('og:description');
+    }, 60_000);
+});
+
 describe('asking a domain whose an address is', () => {
     const DID = 'did:cid:bagaaieraexample';
     const never = () => new AbortController().signal;
@@ -148,6 +243,16 @@ describe('asking a domain whose an address is', () => {
 
         return { asked, fetcher };
     };
+
+    it('asks nothing for what is not a name at a domain', async () => {
+        const signal = new AbortController().signal;
+        const fetcher = jest.fn();
+
+        for (const address of ['alice', '@example.org', 'alice@', 'alice@example.org@example.com']) {
+            expect([address, await addressOwner(address, signal, fetcher as never)]).toStrictEqual([address, null]);
+        }
+        expect(fetcher).not.toHaveBeenCalled();
+    });
 
     it('asks the domain for the name, and gives the DID it answers with', async () => {
         const { asked, fetcher } = answering(() => Response.json({ did: DID }));
