@@ -1,6 +1,6 @@
 {
   "name": "node-runner-server",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "type": "module",
   "description": "Archon node-runner: manage a node from a web app",
   "main": "dist/index.js",

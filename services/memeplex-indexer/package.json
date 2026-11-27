@@ -1,6 +1,6 @@
 {
   "name": "memeplex-indexer",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "type": "module",
   "description": "Archon Memeplex indexer",
   "main": "dist/memeplex-indexer.js",
