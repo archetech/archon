@@ -338,6 +338,8 @@ const DmailTab: React.FC = () => {
         setEphemeral(false);
         setExpiresAt("");
         setDmailReference(prefill.reference || "");
+        setDmailAttachments({});
+        setForwardSourceDid(null);
     }
 
     function handleForward() {
@@ -481,11 +483,11 @@ const DmailTab: React.FC = () => {
         return out;
     }
 
+    // A message with no DID has its attachments set by whatever started it
+    // (openCompose, handleForward, clearAll).
     useEffect(() => {
         if (dmailDid) {
             refreshDmailAttachments();
-        } else {
-            setDmailAttachments({});
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dmailDid]);
@@ -580,6 +582,7 @@ const DmailTab: React.FC = () => {
         setSendSubject(selected.message.subject);
         setSendBody(selected.message.body);
         setDmailDid(selected.did);
+        setForwardSourceDid(null);
         setDmailReference(selected.message.reference || "");
         await refreshDmailAttachments();
         setActiveTab("send");
