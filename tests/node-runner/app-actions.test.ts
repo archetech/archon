@@ -63,15 +63,18 @@ afterEach(() => {
 const post = (path: string, body: object = {}) => request(app).post(`/api${path}`).set('Cookie', cookie).send(body);
 const get = (path: string) => request(app).get(`/api${path}`).set('Cookie', cookie);
 
-// A job that runs until it is told to finish, so that another can be asked for meanwhile.
+// A job that runs until it is told to finish, so that another can be asked
+// for meanwhile, and that can be made to print a line while it runs.
 function held(title: string) {
     let finish!: () => void;
+    let print!: (text: string) => void;
     const work: JobWork = async log => {
+        print = log;
         log('started');
         await new Promise<void>(resolve => { finish = resolve; });
     };
 
-    return { title, work, finish: () => finish() };
+    return { title, work, finish: () => finish(), print: (text: string) => print(text) };
 }
 
 async function finished(id: string) {
@@ -247,13 +250,24 @@ describe('a job\'s output', () => {
         lifecycle.run.mockResolvedValue(running);
         const { body } = await post('/actions/run', { action: 'restart' }).expect(202);
 
+        // The stream is listening once it has subscribed to the job. A line
+        // printed after that can only reach it as it is printed.
+        const subscribe = jobs.subscribe.bind(jobs);
+        const listening = new Promise<void>(resolve => {
+            jest.spyOn(jobs, 'subscribe').mockImplementation((id, listener) => {
+                const unsubscribe = subscribe(id, listener);
+                resolve();
+                return unsubscribe;
+            });
+        });
         const stream = get(`/jobs/${body.id}/stream`).then(res => events(res.text));
-        // Let the stream open before the job ends, so the end reaches it as an event.
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await listening;
+        running.print('still going');
         running.finish();
         const seen = await stream;
 
-        expect(seen[0]).toMatchObject({ event: 'line', data: { text: 'started' } });
-        expect(seen[seen.length - 1]).toMatchObject({ event: 'end', data: { status: 'succeeded' } });
+        expect(seen.map(each => each.event)).toStrictEqual(['line', 'line', 'end']);
+        expect(seen.slice(0, 2).map(each => each.data.text)).toStrictEqual(['started', 'still going']);
+        expect(seen[2].data).toMatchObject({ status: 'succeeded' });
     });
 });
