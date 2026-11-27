@@ -48,6 +48,9 @@ const DEGREE = 'did:cid:degree';
 const LICENCE = 'did:cid:licence';
 const OFFERED = 'did:cid:offered';
 const credential = { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice' } };
+// A manifest entry as Keymaster's publishCredential writes it, without and with the claims.
+const hidden = { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice' } };
+const revealed = { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice', grade: 'A' } };
 
 beforeEach(() => {
     vi.resetAllMocks();
@@ -296,23 +299,47 @@ describe('the credentials held', () => {
     });
 
     // Keymaster puts the credential itself in the manifest, with its claims
-    // taken out unless it was published revealed. The tab does not read that
-    // form: it looks for a `credential` member the manifest never has, and so
-    // gets Publish and Reveal wrong for every published credential (#1811).
-    // These check what it does get right, with the manifest as Keymaster writes it.
-    it.each([
-        ['published without its contents', { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice' } }],
-        ['published with its contents', { type: ['VerifiableCredential'], credentialSubject: { id: 'did:cid:alice', grade: 'A' } }],
-    ])('lets a credential that is %s be unpublished, and not removed until it is', async (_how, published) => {
+    // taken out, leaving only the subject's id, unless it was revealed.
+    it('offers to reveal a credential published without its contents, or to unpublish it', async () => {
         const user = userEvent.setup({ delay: null });
         variables.heldList = [DEGREE, LICENCE];
-        variables.manifest = { [LICENCE]: published };
+        variables.manifest = { [LICENCE]: hidden };
         render(<HeldTab />);
 
         const menu = await openMenu(user, 1);
 
+        expect(within(menu).getByRole('menuitem', { name: 'Publish' })).toHaveAttribute('aria-disabled', 'true');
+        expect(within(menu).getByRole('menuitem', { name: 'Reveal' })).not.toHaveAttribute('aria-disabled');
         expect(within(menu).getByRole('menuitem', { name: 'Unpublish' })).not.toHaveAttribute('aria-disabled');
         expect(within(menu).getByRole('menuitem', { name: 'Remove' })).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('offers to publish a revealed credential without its contents, or to unpublish it', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.heldList = [DEGREE, LICENCE];
+        variables.manifest = { [LICENCE]: revealed };
+        render(<HeldTab />);
+
+        const menu = await openMenu(user, 1);
+
+        expect(within(menu).getByRole('menuitem', { name: 'Publish' })).not.toHaveAttribute('aria-disabled');
+        expect(within(menu).getByRole('menuitem', { name: 'Reveal' })).toHaveAttribute('aria-disabled', 'true');
+        expect(within(menu).getByRole('menuitem', { name: 'Unpublish' })).not.toHaveAttribute('aria-disabled');
+        expect(within(menu).getByRole('menuitem', { name: 'Remove' })).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('reads each credential by its own manifest entry', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.heldList = [DEGREE, LICENCE];
+        variables.manifest = { [DEGREE]: revealed };
+        render(<HeldTab />);
+
+        const menu = await openMenu(user, 1);
+
+        expect(within(menu).getByRole('menuitem', { name: 'Publish' })).not.toHaveAttribute('aria-disabled');
+        expect(within(menu).getByRole('menuitem', { name: 'Reveal' })).not.toHaveAttribute('aria-disabled');
+        expect(within(menu).getByRole('menuitem', { name: 'Unpublish' })).toHaveAttribute('aria-disabled', 'true');
+        expect(within(menu).getByRole('menuitem', { name: 'Remove' })).not.toHaveAttribute('aria-disabled');
     });
 
     it('publishes a credential without its contents and shows it', async () => {
@@ -340,7 +367,7 @@ describe('the credentials held', () => {
 
     it('unpublishes a credential and shows it', async () => {
         const user = userEvent.setup({ delay: null });
-        variables.manifest = { [DEGREE]: { credential: null } };
+        variables.manifest = { [DEGREE]: hidden };
         render(<HeldTab />);
 
         await choose(user, 'Unpublish');
@@ -357,7 +384,7 @@ describe('the credentials held', () => {
     ] as const)('reports a failure to %s', async (action, method) => {
         const user = userEvent.setup({ delay: null });
         const failure = new Error('registry unavailable');
-        variables.manifest = action === 'Unpublish' ? { [DEGREE]: { credential: null } } : {};
+        variables.manifest = action === 'Unpublish' ? { [DEGREE]: hidden } : {};
         keymaster[method].mockRejectedValue(failure);
         render(<HeldTab />);
 
@@ -434,7 +461,7 @@ describe('a wallet with no keymaster', () => {
     it('asks nothing of it and reports nothing', async () => {
         const user = userEvent.setup({ delay: null });
         wallet.keymaster = null;
-        variables.manifest = { [DEGREE]: { credential: null } };
+        variables.manifest = { [DEGREE]: hidden };
         render(<HeldTab />);
 
         await user.type(didField(), OFFERED);
