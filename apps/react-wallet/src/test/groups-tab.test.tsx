@@ -216,6 +216,28 @@ describe('picking a group', () => {
         expect(groupPicker()).toHaveTextContent('Select group');
         expect(renameButton()).toBeDisabled();
     });
+
+    it('keeps the group picked last when an earlier one fails to load after it', async () => {
+        const user = userEvent.setup();
+        variables.groupList = ['team', 'devs'];
+        let fail!: (error: Error) => void;
+        keymaster.getGroup.mockImplementation(async (name: string) => name === 'devs'
+            ? new Promise((_resolve, reject) => { fail = reject; })
+            : { name: 'team', members: [BOB, CAROL] });
+        render(<GroupsTab />);
+        await user.click(groupPicker());
+        await user.click(await screen.findByRole('option', { name: 'devs' }));
+        await waitFor(() => expect(keymaster.getGroup).toHaveBeenCalledWith('devs'));
+
+        await openGroup(user);
+        expect(await screen.findByText(CAROL)).toBeInTheDocument();
+        fail(new Error('unknown group'));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(screen.getByText(CAROL)).toBeInTheDocument();
+        expect(groupPicker()).toHaveTextContent('team');
+        expect(setError).not.toHaveBeenCalled();
+    });
 });
 
 describe('group members', () => {

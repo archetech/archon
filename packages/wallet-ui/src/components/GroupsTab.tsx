@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
     Box,
     Button,
@@ -70,18 +70,28 @@ const GroupsTab = () => {
         }
     }
 
+    // The group asked for last: an answer for any other is out of date.
+    const wanted = useRef('');
+
     async function refreshGroup(groupName: string) {
         if (!keymaster) {
             return;
         }
+        wanted.current = groupName;
         try {
             const group = await keymaster.getGroup(groupName);
+            if (wanted.current !== groupName) {
+                return;
+            }
             setSelectedGroup(group);
             setMemberDID('');
             openView({
                 tab: "groups",
             });
         } catch (error: any) {
+            if (wanted.current !== groupName) {
+                return;
+            }
             setSelectedGroupName('');
             setSelectedGroup(null);
             setError(error);
