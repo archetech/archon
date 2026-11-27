@@ -240,19 +240,55 @@ describe('answering a challenge by hand', () => {
 
         await user.click(button('Send'));
         expect(axiosPost).toHaveBeenCalledWith(CALLBACK, { response: RESPONSE });
+        expect(setSuccess).toHaveBeenCalledWith('Response sent successfully');
         expect(button('Send').disabled).toBe(true);
         // The description goes with the callback it was shown for.
         expect(screen.queryByText('Sign in to example.org')).toBeNull();
     });
 
-    it('reports a response the callback refuses', async () => {
-        axiosPost.mockRejectedValue(new Error('Network Error'));
+    it('reports a response the callback refuses, and lets the user send it again', async () => {
+        axiosPost.mockRejectedValueOnce(new Error('Network Error'));
         const user = await respondTo();
         await waitFor(() => expect(button('Send').disabled).toBe(false));
 
         await user.click(button('Send'));
 
         await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Network Error' })));
+        expect(setSuccess).not.toHaveBeenCalled();
+        expect(button('Send').disabled).toBe(false);
+
+        await user.click(button('Send'));
+        expect(axiosPost).toHaveBeenCalledTimes(2);
+        expect(axiosPost).toHaveBeenLastCalledWith(CALLBACK, { response: RESPONSE });
+        expect(setSuccess).toHaveBeenCalledWith('Response sent successfully');
+        expect(button('Send').disabled).toBe(true);
+    });
+
+    it('offers no send for a challenge with no callback answered after one with a callback', async () => {
+        const user = await respondTo();
+        await waitFor(() => expect(button('Send').disabled).toBe(false));
+
+        keymaster.resolveAsset.mockResolvedValue(challengeAsset({}));
+        keymaster.createResponse.mockResolvedValue('did:cid:second-response');
+        await user.clear(input('Challenge'));
+        await user.type(input('Challenge'), 'did:cid:second-challenge');
+        await user.click(button('Respond'));
+
+        await waitFor(() => expect(input('Response').value).toBe('did:cid:second-response'));
+        expect(button('Send').disabled).toBe(true);
+        expect(axiosPost).not.toHaveBeenCalled();
+    });
+
+    it('offers no send when answering a later challenge fails', async () => {
+        const user = await respondTo();
+        await waitFor(() => expect(button('Send').disabled).toBe(false));
+
+        keymaster.createResponse.mockRejectedValue(new Error('Invalid parameter: challengeDID'));
+        await user.click(button('Respond'));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Invalid parameter: challengeDID' })));
+        expect(input('Response').value).toBe('');
+        expect(button('Send').disabled).toBe(true);
     });
 
     it('offers no send for a challenge with no callback', async () => {

@@ -253,6 +253,8 @@ function SignIn() {
         }
         try {
             await clearResponse();
+            // Send is offered only once this challenge's response and callback are known.
+            setDisableSendResponse(true);
 
             // A challenge this node does not have yet is left to createResponse,
             // which waits for it.
@@ -330,8 +332,10 @@ function SignIn() {
         try {
             await setDisableSendResponse(true);
             await axios.post(callback, { response });
+            setSuccess("Response sent successfully");
             await setCallback("");
         } catch (error: any) {
+            setDisableSendResponse(false);
             setError(error);
         }
     }
