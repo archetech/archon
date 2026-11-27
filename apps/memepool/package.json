@@ -1,6 +1,6 @@
 {
   "name": "@didcid/memepool-app",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "Memepool pages: sign in with a wallet, grant the service, read and publish",
   "scripts": {
