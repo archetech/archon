@@ -103,6 +103,7 @@ beforeEach(() => {
     keymaster.resolveDID.mockResolvedValue({ didDocumentMetadata: { version: 1, created: CREATED } });
     keymaster.getDmailMessage.mockResolvedValue(null);
     keymaster.listDmailAttachments.mockResolvedValue({});
+    keymaster.fileDmail.mockResolvedValue(true);
 });
 
 const folder = (user: UserEvent, name: string) => user.click(screen.getByRole('tab', { name }));
@@ -276,6 +277,19 @@ describe('reading a message', () => {
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(LUNCH, ['inbox']));
         await waitFor(() => expect(walletData.refreshInbox).toHaveBeenCalled());
+    });
+
+    it('reports a failure to mark a message as read and keeps it open', async () => {
+        const user = userEvent.setup({ delay: null });
+        const failure = new Error('wallet is locked');
+        keymaster.fileDmail.mockRejectedValue(failure);
+        render(<DmailTab />);
+
+        await open(user, 'Lunch plans');
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+        expect(screen.getAllByDisplayValue(LUNCH_BODY)[0]).toBeInTheDocument();
     });
 
     it('leaves the tags of a message that was already read', async () => {
@@ -558,7 +572,7 @@ describe('filing a message', () => {
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(HELLO, ['inbox', 'archived']));
         await waitFor(() => expect(walletData.refreshInbox).toHaveBeenCalled());
-        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
     });
 
     it('deletes a message from the inbox', async () => {
@@ -569,7 +583,7 @@ describe('filing a message', () => {
         await user.click(screen.getByRole('button', { name: 'Delete' }));
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(HELLO, ['inbox', 'deleted']));
-        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
     });
 
     it('offers a sent message to edit, archive or delete, and no reply', async () => {
@@ -607,7 +621,7 @@ describe('filing a message', () => {
         await user.click(screen.getByRole('button', { name: 'Unarchive' }));
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(OLD, ['inbox']));
-        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
     });
 
     it('deletes an archived message', async () => {
@@ -631,7 +645,47 @@ describe('filing a message', () => {
         await user.click(screen.getByRole('button', { name: 'Restore' }));
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(SPAM, ['inbox']));
-        expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Back' })).toBeNull());
+    });
+
+    it.each([
+        ['Inbox', 'Hello from afar', 'Archive'],
+        ['Inbox', 'Hello from afar', 'Delete'],
+        ['Archive', 'Old news', 'Unarchive'],
+        ['Trash', 'You have won', 'Restore'],
+    ])('reports a failure to file a message from %s with %s and keeps it open', async (name, subject, action) => {
+        const user = userEvent.setup({ delay: null });
+        const failure = new Error('wallet is locked');
+        keymaster.fileDmail.mockRejectedValue(failure);
+        render(<DmailTab />);
+        await folder(user, name);
+        await open(user, subject);
+        walletData.refreshInbox.mockClear();
+
+        await user.click(screen.getByRole('button', { name: action }));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+        expect(screen.getByText(subject)).toBeInTheDocument();
+        expect(walletData.refreshInbox).not.toHaveBeenCalled();
+    });
+
+    it('leaves another message open when filing the one before it finishes later', async () => {
+        const user = userEvent.setup({ delay: null });
+        let finish!: (value: boolean) => void;
+        keymaster.fileDmail.mockReturnValue(new Promise<boolean>(resolve => { finish = resolve; }));
+        render(<DmailTab />);
+        await open(user, 'Hello from afar');
+        walletData.refreshInbox.mockClear();
+
+        await user.click(screen.getByRole('button', { name: 'Archive' }));
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await open(user, 'Note to self');
+        finish(true);
+
+        await waitFor(() => expect(walletData.refreshInbox).toHaveBeenCalled());
+        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+        expect(screen.getByText('Note to self')).toBeInTheDocument();
     });
 
     it('offers nothing to do with a message opened from All', async () => {
