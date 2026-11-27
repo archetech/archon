@@ -1163,6 +1163,32 @@ describe('a poll past its deadline', () => {
         expect(await screen.findByText('Results not published yet')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'View Results' })).toBeNull();
     });
+
+    it('shows none of a poll\'s results when it is read after another was picked', async () => {
+        const user = setup();
+        variables.aliasList = { lunch: POLL, dinner: NEW_POLL };
+        variables.pollList = ['lunch', 'dinner'];
+        keymaster.getPoll.mockImplementation(async (did: string) => (
+            did === POLL ? lunch(CLOSED_SINCE) : { ...lunch(CLOSED_SINCE), name: 'dinner', description: 'Where next?' }
+        ));
+        let late!: (view: unknown) => void;
+        keymaster.viewPoll.mockImplementation(async (did: string) => (
+            did === POLL ? new Promise(resolve => { late = resolve; }) : pollView({ ...CLOSED, description: 'Where next?' })
+        ));
+        render(<PollTab />);
+        await showPolls(user);
+        await pickPoll(user, 'lunch');
+        await waitFor(() => expect(keymaster.viewPoll).toHaveBeenCalledWith(POLL));
+
+        await pickPoll(user, 'dinner');
+        expect(await screen.findByText('Results not published yet')).toBeInTheDocument();
+        late(pollView({ ...CLOSED, results: { tally: RESULTS.tally } }));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(screen.getByText('Where next?')).toBeInTheDocument();
+        expect(screen.getByText('Results not published yet')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Results' })).toBeNull();
+    });
 });
 
 describe('renaming a poll', () => {

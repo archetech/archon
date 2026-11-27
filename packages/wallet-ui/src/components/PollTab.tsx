@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import {
     Autocomplete,
     Box,
@@ -124,7 +124,12 @@ const PollsTab: React.FC = () => {
         })();
     }, [pollList, aliasList, keymaster, currentDID]);
 
+    // Counts the changes of the selected poll, so that what was read for one
+    // poll is not shown once another is chosen.
+    const selection = useRef(0);
+
     function clearPollList() {
+        selection.current++;
         setSelectedPollName("");
         setSelectedPollDesc("");
         setPollOptions([]);
@@ -314,6 +319,8 @@ const PollsTab: React.FC = () => {
             return;
         }
         const name = event.target.value;
+        const chosen = ++selection.current;
+        const superseded = () => chosen !== selection.current;
         setSelectedPollName(name);
         setSelectedPollDesc("");
         setSelectedOptionIdx(0);
@@ -330,21 +337,34 @@ const PollsTab: React.FC = () => {
             const did = aliasList[name] ?? "";
             if (did) {
                 const poll = await keymaster.getPoll(did);
+                if (superseded()) {
+                    return;
+                }
                 setSelectedPollDesc(poll?.description ?? "");
                 setPollOptions(poll?.options ?? []);
                 setPollDeadline(poll?.deadline ? new Date(poll.deadline) : null);
 
                 const didDoc = await keymaster.resolveDID(did);
+                if (superseded()) {
+                    return;
+                }
                 if (didDoc) {
                     setPollController(didDoc.didDocument?.controller ?? "");
                 }
 
                 const view = await keymaster.viewPoll(did);
+                const results = await publishedResults(did, view);
+                if (superseded()) {
+                    return;
+                }
                 setCanVote(view.isEligible);
                 setHasVoted(view.hasVoted);
-                showPublished(await publishedResults(did, view));
+                showPublished(results);
             }
         } catch (error: any) {
+            if (superseded()) {
+                return;
+            }
             setError(error);
             setPollOptions([]);
         }
@@ -394,16 +414,23 @@ const PollsTab: React.FC = () => {
             return;
         }
 
+        // The poll is published or unpublished whatever is chosen meanwhile;
+        // only the poll still on screen has its results redrawn.
+        const chosen = selection.current;
         try {
             if (pollPublished) {
                 await keymaster.unpublishPoll(selectedPollDid);
-                setPollPublished(false);
-                setPollResults(null);
+                if (chosen === selection.current) {
+                    showPublished(null);
+                }
                 setSuccess("Poll unpublished");
             } else {
                 await keymaster.publishPoll(selectedPollDid);
                 const view = await keymaster.viewPoll(selectedPollDid);
-                showPublished(await publishedResults(selectedPollDid, view));
+                const results = await publishedResults(selectedPollDid, view);
+                if (chosen === selection.current) {
+                    showPublished(results);
+                }
                 setSuccess("Poll published");
             }
         } catch (error: any) {
