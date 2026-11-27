@@ -1056,6 +1056,17 @@ describe('an author\'s avatar', () => {
         expect(limits).toStrictEqual([]);
     }, 120_000);
 
+    it('serves a picture the size of a photo from a phone', async () => {
+        const photo = Buffer.alloc(5_300_000, 1);
+
+        await name(alice, aliceDid, await claimed(photo, { type: 'image/jpg' }));
+        const served = await avatarOf(aliceDid);
+
+        expect(served.status).toBe(200);
+        expect(served.headers['content-type']).toBe('image/jpeg');
+        expect(served.body.length).toBe(photo.length);
+    }, 120_000);
+
     it('is not found when it is larger than the service serves, whatever size it says it is', async () => {
         const large = Buffer.alloc(AVATAR_LIMIT + 1, 1);
 

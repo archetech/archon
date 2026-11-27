@@ -124,8 +124,10 @@ const REQUEST_REUSE = 50 * 60_000;
 // The largest body the service stores, in bytes of UTF-8.
 export const BODY_LIMIT = 200_000;
 // The largest avatar the service serves, in bytes, and how long a browser may
-// keep one before asking again, in seconds.
-export const AVATAR_LIMIT = 1_000_000;
+// keep one before asking again, in seconds. A wallet sets a picture as it was
+// chosen, and a photo from a phone is several megabytes: the limit is the one
+// an image embedded in text has, which is what Drawbridge and the node pass.
+export const AVATAR_LIMIT = 10_000_000;
 const AVATAR_KEPT = 300;
 // The kinds of image served as an avatar. SVG is not one: it is a document that
 // can hold a script, and this is served from the pages' own origin.
