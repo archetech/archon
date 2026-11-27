@@ -84,6 +84,7 @@ const DmailTab: React.FC = () => {
     const { setError, setSuccess } = useSnackbar();
     const {
         currentId,
+        currentDID,
         agentList,
         dmailList,
         registries,
@@ -286,6 +287,7 @@ const DmailTab: React.FC = () => {
             const ok = await keymaster.sendDmail(dmailDid);
             if (ok) {
                 setSuccess("DMail sent");
+                clearAll();
                 await refreshInbox();
             } else {
                 setError("DMail send failed");
@@ -358,8 +360,13 @@ const DmailTab: React.FC = () => {
         }
 
         const toList = [selected.sender];
+        // The listed names are display names; the message holds the DIDs in the
+        // same order, so the identity replying is recognised by its DID.
+        const named = (names: string[], dids: string[] = []) => names.map((name, i) => ({ name, did: dids[i] }));
         const ccList = replyAll
-            ? [...selected.to, ...selected.cc].filter(did => did !== selected.sender)
+            ? [...named(selected.to, selected.message.to), ...named(selected.cc, selected.message.cc)]
+                .filter(({ name, did }) => name !== selected.sender && did !== currentDID)
+                .map(({ name }) => name)
             : [];
 
         openCompose({
@@ -618,7 +625,6 @@ const DmailTab: React.FC = () => {
             return;
         }
         await fileTags(did, tags.filter(t => t !== TAG.unread));
-        await refreshInbox();
     }
 
     function runSimpleSearch(term: string) {
