@@ -1244,20 +1244,23 @@ export default class Keymaster implements KeymasterInterface {
         let source = stream;
         const node = stream as { pipe?: unknown; pause?: () => void; on?: (event: string, listener: (chunk: Uint8Array) => void) => void };
 
-        if (typeof node.pipe === 'function' && typeof node.pause === 'function' && typeof node.on === 'function') {
-            // A Node stream is handed on as it is: the Gatekeeper client pipes
-            // it into its request, and would not send a generator. It is paused
-            // first so that listening for its chunks does not start it flowing
-            // before the Gatekeeper reads it; a pipe or a read resumes it.
-            node.pause();
-            node.on('data', chunk => { counted += chunk.length; });
-        } else {
-            source = (async function* () {
-                for await (const chunk of stream) {
-                    counted += chunk.length;
-                    yield chunk;
-                }
-            })();
+        if (!bytes) {
+            // A stream whose size was given is handed on untouched.
+            if (typeof node.pipe === 'function' && typeof node.pause === 'function' && typeof node.on === 'function') {
+                // A Node stream is handed on as it is: the Gatekeeper client pipes
+                // it into its request, and would not send a generator. It is paused
+                // first so that listening for its chunks does not start it flowing
+                // before the Gatekeeper reads it; a pipe or a read resumes it.
+                node.pause();
+                node.on('data', chunk => { counted += chunk.length; });
+            } else {
+                source = (async function* () {
+                    for await (const chunk of stream) {
+                        counted += chunk.length;
+                        yield chunk;
+                    }
+                })();
+            }
         }
 
         const cid = await this.gatekeeper.addDataStream(source);
