@@ -126,7 +126,12 @@ describe('a proof naming an assertion key the document no longer describes', () 
         expect(await keymaster.verifyProof({ ...legacy, claim: 'changed' } as any)).toBe(false);
     });
 
-    it('does not verify a current proof', async () => {
+    // This shows only that a proof is tied to the method it was signed under.
+    // It does not show that a current proof gets no first-key fallback: the
+    // method is part of what is signed, so changing it breaks the signature
+    // either way, and signing under a method the document lacks needs the
+    // suite's own signing input.
+    it('does not verify a current proof whose method was changed after signing', async () => {
         const { stale } = await withStaleAssertionRef();
         const signed = await keymaster.addProof({ claim: 'value' });
         const proof = Array.isArray(signed.proof) ? signed.proof[0] : signed.proof;

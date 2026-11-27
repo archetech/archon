@@ -67,8 +67,14 @@ describe('changePassphrase', () => {
 
         await expect(km.changePassphrase('new')).rejects.toThrow('Failed to save wallet with new passphrase');
 
+        // The same instance goes on working under the old passphrase: it reads
+        // its mnemonic, and what it saves next opens with the old passphrase.
+        expect((await km.decryptMnemonic()).split(' ')).toHaveLength(12);
+        frozen.frozen = false;
+        await km.createId('Bob');
+
         const reopened = new Keymaster({ gatekeeper, wallet: frozen, cipher, passphrase: 'old' });
-        expect(Object.keys((await reopened.loadWallet()).ids)).toEqual(['Alice']);
+        expect(Object.keys((await reopened.loadWallet()).ids)).toEqual(['Alice', 'Bob']);
     });
 });
 
