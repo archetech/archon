@@ -1642,6 +1642,18 @@ describe('searching', () => {
         expect(screen.queryByText('Advanced search applied')).toBeNull();
         expect(shown()).toHaveLength(3);
     });
+
+    it('applies nothing when the advanced search is made with a field of only spaces', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+
+        await advanced(user, async dialog => {
+            await user.type(within(dialog).getByLabelText('From'), '   ');
+        });
+
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
+        expect(shown()).toHaveLength(3);
+    });
 });
 
 describe('without a wallet', () => {

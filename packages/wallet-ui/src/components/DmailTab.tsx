@@ -618,7 +618,9 @@ const DmailTab: React.FC = () => {
     }
 
     function runAdvancedSearch(p: AdvancedSearchParams) {
-        setAdvParams(hasAdvancedCriteria(p) ? p : null);
+        // A field of only spaces is an empty one.
+        const given = { ...p, from: p.from.trim(), to: p.to.trim(), subject: p.subject.trim(), body: p.body.trim() };
+        setAdvParams(hasAdvancedCriteria(given) ? given : null);
         setAdvancedOpen(false);
     }
 
