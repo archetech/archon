@@ -406,6 +406,14 @@ def test_create_grant_grants_from_the_identity_named_as_controller_under_an_alia
     assert run(node.keymaster.list_assets("Bob")) == [did]
 
 
+def test_create_grant_refuses_an_empty_alias_and_creates_no_grant(node):
+    request = request_of(node)
+
+    with refuses("alias must be a non-empty string$"):
+        run(node.keymaster.create_grant(request, {"alias": ""}))
+    assert run(node.keymaster.list_assets()) == []
+
+
 def test_create_grant_creates_and_signs_as_the_identity_it_checked_whatever_the_current_id_becomes(node):
     request = request_of(node)
     resolve = node.gatekeeper.resolve_did

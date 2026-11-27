@@ -61,7 +61,13 @@ def test_an_asset_whose_alias_is_refused_is_not_made():
     )
     keymaster.validate_alias = lambda *args, **kwargs: Keymaster.validate_alias(keymaster, *args, **kwargs)
 
-    for alias, error in [("team/alice", "alias contains a slash"), ("..", "alias cannot be only dots"), ("taken", "alias already used")]:
+    for alias, error in [
+        ("", "alias must be a non-empty string"),
+        ("   ", "alias must be a non-empty string"),
+        ("team/alice", "alias contains a slash"),
+        ("..", "alias cannot be only dots"),
+        ("taken", "alias already used"),
+    ]:
         with pytest.raises(KeymasterError, match=error):
             asyncio.run(Keymaster.create_asset(keymaster, {"a": 1}, {"alias": alias}))
     assert made == []

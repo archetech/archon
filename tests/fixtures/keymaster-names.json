@@ -17,6 +17,14 @@
   ],
   "refused": [
     {
+      "name": "",
+      "error": "must be a non-empty string"
+    },
+    {
+      "name": "   ",
+      "error": "must be a non-empty string"
+    },
+    {
       "name": "team/alice",
       "error": "contains a slash"
     },

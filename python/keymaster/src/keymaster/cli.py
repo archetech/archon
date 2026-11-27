@@ -641,13 +641,13 @@ async def cmd_create_challenge(km: Keymaster, args: argparse.Namespace) -> None:
     challenge = None
     if args.file:
         challenge = json.loads(Path(args.file).read_text(encoding="utf-8"))
-    opts = {"alias": args.alias} if args.alias else None
+    opts = {"alias": args.alias} if args.alias is not None else None
     print(await km.create_challenge(challenge, opts))
 
 
 async def cmd_create_challenge_cc(km: Keymaster, args: argparse.Namespace) -> None:
     challenge = {"credentials": [{"schema": args.did}]}
-    opts = {"alias": args.alias} if args.alias else None
+    opts = {"alias": args.alias} if args.alias is not None else None
     print(await km.create_challenge(challenge, opts))
 
 
@@ -674,7 +674,7 @@ async def cmd_bind_credential(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_issue_credential(km: Keymaster, args: argparse.Namespace) -> None:
     vc = json.loads(Path(args.file).read_text(encoding="utf-8"))
     opts: dict[str, Any] = {}
-    if args.alias:
+    if args.alias is not None:
         opts["alias"] = args.alias
     if args.registry:
         opts["registry"] = args.registry
@@ -1117,7 +1117,7 @@ async def cmd_cashu_reclaim(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_create_group(km: Keymaster, args: argparse.Namespace) -> None:
     opts: dict[str, Any] = {}
-    if args.alias:
+    if args.alias is not None:
         opts["alias"] = args.alias
     if args.registry:
         opts["registry"] = args.registry
@@ -1149,7 +1149,7 @@ async def cmd_test_group(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_create_schema(km: Keymaster, args: argparse.Namespace) -> None:
     schema = json.loads(Path(args.file).read_text(encoding="utf-8"))
     opts: dict[str, Any] = {}
-    if args.alias:
+    if args.alias is not None:
         opts["alias"] = args.alias
     if args.registry:
         opts["registry"] = args.registry
@@ -1172,7 +1172,7 @@ async def cmd_create_schema_template(km: Keymaster, args: argparse.Namespace) ->
 
 def _asset_opts(args: argparse.Namespace) -> dict[str, Any] | None:
     opts: dict[str, Any] = {}
-    if getattr(args, "alias", None):
+    if getattr(args, "alias", None) is not None:
         opts["alias"] = args.alias
     if getattr(args, "registry", None):
         opts["registry"] = args.registry
@@ -1420,7 +1420,7 @@ async def cmd_unpublish_poll(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_create_vault(km: Keymaster, args: argparse.Namespace) -> None:
     opts: dict[str, Any] = {}
-    if args.alias:
+    if args.alias is not None:
         opts["alias"] = args.alias
     if args.registry:
         opts["registry"] = args.registry

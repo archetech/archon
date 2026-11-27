@@ -2724,7 +2724,7 @@ class Keymaster:
         # The identity checked is named as the controller, so that it is the
         # one that owns and signs the grant whatever the current ID is by then.
         asset_options = {"registry": registry, "controller": id_info["did"]}
-        if options.get("alias"):
+        if options.get("alias") is not None:
             asset_options["alias"] = options["alias"]
         return await self.create_asset({grant_member(app): grant}, asset_options)
 
@@ -2925,7 +2925,8 @@ class Keymaster:
         valid_until = options.get("validUntil")
         alias = options.get("alias")
         # Before anything is created: an asset whose alias is refused is not made.
-        if alias:
+        # An alias that is given is checked, empty or not; None means no alias.
+        if alias is not None:
             self.validate_alias(alias, await self.load_wallet(), "alias")
         id_info = await self.fetch_id_info(controller)
 
@@ -2954,7 +2955,7 @@ class Keymaster:
         did = await self.gatekeeper.create_did(signed)
         if not valid_until:
             await self.add_to_owned(did, controller)
-        if alias:
+        if alias is not None:
             await self.add_alias(alias, did)
         return did
 
