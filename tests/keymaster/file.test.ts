@@ -6,6 +6,11 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import type { FileAsset } from '@didcid/clients/keymaster-types';
 import { generateCID } from '@didcid/ipfs/utils';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
+import { createGatekeeperApp } from '../../services/gatekeeper/server/src/gatekeeper-api.ts';
+import { Readable } from 'node:stream';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 // didDocumentData is `unknown` on a resolved document, so the shape being read
 // has to be named. Same idiom as vault.test.ts and credential.test.ts.
@@ -18,6 +23,12 @@ function fileAsset(doc: { didDocumentData?: unknown }): FileAsset {
 // for exercises the declared contract instead of relying on that leniency.
 async function* streamOf(data: Buffer): AsyncIterable<Uint8Array> {
     yield new Uint8Array(data);
+}
+
+async function* chunksOf(chunks: Buffer[]): AsyncIterable<Uint8Array> {
+    for (const chunk of chunks) {
+        yield new Uint8Array(chunk);
+    }
 }
 
 
@@ -324,6 +335,28 @@ describe('createFileStream', () => {
         expect(fileAsset(doc).type).toBe('application/octet-stream');
         expect(fileAsset(doc).bytes).toBe(20);
     });
+
+    it('records the size of what the stream held when no size is given', async () => {
+        const chunks = [Buffer.from('first chunk, '), Buffer.from('second chunk')];
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createFileStream(chunksOf(chunks));
+        const doc = await keymaster.resolveDID(did);
+
+        expect(fileAsset(doc).bytes).toBe(25);
+        expect(fileAsset(doc).cid).toBe(await generateCID(Buffer.concat(chunks)));
+    });
+
+    it('records the size of a Node stream that the Gatekeeper reads itself', async () => {
+        const chunks = [Buffer.from('first chunk, '), Buffer.from('second chunk')];
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createFileStream(Readable.from(chunks));
+        const file = await keymaster.getFile(did);
+
+        expect(file!.bytes).toBe(25);
+        expect(file!.data).toStrictEqual(Buffer.concat(chunks));
+    });
 });
 
 describe('updateFileStream', () => {
@@ -347,5 +380,55 @@ describe('updateFileStream', () => {
         expect(fileAsset(doc).cid).toBe(cid);
         expect(fileAsset(doc).bytes).toBe(19);
         expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
+    });
+
+    it('records the size of what the stream held when no size is given', async () => {
+        const chunks = [Buffer.from('version '), Buffer.from('two')];
+
+        await keymaster.createId('Bob');
+        await keymaster.createFile(Buffer.from('version one'), { alias: 'streamFile' });
+        const ok = await keymaster.updateFileStream('streamFile', chunksOf(chunks));
+        const doc = await keymaster.resolveDID('streamFile');
+
+        expect(ok).toBe(true);
+        expect(fileAsset(doc).bytes).toBe(11);
+    });
+});
+
+describe('a file streamed to a Gatekeeper over HTTP', () => {
+    // The Keymaster service and the CLI hand on a Node stream (the request, a
+    // file being read), which the Gatekeeper client pipes into its request.
+    let server: Server;
+    let remote: Keymaster;
+
+    beforeEach(async () => {
+        const { app } = createGatekeeperApp({ gatekeeper, httpLogging: false, ready: true });
+        server = await new Promise<Server>(resolve => {
+            const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
+        });
+        const client = new GatekeeperClient();
+        await client.connect({ url: `http://127.0.0.1:${(server.address() as AddressInfo).port}` });
+        remote = new Keymaster({ gatekeeper: client, wallet, cipher, passphrase: 'passphrase' });
+    });
+
+    afterEach(async () => {
+        await new Promise(resolve => server.close(resolve));
+    });
+
+    it('stores what the stream held and records its size when no size is given', async () => {
+        const chunks = [Buffer.from('first chunk, '), Buffer.from('second chunk')];
+
+        await remote.createId('Bob');
+        const did = await remote.createFileStream(Readable.from(chunks));
+        const file = await remote.getFile(did);
+
+        expect(file!.bytes).toBe(25);
+        expect(file!.data).toStrictEqual(Buffer.concat(chunks));
+
+        expect(await remote.updateFileStream(did, Readable.from([Buffer.from('version two')]))).toBe(true);
+        const updated = await remote.getFile(did);
+
+        expect(updated!.bytes).toBe(11);
+        expect(updated!.data).toStrictEqual(Buffer.from('version two'));
     });
 });

@@ -126,6 +126,23 @@ def test_create_and_update_file_stream_assets():
     assert updated_doc["didDocumentMetadata"]["versionSequence"] == 2
 
 
+def test_file_stream_records_the_size_of_what_the_stream_held_when_no_size_is_given():
+    testbed = make_testbed()
+    keymaster = testbed.keymaster
+
+    run(keymaster.create_id("Bob"))
+
+    async def chunks_of(chunks):
+        for chunk in chunks:
+            yield chunk
+
+    did = run(keymaster.create_file_stream(chunks_of([b"first chunk, ", b"second chunk"])))
+    assert run(keymaster.resolve_did(did))["didDocumentData"]["file"]["bytes"] == 25
+
+    assert run(keymaster.update_file_stream(did, chunks_of([b"version ", b"two"]))) is True
+    assert run(keymaster.resolve_did(did))["didDocumentData"]["file"]["bytes"] == 11
+
+
 def test_file_helpers_handle_missing_and_invalid_assets():
     testbed = make_testbed()
     keymaster = testbed.keymaster
