@@ -520,7 +520,9 @@ describe('minting', () => {
             mint.payMintQuote(quote.quote);
             mint.refuseNext('/v1/mint/bolt11', 11004, 'outputs pending');
 
-            await expect(keymaster.claimCashuMintQuote(quote.quote)).rejects.toThrow();
+            const error = await keymaster.claimCashuMintQuote(quote.quote).catch(error => error);
+            expect(error).toBeInstanceOf(CashuUnavailableError);
+            expect((error as Error).message).toBe(`Cashu mint unavailable: ${PUBLIC_URL} has the claim pending; run cashu-check`);
             expect(await keymaster.listCashuQuotes()).toEqual([expect.objectContaining({ quote: quote.quote })]);
             // Pending means the mint is working on it: no restore scan for stale counters.
             expect(mint.requests).not.toContain('POST /v1/restore');

@@ -332,6 +332,19 @@ class TestMinting:
         assert run(bed.keymaster.list_cashu_quotes()) == []
         assert bed.balance()["spendable"] == 0
 
+    def test_reports_a_paid_claim_with_pending_outputs_as_pending_and_finishes_it_later(self, bed):
+        quote = run(bed.keymaster.create_cashu_mint_quote(10))
+        bed.mint.pay_mint_quote(quote["quote"])
+        bed.mint.refuse_next("/v1/mint/bolt11", 11004, "outputs pending")
+
+        with pytest.raises(CashuUnavailableError) as raised:
+            run(bed.keymaster.claim_cashu_mint_quote(quote["quote"]))
+        assert str(raised.value) == f"Cashu mint unavailable: {PUBLIC_URL} has the claim pending; run cashu-check"
+        assert len(run(bed.keymaster.list_cashu_quotes())) == 1
+
+        assert run(bed.keymaster.check_cashu()) == {"settled": 1, "open": 0}
+        assert bed.balance()["spendable"] == 10
+
     def test_recovers_a_claim_whose_response_was_lost(self, bed):
         quote = run(bed.keymaster.create_cashu_mint_quote(21))
         bed.mint.pay_mint_quote(quote["quote"])

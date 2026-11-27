@@ -94,6 +94,9 @@ const REQUIRED_NUTS = ['7', '8', '9'];
 type MintFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 type OperationOutcome = 'done' | 'open' | 'spent' | 'rejected';
+// A claim of a paid quote whose outputs the mint reports pending stays open as
+// 'pending', so that it is not taken for a quote that has not been paid.
+type MintOutcome = OperationOutcome | 'pending';
 
 // What became of a reclaim's proofs when some were already spent.
 interface SwapReport {
@@ -1009,7 +1012,7 @@ export class CashuWallet {
         return 'open';
     }
 
-    private async runMint(ctx: MintContext, id: string, retried = false): Promise<OperationOutcome> {
+    private async runMint(ctx: MintContext, id: string, retried = false): Promise<MintOutcome> {
         const op = (await this.readOp(ctx, id))!;
         const quote = await ctx.client.checkMintQuote(op.quote!);
 
@@ -1056,7 +1059,7 @@ export class CashuWallet {
                 throw error;
             }
             if (error.code === OUTPUTS_PENDING) {
-                return 'open';
+                return 'pending';
             }
             const after = await ctx.client.checkMintQuote(current.quote!);
             if (after.state === 'ISSUED') {
@@ -1212,8 +1215,10 @@ export class CashuWallet {
 
     private async settleOp(ctx: MintContext, op: CashuOperation): Promise<OperationOutcome> {
         switch (op.kind) {
-        case 'mint':
-            return this.runMint(ctx, op.id);
+        case 'mint': {
+            const outcome = await this.runMint(ctx, op.id);
+            return outcome === 'pending' ? 'open' : outcome;
+        }
         case 'melt':
             return (await this.settleMelt(ctx, op.id)).outcome;
         default: {
@@ -1525,6 +1530,9 @@ export class CashuWallet {
             throw new CashuUnavailableError(`quote ${quoteId} is already being claimed`);
         }
         const outcome = await this.withActive(op.id, () => this.runMint(ctx, op.id));
+        if (outcome === 'pending') {
+            throw new CashuUnavailableError(`${ctx.url} has the claim pending; run cashu-check`);
+        }
         if (outcome !== 'done') {
             throw new CashuQuoteUnpaidError(quoteId);
         }
