@@ -82,7 +82,8 @@ beforeEach(() => {
     variables.credentialSubject = '';
     variables.issuedList = ['did:cid:earlier'];
     keymaster.bindCredential.mockResolvedValue(bound);
-    keymaster.getSchema.mockResolvedValue(schema);
+    // Keymaster reads the schema anew each time, so each answer is a new object.
+    keymaster.getSchema.mockImplementation(async () => structuredClone(schema));
     keymaster.issueCredential.mockResolvedValue(ISSUED);
 });
 
@@ -226,6 +227,44 @@ describe('issuing the credential', () => {
         expect(issueButton()).toBeDisabled();
 
         await user.type(grade, 'A');
+        expect(issueButton()).toBeEnabled();
+    });
+
+    it('withdraws Issue when a required field is cleared', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+
+        await user.type(grade, 'A');
+        expect(issueButton()).toBeEnabled();
+
+        await user.clear(grade);
+        expect(screen.getByText('This field is required')).toBeInTheDocument();
+        expect(issueButton()).toBeDisabled();
+    });
+
+    it('reads the schema once while the form is filled in', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+
+        await user.type(grade, 'A');
+        await user.type(screen.getByLabelText(/^year \(integer\)/), '2024');
+
+        expect(keymaster.getSchema).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the schema again when the credential is bound again', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+        await user.type(grade, 'A');
+
+        await user.click(editButton());
+
+        await waitFor(() => expect(keymaster.getSchema).toHaveBeenCalledTimes(2));
+        // The form's values are written into the credential bound again.
+        await waitFor(() => expect(JSON.parse(variables.credentialString).credentialSubject).toEqual({ id: BOB, grade: 'A' }));
         expect(issueButton()).toBeEnabled();
     });
 

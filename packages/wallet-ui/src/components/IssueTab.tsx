@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -38,6 +38,8 @@ function IssueTab() {
 
     const [schemaObject, setSchemaObject] = useState<any>(null);
     const [isFormValid, setIsFormValid] = useState<boolean>(false);
+    // The schema last read, so that edits to the credential do not read it again.
+    const loadedSchemaDID = useRef<string | null>(null);
 
     async function editCredential() {
         if (!keymaster) {
@@ -48,6 +50,7 @@ function IssueTab() {
                 credentialSubject,
                 { schema: credentialSchema },
             );
+            loadedSchemaDID.current = null;
             setCredentialString(JSON.stringify(credentialBound, null, 4));
             setCredentialDID("");
         } catch (error: any) {
@@ -83,6 +86,10 @@ function IssueTab() {
                     return;
                 }
                 const schemaDID = credentialObject.credentialSchema.id;
+                if (schemaDID === loadedSchemaDID.current) {
+                    return;
+                }
+                loadedSchemaDID.current = schemaDID;
                 const schemaObject = await keymaster.getSchema(schemaDID);
                 setSchemaObject(schemaObject);
             } catch (error: any) {

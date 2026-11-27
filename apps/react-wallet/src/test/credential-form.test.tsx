@@ -119,17 +119,43 @@ describe('the credential handed to the parent', () => {
             required: ['name', 'city', 'absent'],
         });
 
-        expect(onChange).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenLastCalledWith(BASE, false);
         expect(screen.getAllByText('This field is required')).toHaveLength(2);
 
         await user.type(screen.getByLabelText(/^name \(string\)/), 'Bob');
-        expect(onChange).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenLastCalledWith(BASE, false);
         expect(screen.getAllByText('This field is required')).toHaveLength(1);
 
         await user.type(screen.getByLabelText(/^city \(string\)/), 'Oslo');
         expect(screen.queryByText('This field is required')).toBeNull();
         expect(handedOver().valid).toBe(true);
         expect(subject()).toEqual({ id: BOB, name: 'Bob', city: 'Oslo' });
+    });
+
+    it('reports that it is no longer valid when a required field is cleared', async () => {
+        const user = userEvent.setup({ delay: null });
+        show({ properties: { name: { type: 'string' } }, required: ['name'] });
+        const name = screen.getByLabelText(/^name \(string\)/);
+
+        await user.type(name, 'Bob');
+        expect(handedOver().valid).toBe(true);
+
+        await user.clear(name);
+        expect(screen.getByText('This field is required')).toBeInTheDocument();
+        expect(onChange).toHaveBeenLastCalledWith(BASE, false);
+    });
+
+    it('reports that it is no longer valid when a value stops being of its type', async () => {
+        const user = userEvent.setup({ delay: null });
+        show({ properties: { age: { type: 'integer' } } });
+        const age = screen.getByLabelText(/^age \(integer\)/);
+
+        await user.type(age, '7');
+        expect(subject()).toEqual({ id: BOB, age: 7 });
+
+        await user.type(age, '.5');
+        expect(screen.getByText('Must be an integer')).toBeInTheDocument();
+        expect(onChange).toHaveBeenLastCalledWith(BASE, false);
     });
 
     it('requires nothing when the schema\'s required is not a list', () => {
@@ -197,6 +223,7 @@ describe('the credential handed to the parent', () => {
         show({ properties: { name: { type: 'string' } } }, 'not json');
 
         expect(setError).toHaveBeenCalledWith('Invalid base credential JSON');
+        expect(onChange).toHaveBeenLastCalledWith('not json', false);
     });
 });
 
@@ -254,7 +281,7 @@ describe('checking what is typed', () => {
         show({ properties: { active: { type: 'boolean' } }, required: ['active'] });
 
         expect(screen.getByText('This field is required')).toBeInTheDocument();
-        expect(onChange).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenLastCalledWith(BASE, false);
 
         await pick(user, screen.getByRole('combobox', { name: /^active \(boolean\)/ }), 'False');
 
@@ -319,6 +346,18 @@ describe('a property of more than one type', () => {
         expect(screen.getByText('Enter a JSON object')).toBeInTheDocument();
         await paste(user, screen.getByLabelText(/^value \(object\)/), '{"a": 1}');
         expect(subject()).toEqual({ id: BOB, value: { a: 1 } });
+    });
+
+    it('gives each of its elements an id of its own when the type picked is boolean', async () => {
+        const user = userEvent.setup({ delay: null });
+        const { container } = show({ properties: { value: { type: ['integer', 'boolean'] } } });
+
+        await pick(user, typePicker(), 'boolean');
+
+        const ids = Array.from(container.querySelectorAll('[id]'), element => element.id);
+        expect(ids.length).toBeGreaterThan(0);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(screen.getByRole('combobox', { name: /^value \(boolean\)/ })).toBe(screen.getAllByRole('combobox')[1]);
     });
 
     it('is checked as the type picked', async () => {
