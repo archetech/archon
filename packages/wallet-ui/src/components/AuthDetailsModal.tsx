@@ -103,7 +103,7 @@ const AuthDetailsModal: React.FC<AuthDetailsProps> = ({
                             readOnly,
                             endAdornment: (
                                 <InputAdornment position="end">
-                                    <Tooltip title="Show password">
+                                    <Tooltip title={showPassword ? "Hide password" : "Show password"}>
                                         <IconButton
                                             onClick={handleClickShowPassword}
                                             onMouseDown={handleMouseDownPassword}

@@ -39,6 +39,8 @@ const WarningModal: React.FC<WarningModalProps> = ({ isOpen, title, warningText,
             onClose={handleClose}
             maxWidth="lg"
             fullWidth
+            aria-labelledby="confirm-dialog-title"
+            aria-describedby="confirm-dialog-description"
             slotProps={{
                 paper: {
                     sx: {
