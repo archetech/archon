@@ -232,6 +232,18 @@ describe('uploading a file', () => {
         await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledWith('a-very-long-name-for-a-qua', NEW_DID));
     });
 
+    it('numbers a name that ends in a space where it is cut, when the wallet has it trimmed', async () => {
+        const user = userEvent.setup({ delay: null });
+        const upload = nodeUpload();
+        keymaster.listAliases.mockResolvedValue({ 'my quarterly report for a': 'did:cid:one' });
+        render(<FileTab />);
+
+        await user.upload(uploadInput(), pdf('my quarterly report for a board.pdf'));
+        await upload.answer(200, 'cid-new');
+
+        await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledWith('my quarterly report for a (1)', NEW_DID));
+    });
+
     it('numbers the name when the wallet already has it', async () => {
         const user = userEvent.setup({ delay: null });
         const upload = nodeUpload();

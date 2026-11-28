@@ -119,11 +119,13 @@ const ImageTab = () => {
                     const did = await keymaster.createImage(buffer, { registry });
 
                     const aliasList = await keymaster.listAliases();
-                    let name = file.name.slice(0, 26);
+                    // Keymaster trims an alias, so the name checked is the one it will store.
+                    const base = file.name.slice(0, 26).trim();
+                    let name = base;
                     let count = 1;
 
                     while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                        name = `${base} (${count++})`;
                     }
 
                     await keymaster.addAlias(name, did);

@@ -106,6 +106,33 @@ describe('cloning an asset', () => {
         expect(didField()).toHaveValue('did:cid:agent');
     });
 
+    it('says only assets can be cloned when a Keymaster service refuses the DID', async () => {
+        const user = userEvent.setup({ delay: null });
+        // KeymasterClient throws the service's response body.
+        keymaster.cloneAsset.mockRejectedValue({ error: 'Error: Invalid parameter: id' });
+        render(<CloneAssetTab />);
+
+        await user.type(nameField(), 'copy');
+        await user.type(didField(), 'did:cid:agent');
+        await user.click(cloneButton());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith('Only assets can be cloned'));
+    });
+
+    it("reports Keymaster's own error for any other failure", async () => {
+        const user = userEvent.setup({ delay: null });
+        const error = new Error('Invalid parameter: alias already used');
+        keymaster.cloneAsset.mockRejectedValue(error);
+        render(<CloneAssetTab />);
+
+        await user.type(nameField(), 'copy');
+        await user.type(didField(), ASSET);
+        await user.click(cloneButton());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(error));
+        expect(nameField()).toHaveValue('copy');
+    });
+
     it('does nothing while the wallet has no keymaster', async () => {
         const user = userEvent.setup({ delay: null });
         wallet.keymaster = null;
