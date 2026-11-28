@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import {
     Autocomplete,
     Box,
@@ -20,25 +20,38 @@ import {
 import {
     AddCircleOutline,
     BarChart,
-    Block,
     Close,
     Delete,
     Edit,
-    HowToVote,
+    ErrorOutline,
     PersonAdd,
+    Poll,
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useWalletData } from "../hooks/useWalletData";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import PollResultsModal from "./PollResultsModal";
-import {PollConfig, PollResults} from "@didcid/keymaster/types";
+import {PollConfig, PollResults, ViewPollResult} from "@didcid/keymaster/types";
 import TextInputModal from "./TextInputModal";
 import WarningModal from "./WarningModal";
 import CopyResolveDID from "./CopyResolveDID";
 import DisplayDID from "./DisplayDID";
 import { useIsTabletUp } from "../hooks/useIsTabletUp";
 import PageHeader from "./layout/PageHeader";
+
+// The vault item a poll holds its results in while they are published.
+const PUBLISHED_RESULTS_ITEM = "results";
+
+// A stored deadline as a datetime-local field shows it: in local time.
+function localDateTimeInput(iso: string): string {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) {
+        return "";
+    }
+    const offsetMs = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
 
 const PollsTab: React.FC = () => {
     const { keymaster } = useWalletContext();
@@ -85,7 +98,7 @@ const PollsTab: React.FC = () => {
     const [removeOpen, setRemoveOpen]   = useState(false);
     const [removeName, setRemoveName]   = useState<string>("");
     const [canVote, setCanVote] = useState<boolean>(false);
-    const [eligiblePolls, setEligiblePolls] = useState<Record<string, boolean>>({});
+    const [readablePolls, setReadablePolls] = useState<Record<string, boolean>>({});
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
@@ -107,15 +120,21 @@ const PollsTab: React.FC = () => {
                     map[name] = false;
                 }
             }
-            setEligiblePolls(map);
+            setReadablePolls(map);
         })();
     }, [pollList, aliasList, keymaster, currentDID]);
 
+    // Counts the changes of the selected poll, so that what was read for one
+    // poll is not shown once another is chosen.
+    const selection = useRef(0);
+
     function clearPollList() {
+        selection.current++;
         setSelectedPollName("");
         setSelectedPollDesc("");
         setPollOptions([]);
         setPollResults(null);
+        setPollPublished(false);
         setPollController("");
     }
 
@@ -140,7 +159,7 @@ const PollsTab: React.FC = () => {
                     setPollName(config.name || "");
                     setDescription(config.description || "");
                     setOptionsStr(config.options?.join(", ") || "");
-                    setDeadline(config.deadline ? config.deadline.slice(0, 16) : "");
+                    setDeadline(config.deadline ? localDateTimeInput(config.deadline) : "");
                     refreshVoters(saved);
                 } else {
                     sessionStorage.removeItem('createdPollDid');
@@ -276,11 +295,32 @@ const PollsTab: React.FC = () => {
         }
     };
 
+    // The results of a poll as far as they are published, or null. Keymaster
+    // gives a poll's owner the results so far whether or not they are
+    // published, so for the owner the poll's vault says whether they are.
+    const publishedResults = async (pollDid: string, view: ViewPollResult): Promise<PollResults | null> => {
+        if (!keymaster || !view.results) {
+            return null;
+        }
+        if (!view.isOwner) {
+            return view.results;
+        }
+        const items = await keymaster.listVaultItems(pollDid);
+        return items[PUBLISHED_RESULTS_ITEM] ? view.results : null;
+    };
+
+    const showPublished = (results: PollResults | null) => {
+        setPollResults(results);
+        setPollPublished(!!results);
+    };
+
     const handleSelectPoll = async (event: SelectChangeEvent) => {
         if (!keymaster) {
             return;
         }
         const name = event.target.value;
+        const chosen = ++selection.current;
+        const superseded = () => chosen !== selection.current;
         setSelectedPollName(name);
         setSelectedPollDesc("");
         setSelectedOptionIdx(0);
@@ -289,28 +329,42 @@ const PollsTab: React.FC = () => {
         setLastBallotDid("");
         setBallotSent(false);
         setPollController("");
+        setPollOptions([]);
+        setPollDeadline(null);
+        setCanVote(false);
+        showPublished(null);
         try {
             const did = aliasList[name] ?? "";
             if (did) {
                 const poll = await keymaster.getPoll(did);
+                if (superseded()) {
+                    return;
+                }
                 setSelectedPollDesc(poll?.description ?? "");
                 setPollOptions(poll?.options ?? []);
                 setPollDeadline(poll?.deadline ? new Date(poll.deadline) : null);
 
                 const didDoc = await keymaster.resolveDID(did);
+                if (superseded()) {
+                    return;
+                }
                 if (didDoc) {
                     setPollController(didDoc.didDocument?.controller ?? "");
                 }
 
                 const view = await keymaster.viewPoll(did);
+                const results = await publishedResults(did, view);
+                if (superseded()) {
+                    return;
+                }
                 setCanVote(view.isEligible);
                 setHasVoted(view.hasVoted);
-                if (view.results) {
-                    setPollResults(view.results);
-                    setPollPublished(true);
-                }
+                showPublished(results);
             }
         } catch (error: any) {
+            if (superseded()) {
+                return;
+            }
             setError(error);
             setPollOptions([]);
         }
@@ -360,19 +414,23 @@ const PollsTab: React.FC = () => {
             return;
         }
 
+        // The poll is published or unpublished whatever is chosen meanwhile;
+        // only the poll still on screen has its results redrawn.
+        const chosen = selection.current;
         try {
             if (pollPublished) {
                 await keymaster.unpublishPoll(selectedPollDid);
-                setPollPublished(false);
-                setPollResults(null);
+                if (chosen === selection.current) {
+                    showPublished(null);
+                }
                 setSuccess("Poll unpublished");
             } else {
                 await keymaster.publishPoll(selectedPollDid);
                 const view = await keymaster.viewPoll(selectedPollDid);
-                if (view.results) {
-                    setPollResults(view.results);
+                const results = await publishedResults(selectedPollDid, view);
+                if (chosen === selection.current) {
+                    showPublished(results);
                 }
-                setPollPublished(true);
                 setSuccess("Poll published");
             }
         } catch (error: any) {
@@ -696,10 +754,10 @@ const PollsTab: React.FC = () => {
                                         </MenuItem>
                                         {pollList.map((name: string) => (
                                             <MenuItem key={name} value={name}>
-                                                {eligiblePolls[name] ? (
-                                                    <HowToVote fontSize="small" sx={{ mr: 1 }} />
+                                                {readablePolls[name] ? (
+                                                    <Poll fontSize="small" sx={{ mr: 1 }} />
                                                 ) : (
-                                                    <Block fontSize="small" sx={{ mr: 1 }} />
+                                                    <ErrorOutline fontSize="small" sx={{ mr: 1 }} />
                                                 )}
                                                 {name}
                                             </MenuItem>

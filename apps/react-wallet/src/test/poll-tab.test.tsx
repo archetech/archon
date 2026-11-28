@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import PollTab from '../../../../packages/wallet-ui/src/components/PollTab';
@@ -12,7 +12,7 @@ const { keymaster, wallet, variables, walletData, setError, setSuccess, openView
         getPoll: vi.fn(), pollTemplate: vi.fn(), createPoll: vi.fn(), sendPoll: vi.fn(),
         listPollVoters: vi.fn(), addPollVoter: vi.fn(), removePollVoter: vi.fn(),
         resolveDID: vi.fn(), viewPoll: vi.fn(), votePoll: vi.fn(), updatePoll: vi.fn(), sendBallot: vi.fn(),
-        publishPoll: vi.fn(), unpublishPoll: vi.fn(),
+        publishPoll: vi.fn(), unpublishPoll: vi.fn(), listVaultItems: vi.fn(),
         addAlias: vi.fn(), removeAlias: vi.fn(),
     };
 
@@ -63,6 +63,27 @@ function lunch(deadline: string | undefined = OPEN_UNTIL) {
     return { name: 'lunch', description: 'Where do we eat?', options: ['pizza', 'sushi', 'tacos'], deadline };
 }
 
+// What Keymaster's viewPoll returns, for someone eligible who has not voted in
+// an open poll they do not own.
+function pollView(given: Record<string, unknown> = {}) {
+    return {
+        description: 'Where do we eat?',
+        options: ['pizza', 'sushi', 'tacos'],
+        deadline: OPEN_UNTIL,
+        isOwner: false,
+        isEligible: true,
+        voteExpired: false,
+        hasVoted: false,
+        ballots: [],
+        ...given,
+    };
+}
+
+// A poll is a vault. It holds its results as the item `results` only while
+// they are published.
+const UNPUBLISHED_ITEMS = { poll: { cid: 'poll-cid' } };
+const PUBLISHED_ITEMS = { ...UNPUBLISHED_ITEMS, results: { cid: 'results-cid' } };
+
 beforeEach(() => {
     vi.resetAllMocks();
     wallet.keymaster = keymaster;
@@ -77,7 +98,7 @@ beforeEach(() => {
     keymaster.createPoll.mockResolvedValue(NEW_POLL);
     keymaster.listPollVoters.mockResolvedValue({});
     keymaster.resolveDID.mockResolvedValue({ didDocument: { controller: OTHER } });
-    keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: false });
+    keymaster.viewPoll.mockResolvedValue(pollView());
     keymaster.votePoll.mockResolvedValue(BALLOT);
 });
 
@@ -140,13 +161,12 @@ async function openPoll(user: UserEvent, name = 'lunch') {
     await screen.findByText('Where do we eat?');
 }
 
-// Makes the current identity the poll's owner. The view of the poll is left
-// as each test sets it, without results: Keymaster always gives an owner the
-// results, and the tab then takes an unpublished poll for a published one
-// (#1804). These tests cover what the tab does once it is told a poll is not
-// published, not that first reading.
-function ownPoll() {
+// Makes the current identity the owner of an unpublished poll. Keymaster gives
+// an owner the results so far whether or not they are published.
+function ownPoll(given: Record<string, unknown> = {}) {
     keymaster.resolveDID.mockResolvedValue({ didDocument: { controller: ME } });
+    keymaster.viewPoll.mockResolvedValue(pollView({ ...given, isOwner: true, results: RESULTS }));
+    keymaster.listVaultItems.mockResolvedValue(UNPUBLISHED_ITEMS);
 }
 
 describe('creating a poll', () => {
@@ -531,6 +551,31 @@ describe('a poll created before the tab was left', () => {
         expect(sendButton()).toBeEnabled();
     });
 
+    describe('in a time zone ahead of UTC', () => {
+        const zone = process.env.TZ;
+        beforeEach(() => {
+            process.env.TZ = 'Asia/Kolkata';
+        });
+        afterEach(() => {
+            if (zone === undefined) {
+                delete process.env.TZ;
+            } else {
+                process.env.TZ = zone;
+            }
+        });
+
+        it('shows its deadline in local time', async () => {
+            keymaster.getPoll.mockResolvedValue({
+                name: 'dinner', description: 'Where next?', options: ['thai', 'ramen'], deadline: '2031-05-06T07:08:00.000Z',
+            });
+            render(<PollTab />);
+
+            await screen.findByText(NEW_POLL);
+            // UTC+5:30
+            expect(deadlineField()).toHaveValue('2031-05-06T12:38');
+        });
+    });
+
     it('is brought back even when it holds none of the fields', async () => {
         keymaster.getPoll.mockResolvedValue({});
         render(<PollTab />);
@@ -606,9 +651,12 @@ describe('the list of polls', () => {
         await user.click(pollPicker());
 
         const option = (name: string) => screen.getByRole('option', { name });
-        expect(await within(await screen.findByRole('option', { name: 'lunch' })).findByTestId('HowToVoteIcon')).toBeInTheDocument();
-        expect(within(option('gone')).getByTestId('BlockIcon')).toBeInTheDocument();
-        expect(within(option('broken')).getByTestId('BlockIcon')).toBeInTheDocument();
+        expect(await within(await screen.findByRole('option', { name: 'lunch' })).findByTestId('PollIcon')).toBeInTheDocument();
+        expect(within(option('gone')).getByTestId('ErrorOutlineIcon')).toBeInTheDocument();
+        expect(within(option('broken')).getByTestId('ErrorOutlineIcon')).toBeInTheDocument();
+        // Whether a poll can be read says nothing of whether this identity may vote in it.
+        expect(screen.queryByTestId('HowToVoteIcon')).toBeNull();
+        expect(screen.queryByTestId('BlockIcon')).toBeNull();
         expect(screen.getByRole('option', { name: 'Select poll' })).toHaveAttribute('aria-disabled', 'true');
         expect(setError).not.toHaveBeenCalled();
     });
@@ -621,7 +669,7 @@ describe('the list of polls', () => {
         await showPolls(user);
         await user.click(pollPicker());
 
-        expect(within(await screen.findByRole('option', { name: 'lunch' })).getByTestId('BlockIcon')).toBeInTheDocument();
+        expect(within(await screen.findByRole('option', { name: 'lunch' })).getByTestId('ErrorOutlineIcon')).toBeInTheDocument();
         expect(keymaster.getPoll).not.toHaveBeenCalled();
     });
 
@@ -693,7 +741,7 @@ describe('opening a poll', () => {
 
     it('asks for an updated vote from someone who has voted', async () => {
         const user = setup();
-        keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: true });
+        keymaster.viewPoll.mockResolvedValue(pollView({ hasVoted: true }));
         render(<PollTab />);
 
         await openPoll(user);
@@ -704,7 +752,7 @@ describe('opening a poll', () => {
 
     it('offers no vote to someone who is not a voter', async () => {
         const user = setup();
-        keymaster.viewPoll.mockResolvedValue({ isEligible: false, hasVoted: false });
+        keymaster.viewPoll.mockResolvedValue(pollView({ isEligible: false }));
         render(<PollTab />);
 
         await openPoll(user);
@@ -755,6 +803,32 @@ describe('opening a poll', () => {
 
         await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
         expect(keymaster.viewPoll).not.toHaveBeenCalled();
+        expect(screen.queryByRole('radio')).toBeNull();
+    });
+
+    it('shows neither the vote nor the deadline of the last poll when the next cannot be read', async () => {
+        const user = setup();
+        variables.aliasList = { lunch: POLL, broken: 'did:cid:broken' };
+        variables.pollList = ['lunch', 'broken'];
+        const failure = new Error('unknown poll');
+        keymaster.getPoll.mockImplementation(async (did: string) => {
+            if (did === POLL) {
+                return lunch();
+            }
+            throw failure;
+        });
+        render(<PollTab />);
+        await openPoll(user);
+        expect(await screen.findByRole('button', { name: 'Vote' })).toBeInTheDocument();
+        expect(screen.getByText(/^Deadline:/)).toBeInTheDocument();
+
+        await pickPoll(user, 'broken');
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(pollPicker()).toHaveTextContent('broken');
+        expect(screen.queryByText('Where do we eat?')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Vote' })).toBeNull();
+        expect(screen.queryByText(/^Deadline:/)).toBeNull();
         expect(screen.queryByRole('radio')).toBeNull();
     });
 
@@ -930,7 +1004,6 @@ describe('the owner\'s tally', () => {
         // An open poll is not yet to be published.
         expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull();
 
-        keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: false, results: RESULTS });
         await user.click(screen.getByRole('button', { name: 'View' }));
 
         const dialog = await screen.findByRole('dialog', { name: 'Poll Results' });
@@ -944,19 +1017,6 @@ describe('the owner\'s tally', () => {
 
         await user.click(within(dialog).getByRole('button', { name: 'Close' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    });
-
-    it('shows nothing when the poll has no results to give', async () => {
-        const user = setup();
-        ownPoll();
-        render(<PollTab />);
-        await openPoll(user);
-
-        await user.click(screen.getByRole('button', { name: 'View' }));
-
-        await waitFor(() => expect(keymaster.viewPoll).toHaveBeenCalledTimes(2));
-        expect(screen.queryByRole('dialog')).toBeNull();
-        expect(setError).not.toHaveBeenCalled();
     });
 
     it('reports a failure to read the results', async () => {
@@ -975,8 +1035,11 @@ describe('the owner\'s tally', () => {
 });
 
 describe('a poll past its deadline', () => {
+    const CLOSED = { deadline: CLOSED_SINCE, voteExpired: true };
+
     beforeEach(() => {
         keymaster.getPoll.mockResolvedValue(lunch(CLOSED_SINCE));
+        keymaster.viewPoll.mockResolvedValue(pollView(CLOSED));
     });
 
     it('takes no more votes and says its results are not published', async () => {
@@ -996,7 +1059,7 @@ describe('a poll past its deadline', () => {
 
     it('shows the published results to a voter', async () => {
         const user = setup();
-        keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: true, results: { tally: RESULTS.tally } });
+        keymaster.viewPoll.mockResolvedValue(pollView({ ...CLOSED, hasVoted: true, results: { tally: RESULTS.tally } }));
         render(<PollTab />);
         await openPoll(user);
 
@@ -1009,22 +1072,40 @@ describe('a poll past its deadline', () => {
         expect(screen.queryByText('Results not published yet')).toBeNull();
     });
 
-    it('lets its owner publish the results and take them back', async () => {
+    it('offers its owner Publish while the results are not published', async () => {
         const user = setup();
-        ownPoll();
+        ownPoll(CLOSED);
         render(<PollTab />);
         await openPoll(user);
         await screen.findByText('Poll complete');
 
-        keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: true, results: RESULTS });
-        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        expect(await screen.findByRole('button', { name: 'Publish' })).toBeInTheDocument();
+        expect(keymaster.listVaultItems).toHaveBeenCalledWith(POLL);
+        expect(screen.queryByRole('button', { name: 'Unpublish' })).toBeNull();
+        expect(screen.getByText('Results not published yet')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Results' })).toBeNull();
+    });
+
+    it('lets its owner publish the results and take them back', async () => {
+        const user = setup();
+        ownPoll(CLOSED);
+        render(<PollTab />);
+        await openPoll(user);
+        await screen.findByText('Poll complete');
+
+        keymaster.listVaultItems.mockResolvedValue(PUBLISHED_ITEMS);
+        await user.click(await screen.findByRole('button', { name: 'Publish' }));
 
         expect(await screen.findByRole('button', { name: 'Unpublish' })).toBeInTheDocument();
         expect(keymaster.publishPoll).toHaveBeenCalledWith(POLL);
         expect(keymaster.viewPoll).toHaveBeenLastCalledWith(POLL);
         expect(setSuccess).toHaveBeenCalledWith('Poll published');
-        expect(screen.getByRole('button', { name: 'View Results' })).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'View Results' }));
+        expect(await screen.findByRole('dialog', { name: 'Poll Results' })).toHaveTextContent('sushi');
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
+        keymaster.listVaultItems.mockResolvedValue(UNPUBLISHED_ITEMS);
         await user.click(screen.getByRole('button', { name: 'Unpublish' }));
 
         expect(await screen.findByRole('button', { name: 'Publish' })).toBeInTheDocument();
@@ -1035,31 +1116,16 @@ describe('a poll past its deadline', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
-    it('publishes even when the poll gives no results back', async () => {
-        const user = setup();
-        ownPoll();
-        render(<PollTab />);
-        await openPoll(user);
-        await screen.findByText('Poll complete');
-
-        await user.click(screen.getByRole('button', { name: 'Publish' }));
-
-        expect(await screen.findByRole('button', { name: 'Unpublish' })).toBeInTheDocument();
-        expect(keymaster.publishPoll).toHaveBeenCalledWith(POLL);
-        expect(setSuccess).toHaveBeenCalledWith('Poll published');
-        expect(setError).not.toHaveBeenCalled();
-    });
-
     it('reports a failure to publish', async () => {
         const user = setup();
         const failure = new Error('not the owner');
-        ownPoll();
+        ownPoll(CLOSED);
         keymaster.publishPoll.mockRejectedValue(failure);
         render(<PollTab />);
         await openPoll(user);
         await screen.findByText('Poll complete');
 
-        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await user.click(await screen.findByRole('button', { name: 'Publish' }));
 
         await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
         expect(setSuccess).not.toHaveBeenCalled();
@@ -1070,8 +1136,8 @@ describe('a poll past its deadline', () => {
     it('reports a failure to unpublish and leaves the results published', async () => {
         const user = setup();
         const failure = new Error('not the owner');
-        ownPoll();
-        keymaster.viewPoll.mockResolvedValue({ isEligible: true, hasVoted: true, results: RESULTS });
+        ownPoll(CLOSED);
+        keymaster.listVaultItems.mockResolvedValue(PUBLISHED_ITEMS);
         keymaster.unpublishPoll.mockRejectedValue(failure);
         render(<PollTab />);
         await openPoll(user);
@@ -1081,6 +1147,54 @@ describe('a poll past its deadline', () => {
         await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
         expect(screen.getByRole('button', { name: 'Unpublish' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'View Results' })).toBeInTheDocument();
+    });
+
+    it('shows none of the last poll\'s results when an unpublished one is picked', async () => {
+        const user = setup();
+        variables.aliasList = { lunch: POLL, dinner: NEW_POLL };
+        variables.pollList = ['lunch', 'dinner'];
+        keymaster.getPoll.mockImplementation(async (did: string) => (
+            did === POLL ? lunch(CLOSED_SINCE) : { ...lunch(CLOSED_SINCE), name: 'dinner', description: 'Where next?' }
+        ));
+        keymaster.viewPoll.mockImplementation(async (did: string) => (
+            did === POLL ? pollView({ ...CLOSED, results: { tally: RESULTS.tally } }) : pollView({ ...CLOSED, description: 'Where next?' })
+        ));
+        render(<PollTab />);
+        await openPoll(user);
+        expect(await screen.findByRole('button', { name: 'View Results' })).toBeInTheDocument();
+
+        await pickPoll(user, 'dinner');
+
+        expect(await screen.findByText('Where next?')).toBeInTheDocument();
+        await waitFor(() => expect(keymaster.viewPoll).toHaveBeenLastCalledWith(NEW_POLL));
+        expect(await screen.findByText('Results not published yet')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Results' })).toBeNull();
+    });
+
+    it('shows none of a poll\'s results when it is read after another was picked', async () => {
+        const user = setup();
+        variables.aliasList = { lunch: POLL, dinner: NEW_POLL };
+        variables.pollList = ['lunch', 'dinner'];
+        keymaster.getPoll.mockImplementation(async (did: string) => (
+            did === POLL ? lunch(CLOSED_SINCE) : { ...lunch(CLOSED_SINCE), name: 'dinner', description: 'Where next?' }
+        ));
+        let late!: (view: unknown) => void;
+        keymaster.viewPoll.mockImplementation(async (did: string) => (
+            did === POLL ? new Promise(resolve => { late = resolve; }) : pollView({ ...CLOSED, description: 'Where next?' })
+        ));
+        render(<PollTab />);
+        await showPolls(user);
+        await pickPoll(user, 'lunch');
+        await waitFor(() => expect(keymaster.viewPoll).toHaveBeenCalledWith(POLL));
+
+        await pickPoll(user, 'dinner');
+        expect(await screen.findByText('Results not published yet')).toBeInTheDocument();
+        late(pollView({ ...CLOSED, results: { tally: RESULTS.tally } }));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(screen.getByText('Where next?')).toBeInTheDocument();
+        expect(screen.getByText('Results not published yet')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Results' })).toBeNull();
     });
 });
 
@@ -1283,7 +1397,7 @@ describe('a tab left open when the wallet loses its keymaster', () => {
 
     it('asks nothing of a closed poll for its owner', async () => {
         const user = setup();
-        ownPoll();
+        ownPoll({ deadline: CLOSED_SINCE, voteExpired: true });
         keymaster.getPoll.mockResolvedValue(lunch(CLOSED_SINCE));
         const shown = render(<PollTab />);
         await openPoll(user);
