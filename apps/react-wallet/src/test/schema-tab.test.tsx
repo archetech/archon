@@ -387,6 +387,28 @@ describe('saving a schema', () => {
         expect(editor()).toHaveValue(JSON.stringify(licence, null, 4));
     });
 
+    it('offers no second save while one is being made', async () => {
+        const user = userEvent.setup({ delay: null });
+        let saved!: (value: boolean) => void;
+        keymaster.setSchema.mockImplementation(() => new Promise<boolean>((resolve) => { saved = resolve; }));
+        render(<SchemaTab />);
+        await openSchema(user);
+        retype(JSON.stringify(amended));
+        keymaster.getSchema.mockResolvedValue(amended);
+
+        await user.click(saveButton());
+        await waitFor(() => expect(keymaster.setSchema).toHaveBeenCalledTimes(1));
+
+        expect(saveButton()).toBeDisabled();
+
+        await act(async () => {
+            saved(true);
+        });
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith('Schema saved'));
+        expect(saveButton()).toBeEnabled();
+    });
+
     it('keeps the editor when a saved schema cannot be read back', async () => {
         const user = userEvent.setup({ delay: null });
         const failure = new Error('node unreachable');

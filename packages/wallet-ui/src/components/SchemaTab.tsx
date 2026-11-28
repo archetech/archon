@@ -43,6 +43,8 @@ const SchemaTab = ()=> {
     const schemaRead = useRef<number>(0);
     // The schema whose text the editor holds, or '' when it holds none.
     const shownSchema = useRef<string>('');
+    // One save at a time, so that a later save is not read back as an earlier one.
+    const [saving, setSaving] = useState<boolean>(false);
 
     const saveSchema = async () => {
         if (!keymaster) {
@@ -52,6 +54,7 @@ const SchemaTab = ()=> {
         // being saved, or its text would be shown under the one picked.
         const name = selectedSchemaName;
         const read = schemaRead.current;
+        setSaving(true);
         try {
             await keymaster.setSchema(name, JSON.parse(schemaString));
             if (schemaRead.current === read) {
@@ -60,6 +63,8 @@ const SchemaTab = ()=> {
             setSuccess("Schema saved");
         } catch (error: any) {
             setError(error);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -282,7 +287,7 @@ const SchemaTab = ()=> {
                         variant="contained"
                         color="primary"
                         onClick={saveSchema}
-                        disabled={!isJsonObject(schemaString)}
+                        disabled={saving || !isJsonObject(schemaString)}
                         sx={{ width: 150 }}
                     >
                         Save Schema
