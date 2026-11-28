@@ -1809,6 +1809,20 @@ describe('searching', () => {
         expect(shown()).toHaveLength(3);
     });
 
+    it('opens the advanced search empty after its search was cleared', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+        await advanced(user, async dialog => {
+            await user.type(within(dialog).getByLabelText('From'), 'bob');
+        });
+
+        await user.click(screen.getByRole('button', { name: 'Clear advanced search' }));
+        await user.click(screen.getByRole('button', { name: 'Advanced search' }));
+
+        const dialog = await screen.findByRole('dialog');
+        expect((within(dialog).getByLabelText('From') as HTMLInputElement).value).toBe('');
+    });
+
     it('applies nothing when the advanced search is made with every field empty', async () => {
         const user = userEvent.setup({ delay: null });
         render(<DmailTab />);
