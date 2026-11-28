@@ -80,6 +80,14 @@ describe('creating a schema', () => {
         expect(create).toBeEnabled();
     });
 
+    it('does not offer Create for a name of only spaces', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<SchemaTab />);
+
+        await user.type(screen.getByLabelText('Schema Name'), '   ');
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
     it('creates the schema on the chosen registry, names it and opens it', async () => {
         const user = userEvent.setup({ delay: null });
         keymaster.createSchema.mockResolvedValue('did:cid:licence-schema');

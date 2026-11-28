@@ -71,6 +71,14 @@ describe('creating a group', () => {
         expect(create).toBeEnabled();
     });
 
+    it('does not offer Create for a name of only spaces', async () => {
+        const user = userEvent.setup();
+        render(<GroupsTab />);
+
+        await user.type(screen.getByLabelText('Group Name'), '   ');
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
     it('creates the group on the chosen registry, names it and opens it', async () => {
         const user = userEvent.setup();
         keymaster.createGroup.mockResolvedValue('did:cid:devs');

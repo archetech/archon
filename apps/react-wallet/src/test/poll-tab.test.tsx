@@ -170,6 +170,14 @@ describe('creating a poll', () => {
         expect(sendButton()).toBeDisabled();
     });
 
+    it('does not offer Create for a name of only spaces', async () => {
+        const user = setup();
+        render(<PollTab />);
+
+        await fillForm(user, '   ');
+        expect(createButton()).toBeDisabled();
+    });
+
     it('creates the poll on the chosen registry, names it and shows its DID', async () => {
         const user = setup();
         render(<PollTab />);
@@ -222,7 +230,6 @@ describe('creating a poll', () => {
     });
 
     it.each([
-        ['a name of only spaces', { name: '   ' }, 'Poll name is required'],
         ['a name that is already an alias', { name: 'taken' }, 'Name "taken" is already in use'],
         ['a description of only spaces', { description: '   ' }, 'Description is required'],
         ['a single option', { options: 'only' }, 'Provide between 2 and 10 options'],

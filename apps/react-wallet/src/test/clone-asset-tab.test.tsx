@@ -52,6 +52,15 @@ describe('cloning an asset', () => {
         expect(cloneButton()).toBeDisabled();
     });
 
+    it('does not offer Clone for a name of only spaces', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<CloneAssetTab />);
+
+        await user.type(nameField(), '   ');
+        await user.type(didField(), ASSET);
+        expect(cloneButton()).toBeDisabled();
+    });
+
     it('clones on hyperswarm unless another registry is chosen, then empties the form', async () => {
         const user = userEvent.setup({ delay: null });
         render(<CloneAssetTab />);
