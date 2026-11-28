@@ -477,7 +477,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_accept_credential', cliCommand: 'accept-credential', description: 'Save a verifiable credential for the current ID.', schema: DidSchema.extend({ alias: z.string().optional() }), mutates: true, handler: async (runtime, { did, alias }) => {
         const keymaster = requireKeymaster(runtime);
         const accepted = await keymaster.acceptCredential(did);
-        if (accepted && alias) await keymaster.addAlias(alias, did);
+        if (accepted && alias !== undefined) await keymaster.addAlias(alias, did);
         return accepted;
     } }),
     tool({ name: 'archon_list_credentials', cliCommand: 'list-credentials', description: 'List credentials held by an ID.', schema: z.object({ id: z.string().optional() }), handler: (runtime, { id }) => requireKeymaster(runtime).listCredentials(id) }),

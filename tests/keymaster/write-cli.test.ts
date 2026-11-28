@@ -30,6 +30,8 @@ const WRITES: [string[], string, string, string][] = [
     [['unpublish-didcomm'], 'DELETE /didcomm/publish', 'unpublished', 'failed'],
 ];
 
+const ALIAS_REFUSED = 'Invalid parameter: alias must be a non-empty string';
+
 beforeAll(async () => {
     // Away from the repo, so a developer's .env cannot reach the command.
     cwd = mkdtempSync(path.join(tmpdir(), 'write-cli-'));
@@ -40,6 +42,10 @@ beforeAll(async () => {
             let reply: Reply;
             if (route === 'GET /ready') {
                 reply = { body: { ready: true } };
+            }
+            else if (route === 'POST /aliases') {
+                requests.push(route);
+                reply = { status: 400, body: { error: ALIAS_REFUSED } };
             }
             else if (route === 'POST /didcomm/credential/accept' || WRITES.some(([, request]) => request === route)) {
                 requests.push(route);
@@ -75,6 +81,24 @@ function run(...args: string[]): Promise<{ status: number, stdout: string, stder
         });
     });
 }
+
+it('reports an empty alias that the node refuses, after the credential is accepted', async () => {
+    answer = true;
+
+    const { status, stdout, stderr } = await run('accept-credential', 'did:cid:credential', '--alias', '');
+
+    expect(requests).toEqual(['POST /credentials/held', 'POST /aliases']);
+    expect({ status, stdout, stderr }).toEqual({ status: 1, stdout: 'OK', stderr: ALIAS_REFUSED });
+});
+
+it('adds no alias when none is given', async () => {
+    answer = true;
+
+    const { status, stdout } = await run('accept-credential', 'did:cid:credential');
+
+    expect(requests).toEqual(['POST /credentials/held']);
+    expect({ status, stdout }).toEqual({ status: 0, stdout: 'OK' });
+});
 
 describe.each(WRITES)('%j', (args, request, taken, refused) => {
     it('prints its success and exits 0 when the node takes the write', async () => {

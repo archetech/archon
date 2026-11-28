@@ -700,7 +700,9 @@ async def cmd_accept_credential(km: Keymaster, args: argparse.Namespace) -> None
     ok = await km.accept_credential(args.did)
     if ok:
         print(UPDATE_OK)
-        if args.alias:
+        # An alias that is given is added, an empty one too, so that Keymaster
+        # refuses it and it is not passed over in silence.
+        if args.alias is not None:
             await km.add_alias(args.alias, args.did)
     else:
         raise CommandError(UPDATE_FAILED)
