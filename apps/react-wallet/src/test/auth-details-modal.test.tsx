@@ -44,8 +44,9 @@ describe('the login details dialog', () => {
         expect(field('Password').type).toBe('password');
         await user.click(screen.getByRole('button', { name: 'Show password' }));
         expect(field('Password').type).toBe('text');
-        await user.click(screen.getByRole('button', { name: 'Show password' }));
+        await user.click(screen.getByRole('button', { name: 'Hide password' }));
         expect(field('Password').type).toBe('password');
+        expect(screen.getByRole('button', { name: 'Show password' })).toBeTruthy();
     });
 
     it('shows a login read-only, and OK closes it when there is nothing to save', async () => {

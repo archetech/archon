@@ -21,7 +21,12 @@ const WarningModal = ({ isOpen, title, warningText, onSubmit, onClose }) => {
     }
 
     return (
-        <Dialog open={isOpen} onClose={handleClose}>
+        <Dialog
+            open={isOpen}
+            onClose={handleClose}
+            aria-labelledby="confirm-dialog-title"
+            aria-describedby="confirm-dialog-description"
+        >
             <form onSubmit={handleSubmit}>
                 <DialogTitle id="confirm-dialog-title">{title}</DialogTitle>
                 <DialogContent>
