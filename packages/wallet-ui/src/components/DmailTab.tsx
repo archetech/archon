@@ -106,51 +106,39 @@ const DmailTab: React.FC = () => {
 
     async function fileTags(did: string, newTags: string[]) {
         if (!keymaster) {
-            return;
+            return false;
         }
-        await keymaster.fileDmail(did, newTags);
+        try {
+            await keymaster.fileDmail(did, newTags);
+        } catch (err: any) {
+            setError(err);
+            return false;
+        }
         await refreshInbox();
+        return true;
     }
 
-    const archive = async () => {
+    // The message stays open until it has been filed, so a failure leaves it
+    // where the user can see it was not moved. Only that message is closed:
+    // another may have been opened while the wallet was being written.
+    async function fileSelected(newTags: (tags: string[]) => string[]) {
         if (!selected) {
             return;
         }
         const { did, tags = [] } = selected;
-        setSelected(null);
-        setSelectedView(null);
-        await fileTags(did, [...tags, TAG.archived]);
-    };
+        if (await fileTags(did, newTags(tags))) {
+            setSelected(current => current?.did === did ? null : current);
+            setSelectedView(current => current?.did === did ? null : current);
+        }
+    }
 
-    const unarchive = async () => {
-        if (!selected) {
-            return;
-        }
-        const { did, tags = [] } = selected;
-        setSelected(null);
-        setSelectedView(null);
-        await fileTags(did, tags.filter(t => t !== TAG.archived));
-    };
+    const archive = () => fileSelected(tags => [...tags, TAG.archived]);
 
-    const del = async () => {
-        if (!selected) {
-            return;
-        }
-        const { did, tags = [] } = selected;
-        setSelected(null);
-        setSelectedView(null);
-        await fileTags(did, [...tags, TAG.deleted]);
-    };
+    const unarchive = () => fileSelected(tags => tags.filter(t => t !== TAG.archived));
 
-    const undelete = async () => {
-        if (!selected) {
-            return;
-        }
-        const { did, tags = [] } = selected;
-        setSelected(null);
-        setSelectedView(null);
-        await fileTags(did, tags.filter(t => t !== TAG.deleted));
-    };
+    const del = () => fileSelected(tags => [...tags, TAG.deleted]);
+
+    const undelete = () => fileSelected(tags => tags.filter(t => t !== TAG.deleted));
 
     useEffect(() => {
         refreshInbox();
