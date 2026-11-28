@@ -171,10 +171,10 @@ def test_accept_remove_revoke_credential():
     response = keymaster.accept_credential(did)
     assert_equal(response, True)
 
-    alias = generate_id()
+    alias = f"accepted-{bob}"
     response = keymaster.accept_credential(did, {"alias": alias})
     assert_equal(response, True)
-    assert_equal(keymaster.get_alias(alias), did)
+    assert_equal(keymaster.list_aliases()[alias], did)
     keymaster.remove_alias(alias)
 
     response = keymaster.remove_credential(did)
