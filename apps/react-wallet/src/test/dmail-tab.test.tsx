@@ -923,7 +923,9 @@ describe('replying and forwarding', () => {
 
         await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
         expect(keymaster.getDmailAttachment).not.toHaveBeenCalledWith(LUNCH, expect.anything());
-        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'menu.pdf');
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(1);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'menu.pdf', Buffer.from('menu'));
     });
 });
 
@@ -1221,6 +1223,62 @@ describe('editing a draft', () => {
         expect(bodyField()).toHaveValue('To be continued');
         expect(await screen.findByText('notes.txt')).toBeInTheDocument();
         expect(buttonBeside('notes.txt')).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+    });
+
+    it('creates a new Dmail with the attachments of the draft and then lists that Dmail\'s own', async () => {
+        const user = userEvent.setup({ delay: null });
+        const notes = Buffer.from('notes');
+        const added: Record<string, { bytes: number }> = {};
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.listDmailAttachments.mockImplementation(async (did: string) => (
+            did === DRAFT ? { 'notes.txt': { bytes: 5 }, 'gone.txt': { bytes: 3 } } : did === NEW ? { ...added } : {}
+        ));
+        keymaster.getDmailAttachment.mockImplementation(async (_did: string, name: string) => (name === 'notes.txt' ? notes : null));
+        keymaster.addDmailAttachment.mockImplementation(async (_did: string, name: string, buf: Buffer) => {
+            added[name] = { bytes: buf.length };
+            return true;
+        });
+        render(<DmailTab />);
+        await editDraft(user);
+        expect(await screen.findByText('gone.txt')).toBeInTheDocument();
+        const draftReads = keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === DRAFT).length;
+
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'notes.txt');
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'gone.txt');
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(1);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'notes.txt', notes);
+        await waitFor(() => expect(screen.queryByText('gone.txt')).toBeNull());
+        expect(screen.getByText('notes.txt')).toBeInTheDocument();
+        expect(screen.getByText(NEW)).toBeInTheDocument();
+        expect(keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === NEW)).toHaveLength(1);
+        expect(keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === DRAFT)).toHaveLength(draftReads);
+    });
+
+    it('offers no Send or Save draft while a new Dmail is being created from the draft', async () => {
+        const user = userEvent.setup({ delay: null });
+        let fetched!: (buf: Buffer) => void;
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.listDmailAttachments.mockImplementation(async (did: string) => (did === DRAFT ? { 'notes.txt': { bytes: 5 } } : {}));
+        keymaster.getDmailAttachment.mockReturnValue(new Promise(resolve => { fetched = resolve; }));
+        keymaster.addDmailAttachment.mockResolvedValue(true);
+        render(<DmailTab />);
+        await editDraft(user);
+        expect(await screen.findByText('notes.txt')).toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+        await waitFor(() => expect(keymaster.getDmailAttachment).toHaveBeenCalled());
+
+        expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+        fetched(Buffer.from('notes'));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
         expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
     });
 

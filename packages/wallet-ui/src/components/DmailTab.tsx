@@ -78,6 +78,8 @@ const DmailTab: React.FC = () => {
     const [advParams, setAdvParams] = useState<AdvancedSearchParams | null>(null);
     const [searchesCleared, setSearchesCleared] = useState<number>(0);
     const [forwardSourceDid, setForwardSourceDid] = useState<string | null>(null);
+    // A Dmail is being created: until it is, the form still names the last one.
+    const [creating, setCreating] = useState<boolean>(false);
     const [ephemeral, setEphemeral] = useState<boolean>(false);
     const [expiresAt, setExpiresAt] = useState<string>("");
     const [dmailReference, setDmailReference] = useState<string>("");
@@ -177,27 +179,35 @@ const DmailTab: React.FC = () => {
             ? { registry, validUntil: new Date(expiresAt).toISOString() }
             : { registry };
 
+        setCreating(true);
         try {
             const did = await keymaster.createDmail(dmail, opts);
-            setDmailDid(did);
 
-            const pendingAtt = { ...dmailAttachments };
+            // The attachments on screen belong to the message forwarded or to
+            // the draft being edited; the new Dmail gets copies of them.
+            const source = forwardSourceDid || dmailDid;
 
-            if (forwardSourceDid && Object.keys(pendingAtt).length) {
-                for (const name of Object.keys(pendingAtt)) {
-                    const buf = await keymaster.getDmailAttachment(forwardSourceDid, name);
-                    if (buf) {
-                        await keymaster.addDmailAttachment(did, name, buf);
+            try {
+                if (source) {
+                    for (const name of Object.keys(dmailAttachments)) {
+                        const buf = await keymaster.getDmailAttachment(source, name);
+                        if (buf) {
+                            await keymaster.addDmailAttachment(did, name, buf);
+                        }
                     }
                 }
+            } finally {
+                // The effect on dmailDid reads the new Dmail's attachments, so
+                // the DID is set only once the copies are made.
+                setForwardSourceDid(null);
+                setDmailDid(did);
             }
 
-            setForwardSourceDid(null);
-            setDmailAttachments(pendingAtt);
-            refreshDmailAttachments().catch(() => undefined);
             setSuccess(`Draft created ${did}`);
         } catch (err: any) {
             setError(err);
+        } finally {
+            setCreating(false);
         }
     }
 
@@ -1210,7 +1220,7 @@ const DmailTab: React.FC = () => {
                     <Button
                         variant="contained"
                         onClick={handleCreate}
-                        disabled={(!sendToList.length && !sendTo) || !sendSubject || !sendBody}
+                        disabled={creating || (!sendToList.length && !sendTo) || !sendSubject || !sendBody}
                     >
                         Create
                     </Button>
@@ -1218,11 +1228,11 @@ const DmailTab: React.FC = () => {
 
                 <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
 
-                    <Button variant="contained" onClick={handleSend} disabled={!dmailDid}>
+                    <Button variant="contained" onClick={handleSend} disabled={creating || !dmailDid}>
                         Send
                     </Button>
 
-                    <Button variant="outlined" onClick={handleUpdate} disabled={!dmailDid}>
+                    <Button variant="outlined" onClick={handleUpdate} disabled={creating || !dmailDid}>
                         Save draft
                     </Button>
 
