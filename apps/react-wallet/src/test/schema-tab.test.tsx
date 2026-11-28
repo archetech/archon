@@ -243,6 +243,79 @@ describe('picking a schema', () => {
         await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
         expect(screen.queryByRole('button', { name: 'Save Schema' })).toBeNull();
     });
+
+    it('hides the previous editor while another schema loads and ignores a late response', async () => {
+        const user = userEvent.setup({ delay: null });
+        const licence = { $schema: DRAFT, type: 'object', properties: { number: { type: 'string' } } };
+        variables.aliasList = { ...variables.aliasList, licence: 'did:cid:licence-schema' };
+        variables.schemaList = ['degree', 'licence'];
+        render(<SchemaTab />);
+        await openSchema(user, 'degree');
+        expect(saveButton()).toBeInTheDocument();
+
+        let finishLicence!: (value: object) => void;
+        let finishDegree!: (value: object) => void;
+        keymaster.getSchema.mockImplementation((name: string) => new Promise<object>((resolve) => {
+            if (name === 'licence') {
+                finishLicence = resolve;
+            } else {
+                finishDegree = resolve;
+            }
+        }));
+
+        await user.click(schemaPicker());
+        await user.click(await screen.findByRole('option', { name: 'licence' }));
+        expect(screen.queryByRole('button', { name: 'Save Schema' })).toBeNull();
+
+        await user.click(schemaPicker());
+        await user.click(await screen.findByRole('option', { name: 'degree' }));
+        expect(screen.queryByRole('button', { name: 'Save Schema' })).toBeNull();
+
+        finishDegree(amended);
+        expect(await screen.findByRole('button', { name: 'Save Schema' })).toBeInTheDocument();
+        expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
+
+        // The earlier read finishes later and must not overwrite the schema now open.
+        finishLicence(licence);
+        await waitFor(() => {
+            expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
+        });
+        expect(setError).not.toHaveBeenCalled();
+    });
+
+    it('ignores a late failure from a superseded schema read', async () => {
+        const user = userEvent.setup({ delay: null });
+        const licence = { $schema: DRAFT, type: 'object', properties: { number: { type: 'string' } } };
+        variables.aliasList = { ...variables.aliasList, licence: 'did:cid:licence-schema' };
+        variables.schemaList = ['degree', 'licence'];
+
+        let failDegree!: (reason: unknown) => void;
+        let finishLicence!: (value: object) => void;
+        keymaster.getSchema.mockImplementation((name: string) => new Promise<object>((resolve, reject) => {
+            if (name === 'degree') {
+                failDegree = reject;
+            } else {
+                finishLicence = resolve;
+            }
+        }));
+
+        render(<SchemaTab />);
+
+        await user.click(schemaPicker());
+        await user.click(await screen.findByRole('option', { name: 'degree' }));
+        await user.click(schemaPicker());
+        await user.click(await screen.findByRole('option', { name: 'licence' }));
+
+        finishLicence(licence);
+        expect(await screen.findByRole('button', { name: 'Save Schema' })).toBeInTheDocument();
+
+        failDegree(new Error('stale failure'));
+        await waitFor(() => {
+            expect(editor()).toHaveValue(JSON.stringify(licence, null, 4));
+        });
+        expect(saveButton()).toBeInTheDocument();
+        expect(setError).not.toHaveBeenCalled();
+    });
 });
 
 describe('saving a schema', () => {

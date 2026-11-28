@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {Box, Button, FormControl, IconButton, MenuItem, Select, TextField, Tooltip} from "@mui/material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -39,6 +39,8 @@ const SchemaTab = ()=> {
     const [schemaEdit, setSchemaEdit] = useState<boolean>(false);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
+    // Each schema read gets a number; an earlier read that finishes late is ignored.
+    const schemaRead = useRef<number>(0);
 
     const saveSchema = async () => {
         if (!keymaster) {
@@ -57,11 +59,20 @@ const SchemaTab = ()=> {
         if (!keymaster || !name) {
             return;
         }
+        const read = ++schemaRead.current;
+        setSchemaEdit(false);
+        setSchemaString('');
         try {
             const schema = (await keymaster.getSchema(name)) as unknown as object;
+            if (schemaRead.current !== read) {
+                return;
+            }
             setSchemaString(JSON.stringify(schema, null, 4));
             setSchemaEdit(true);
         } catch (error: any) {
+            if (schemaRead.current !== read) {
+                return;
+            }
             // A schema that cannot be read leaves no other schema's text in the editor.
             setSchemaEdit(false);
             setSchemaString('');
