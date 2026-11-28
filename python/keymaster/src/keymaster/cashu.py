@@ -862,8 +862,10 @@ class CashuWallet:
         try:
             response = await ctx.client.mint(current["quote"], blinded, signature)
         except CashuMintError as error:
+            # A paid quote whose outputs the mint reports pending stays open as
+            # "pending", so that it is not taken for a quote that has not been paid.
             if error.code == OUTPUTS_PENDING:
-                return "open"
+                return "pending"
             after = await ctx.client.check_mint_quote(current["quote"])
             if after.get("state") == "ISSUED":
                 return await self._recover_mint(ctx, op_id)
@@ -1005,7 +1007,8 @@ class CashuWallet:
 
     async def _settle_op(self, ctx: _MintContext, op: dict[str, Any]) -> str:
         if op["kind"] == "mint":
-            return await self._run_mint(ctx, op["id"])
+            outcome = await self._run_mint(ctx, op["id"])
+            return "open" if outcome == "pending" else outcome
         if op["kind"] == "melt":
             return (await self._settle_melt(ctx, op["id"]))[0]
         if op.get("sent"):
@@ -1278,6 +1281,8 @@ class CashuWallet:
         if op["id"] in self._active:
             raise CashuUnavailableError(f"quote {quote_id} is already being claimed")
         outcome = await self._with_active(op["id"], lambda: self._run_mint(ctx, op["id"]))
+        if outcome == "pending":
+            raise CashuUnavailableError(f"{ctx.url} has the claim pending; run cashu-check")
         if outcome != "done":
             raise CashuQuoteUnpaidError(quote_id)
         return {"amount": op["amount"], "mint": ctx.url}
