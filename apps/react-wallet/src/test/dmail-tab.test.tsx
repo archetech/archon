@@ -721,6 +721,74 @@ describe('replying and forwarding', () => {
         expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(1);
         expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'menu.pdf', menu);
     });
+
+    it('keeps the attachments of a message forwarded while a draft was open', async () => {
+        const user = userEvent.setup({ delay: null });
+        const menu = Buffer.from('menu');
+        const map = Buffer.from('map');
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.getDmailAttachment.mockImplementation(async (_did: string, name: string) => (name === 'menu.pdf' ? menu : map));
+        render(<DmailTab />);
+        await editDraft(user);
+        await folder(user, 'Inbox');
+        await open(user, 'Lunch plans');
+
+        await user.click(screen.getByRole('button', { name: 'Forward' }));
+
+        expect(await screen.findByText('menu.pdf')).toBeInTheDocument();
+        expect(screen.getByText('map.png')).toBeInTheDocument();
+
+        await user.type(toField(), 'Carol');
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(2);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'menu.pdf', menu);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'map.png', map);
+    });
+
+    it('starts a reply without the attachments of a forward that was left unsent', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.getDmailAttachment.mockResolvedValue(Buffer.from('menu'));
+        render(<DmailTab />);
+        await open(user, 'Lunch plans');
+        await user.click(screen.getByRole('button', { name: 'Forward' }));
+        expect(screen.getByText('menu.pdf')).toBeInTheDocument();
+
+        await folder(user, 'Inbox');
+        await open(user, 'Hello from afar');
+        await user.click(screen.getByRole('button', { name: 'Reply' }));
+
+        expect(subjectField()).toHaveValue('Re: Hello from afar');
+        expect(screen.queryByText('menu.pdf')).toBeNull();
+        expect(screen.queryByText('map.png')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(keymaster.getDmailAttachment).not.toHaveBeenCalled();
+        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+    });
+
+    it('copies nothing from a forward that was left unsent into a draft being edited', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.getDmailAttachment.mockResolvedValue(Buffer.from('menu'));
+        keymaster.listDmailAttachments.mockImplementation(async (did: string) => (
+            did === DRAFT ? { 'menu.pdf': { bytes: 4 } } : {}
+        ));
+        render(<DmailTab />);
+        await open(user, 'Lunch plans');
+        await user.click(screen.getByRole('button', { name: 'Forward' }));
+
+        await editDraft(user);
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(keymaster.getDmailAttachment).not.toHaveBeenCalledWith(LUNCH, expect.anything());
+        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+    });
 });
 
 describe('composing a message', () => {
