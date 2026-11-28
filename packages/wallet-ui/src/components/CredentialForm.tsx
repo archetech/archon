@@ -223,9 +223,13 @@ const CredentialForm: React.FC<CredentialsFormProps> = ({
                 return val !== "" && val !== undefined && val !== null;
             });
 
-        if (isValid) {
-            const credString = buildCredentialJson(vals, types);
+        const credString = isValid ? buildCredentialJson(vals, types) : "";
+        if (credString) {
             onChange(credString, true);
+        } else {
+            // An invalid form, or a base credential that cannot be read,
+            // leaves the parent's credential as it was.
+            onChange(baseCredential, false);
         }
     };
 
@@ -294,12 +298,12 @@ const CredentialForm: React.FC<CredentialsFormProps> = ({
                             sx={{ gap: 1 }}
                         >
                             <FormControl sx={{ width: "20%" }}>
-                                <InputLabel id={`${name}-label`}>
+                                <InputLabel id={`${name}-type-label`}>
                                     Type
                                 </InputLabel>
                                 <Select
-                                    labelId={`${name}-label`}
-                                    id={`${name}-select`}
+                                    labelId={`${name}-type-label`}
+                                    id={`${name}-type-select`}
                                     label="Type"
                                     value={currentType}
                                     onChange={(e) => handleTypeChange(name, e)}

@@ -82,7 +82,8 @@ beforeEach(() => {
     variables.credentialSubject = '';
     variables.issuedList = ['did:cid:earlier'];
     keymaster.bindCredential.mockResolvedValue(bound);
-    keymaster.getSchema.mockResolvedValue(schema);
+    // Keymaster reads the schema anew each time, so each answer is a new object.
+    keymaster.getSchema.mockImplementation(async () => structuredClone(schema));
     keymaster.issueCredential.mockResolvedValue(ISSUED);
 });
 
@@ -226,6 +227,95 @@ describe('issuing the credential', () => {
         expect(issueButton()).toBeDisabled();
 
         await user.type(grade, 'A');
+        expect(issueButton()).toBeEnabled();
+    });
+
+    it('withdraws Issue when a required field is cleared', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+
+        await user.type(grade, 'A');
+        expect(issueButton()).toBeEnabled();
+
+        await user.clear(grade);
+        expect(screen.getByText('This field is required')).toBeInTheDocument();
+        expect(issueButton()).toBeDisabled();
+    });
+
+    it('reads the schema once while the form is filled in', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+
+        await user.type(grade, 'A');
+        await user.type(screen.getByLabelText(/^year \(integer\)/), '2024');
+
+        expect(keymaster.getSchema).toHaveBeenCalledTimes(1);
+    });
+
+    describe('when a credential of another schema is bound', () => {
+        const OTHER = 'did:cid:licence-schema';
+        const licence = { properties: { number: { type: 'string' } }, required: ['number'] };
+
+        async function bindLicence(user: ReturnType<typeof userEvent.setup>) {
+            keymaster.bindCredential.mockResolvedValue({
+                ...bound,
+                credentialSchema: { id: OTHER, type: 'JsonSchema' },
+                credentialSubject: { id: BOB, number: 'TBD' },
+            });
+            await pick(user, schemaPicker(), 'licence');
+            await user.click(editButton());
+        }
+
+        it('shows no form, and no Issue, when its schema cannot be read', async () => {
+            const user = userEvent.setup({ delay: null });
+            render(<IssueTab />);
+            const grade = await openForm(user);
+            await user.type(grade, 'A');
+            const failure = new Error('unknown schema');
+            keymaster.getSchema.mockRejectedValue(failure);
+
+            await bindLicence(user);
+
+            await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+            expect(screen.queryByLabelText(/^grade/)).toBeNull();
+            expect(screen.queryByRole('button', { name: 'Issue' })).toBeNull();
+        });
+
+        it('shows its form when the schema bound before it is read late', async () => {
+            const user = userEvent.setup({ delay: null });
+            let late!: (value: unknown) => void;
+            keymaster.getSchema.mockImplementation(async (did: string) => did === OTHER
+                ? structuredClone(licence)
+                : new Promise(resolve => { late = resolve; }));
+            render(<IssueTab />);
+            await user.type(subjectField(), 'Bob');
+            await pick(user, schemaPicker(), 'degree');
+            await user.click(editButton());
+            await waitFor(() => expect(keymaster.getSchema).toHaveBeenCalledWith(SCHEMA));
+
+            await bindLicence(user);
+            await screen.findByLabelText(/^number/);
+            late(structuredClone(schema));
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            expect(screen.getByLabelText(/^number/)).toBeTruthy();
+            expect(screen.queryByLabelText(/^grade/)).toBeNull();
+        });
+    });
+
+    it('reads the schema again when the credential is bound again', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IssueTab />);
+        const grade = await openForm(user);
+        await user.type(grade, 'A');
+
+        await user.click(editButton());
+
+        await waitFor(() => expect(keymaster.getSchema).toHaveBeenCalledTimes(2));
+        // The form's values are written into the credential bound again.
+        await waitFor(() => expect(JSON.parse(variables.credentialString).credentialSubject).toEqual({ id: BOB, grade: 'A' }));
         expect(issueButton()).toBeEnabled();
     });
 

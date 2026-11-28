@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -38,6 +38,10 @@ function IssueTab() {
 
     const [schemaObject, setSchemaObject] = useState<any>(null);
     const [isFormValid, setIsFormValid] = useState<boolean>(false);
+    // The schema last read, so that edits to the credential do not read it again.
+    const loadedSchemaDID = useRef<string | null>(null);
+    // The schema the form on screen was drawn from.
+    const shownSchemaDID = useRef<string | null>(null);
 
     async function editCredential() {
         if (!keymaster) {
@@ -48,6 +52,7 @@ function IssueTab() {
                 credentialSubject,
                 { schema: credentialSchema },
             );
+            loadedSchemaDID.current = null;
             setCredentialString(JSON.stringify(credentialBound, null, 4));
             setCredentialDID("");
         } catch (error: any) {
@@ -72,6 +77,32 @@ function IssueTab() {
     }
 
     useEffect(() => {
+        // A credential is never shown in the form of another schema: the form
+        // goes while a different schema is read, and stays gone if the read fails.
+        async function readSchema(schemaDID: string) {
+            if (!keymaster) {
+                return;
+            }
+            if (shownSchemaDID.current !== schemaDID) {
+                shownSchemaDID.current = null;
+                setSchemaObject(null);
+                setIsFormValid(false);
+            }
+            try {
+                const schemaObject = await keymaster.getSchema(schemaDID);
+                if (loadedSchemaDID.current !== schemaDID) {
+                    return;
+                }
+                shownSchemaDID.current = schemaDID;
+                setSchemaObject(schemaObject);
+            } catch (error: any) {
+                if (loadedSchemaDID.current === schemaDID) {
+                    loadedSchemaDID.current = null;
+                    setError(error);
+                }
+            }
+        }
+
         async function getSchema() {
             if (!keymaster) {
                 return;
@@ -83,8 +114,11 @@ function IssueTab() {
                     return;
                 }
                 const schemaDID = credentialObject.credentialSchema.id;
-                const schemaObject = await keymaster.getSchema(schemaDID);
-                setSchemaObject(schemaObject);
+                if (schemaDID === loadedSchemaDID.current) {
+                    return;
+                }
+                loadedSchemaDID.current = schemaDID;
+                await readSchema(schemaDID);
             } catch (error: any) {
                 setError(error);
             }
