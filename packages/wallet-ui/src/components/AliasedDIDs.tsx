@@ -67,7 +67,7 @@ function AliasedDIDs() {
           | "group"
           | "schema"
           | "image"
-          | "document"
+          | "file"
           | "unknown";
     const [filter, setFilter] = useState<NameKind>("all");
     type RegistryFilter = "all" | "unresolved" | string;
@@ -581,7 +581,7 @@ function AliasedDIDs() {
                 >
                     <MenuItem value="all">Type: All</MenuItem>
                     <MenuItem value="agent">Agents</MenuItem>
-                    <MenuItem value="document">Documents</MenuItem>
+                    <MenuItem value="file">Documents</MenuItem>
                     <MenuItem value="group">Groups</MenuItem>
                     <MenuItem value="image">Images</MenuItem>
                     <MenuItem value="poll">Polls</MenuItem>

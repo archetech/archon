@@ -233,10 +233,9 @@ describe('filtering the list', () => {
         expect(listed()).toEqual(ALL);
     });
 
-    // Documents is left out: the option selects a kind no name is ever given,
-    // so it lists nothing whatever files there are (#1813).
     it.each([
         ['Agents', ['bob']],
+        ['Documents', ['report']],
         ['Groups', ['team']],
         ['Images', ['photo']],
         ['Polls', ['vote']],
