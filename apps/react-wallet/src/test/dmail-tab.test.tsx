@@ -388,6 +388,62 @@ describe('reading a message', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
+    it('opens a referenced message in its own folder, with that folder\'s actions', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+        await open(user, 'Hello from afar');
+
+        await user.click(screen.getByRole('button', { name: 'Open referenced message' }));
+
+        expect(await screen.findByText('Quarterly report')).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Sent' })).toHaveAttribute('aria-selected', 'true');
+        expect(['Edit', 'Archive', 'Delete'].every(name => screen.queryByRole('button', { name }))).toBe(true);
+        expect(['Reply', 'Reply all', 'Forward'].some(name => screen.queryByRole('button', { name }))).toBe(false);
+        await waitFor(() => expect(keymaster.resolveDID).toHaveBeenCalledWith(REPORT));
+    });
+
+    it('marks a referenced message as read when it is opened', async () => {
+        const user = userEvent.setup({ delay: null });
+        (variables.dmailList[HELLO] as DmailItem).message.reference = OLD;
+        (variables.dmailList[OLD] as DmailItem).tags = ['inbox', 'archived', 'unread'];
+        render(<DmailTab />);
+        await open(user, 'Hello from afar');
+
+        await user.click(screen.getByRole('button', { name: 'Open referenced message' }));
+
+        expect(await screen.findByText('Old news')).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Archive' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('button', { name: 'Unarchive' })).toBeInTheDocument();
+        await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(OLD, ['inbox', 'archived']));
+        await waitFor(() => expect(keymaster.resolveDID).toHaveBeenCalledWith(OLD));
+    });
+
+    it('keeps the folder when it holds the referenced message', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+        await folder(user, 'All');
+        await open(user, 'Hello from afar');
+
+        await user.click(screen.getByRole('button', { name: 'Open referenced message' }));
+
+        expect(await screen.findByText('Quarterly report')).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => expect(keymaster.resolveDID).toHaveBeenCalledWith(REPORT));
+    });
+
+    it('shows a referenced message that the search leaves out of its folder', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+        await user.type(screen.getByPlaceholderText('Search…'), 'afar');
+        await open(user, 'Hello from afar');
+
+        await user.click(screen.getByRole('button', { name: 'Open referenced message' }));
+
+        expect(await screen.findByText('Quarterly report')).toBeInTheDocument();
+        expect(screen.queryByText('No sent mail yet.')).toBeNull();
+        await waitFor(() => expect(keymaster.resolveDID).toHaveBeenCalledWith(REPORT));
+    });
+
     it('says so when the message referred to is not in the mailbox', async () => {
         const user = userEvent.setup({ delay: null });
         delete variables.dmailList[REPORT];
@@ -1725,6 +1781,53 @@ describe('searching', () => {
         await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(shown()).toHaveLength(3);
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
+    });
+
+    it('says while an advanced search is applied, and clears it', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Clear advanced search' })).toBeNull();
+
+        await advanced(user, async dialog => {
+            await user.type(within(dialog).getByLabelText('From'), 'bob');
+        });
+        expect(screen.getByText('Advanced search applied')).toBeInTheDocument();
+        expect(shown()).toEqual(['Lunch plans']);
+
+        // It stays applied in every folder.
+        await folder(user, 'Archive');
+        expect(screen.getByText('Advanced search applied')).toBeInTheDocument();
+        expect(screen.getByText('Old news')).toBeInTheDocument();
+        await folder(user, 'Inbox');
+
+        await user.click(screen.getByRole('button', { name: 'Clear advanced search' }));
+
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
+        expect(shown()).toHaveLength(3);
+    });
+
+    it('applies nothing when the advanced search is made with every field empty', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+
+        await advanced(user, () => undefined);
+
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
+        expect(shown()).toHaveLength(3);
+    });
+
+    it('applies nothing when the advanced search is made with a field of only spaces', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<DmailTab />);
+
+        await advanced(user, async dialog => {
+            await user.type(within(dialog).getByLabelText('From'), '   ');
+        });
+
+        expect(screen.queryByText('Advanced search applied')).toBeNull();
         expect(shown()).toHaveLength(3);
     });
 });

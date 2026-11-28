@@ -383,50 +383,42 @@ const DmailTab: React.FC = () => {
         setDmailReference("");
     }
 
+    function inFolder(itm: DmailItem, folder: Folder): boolean {
+        const has = (t: string) => itm.tags?.includes(t);
+        const not = (t: string) => !itm.tags?.includes(t);
+        switch (folder) {
+        case "all":
+            return true;
+        case "inbox":
+            return !!has(TAG.inbox) && not(TAG.archived) && not(TAG.deleted);
+        case "outbox": {
+            const isSelfAddressed = !!currentId && itm.sender === currentId && (itm.to?.includes(currentId) || itm.cc?.includes(currentId));
+            return (!!has(TAG.sent) || !!isSelfAddressed) && not(TAG.archived) && not(TAG.deleted) && not(TAG.draft);
+        }
+        case "drafts":
+            return !!has(TAG.draft) && not(TAG.archived) && not(TAG.deleted);
+        case "archive":
+            return !!has(TAG.archived) && not(TAG.deleted);
+        case "trash":
+            return !!has(TAG.deleted);
+        default:
+            return false;
+        }
+    }
+
+    function hasAdvancedCriteria(p: AdvancedSearchParams): boolean {
+        return !!(p.from || p.to || p.subject || p.body || p.hasAttach || p.dateFrom || p.dateTo);
+    }
+
     function filteredList(): Record<string, DmailItem> {
-        let base: Record<string, DmailItem> = {};
+        const base: Record<string, DmailItem> = {};
         if (activeTab === "send") {
             return base;
         }
-        if (activeTab === "all") {
-            base = dmailList;
-        } else {
-            const outBase: Record<string, DmailItem> = {};
-            for (const [did, itm] of Object.entries(dmailList)) {
-                const has = (t: string) => itm.tags?.includes(t);
-                const not = (t: string) => !itm.tags?.includes(t);
-                switch (activeTab) {
-                case "inbox":
-                    if (has(TAG.inbox) && not(TAG.archived) && not(TAG.deleted)) {
-                        outBase[did] = itm;
-                    }
-                    break;
-                case "outbox":
-                    {
-                        const isSelfAddressed = !!currentId && itm.sender === currentId && (itm.to?.includes(currentId) || itm.cc?.includes(currentId));
-                        if ((has(TAG.sent) || isSelfAddressed) && not(TAG.archived) && not(TAG.deleted) && not(TAG.draft)) {
-                            outBase[did] = itm;
-                        }
-                    }
-                    break;
-                case "drafts":
-                    if (has(TAG.draft) && not(TAG.archived) && not(TAG.deleted)) {
-                        outBase[did] = itm;
-                    }
-                    break;
-                case "archive":
-                    if (has(TAG.archived) && not(TAG.deleted)) {
-                        outBase[did] = itm;
-                    }
-                    break;
-                case "trash":
-                    if (has(TAG.deleted)) {
-                        outBase[did] = itm;
-                    }
-                    break;
-                }
+        for (const [did, itm] of Object.entries(dmailList)) {
+            if (inFolder(itm, activeTab)) {
+                base[did] = itm;
             }
-            base = outBase;
         }
 
         const q = searchQuery.trim().toLowerCase();
@@ -623,7 +615,9 @@ const DmailTab: React.FC = () => {
     }
 
     function runAdvancedSearch(p: AdvancedSearchParams) {
-        setAdvParams(p);
+        // A field of only spaces is an empty one.
+        const given = { ...p, from: p.from.trim(), to: p.to.trim(), subject: p.subject.trim(), body: p.body.trim() };
+        setAdvParams(hasAdvancedCriteria(given) ? given : null);
         setAdvancedOpen(false);
     }
 
@@ -655,9 +649,16 @@ const DmailTab: React.FC = () => {
             setError(`Referenced message not found: ${did}`);
             return;
         }
+        // A message is shown with the actions of a folder that holds it: the
+        // current one where it is there, otherwise the first that holds it.
+        if (!inFolder(item, activeTab)) {
+            const folders: Folder[] = ["inbox", "outbox", "drafts", "archive", "trash"];
+            setActiveTab(folders.find(f => inFolder(item, f)) ?? "all");
+        }
         const next = { ...item, did };
         setSelected(next);
         setSelectedView(next);
+        markAsRead(did, item.tags);
     }
 
     function shortDateOrTime(iso: string) {
@@ -771,7 +772,7 @@ const DmailTab: React.FC = () => {
             send: "",
         };
 
-        if (entries.length === 0) {
+        if (entries.length === 0 && !selected) {
             return (
                 <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={6} sx={{ color: "text.secondary" }}>
                     {activeTab === "inbox" && <Inbox fontSize="large" />}
@@ -1372,6 +1373,20 @@ const DmailTab: React.FC = () => {
                         }}
                     />
                 </Box>
+
+                {advParams && (
+                    <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                        <Tune fontSize="small" color="primary" />
+                        <Typography variant="body2" color="primary">
+                            Advanced search applied
+                        </Typography>
+                        <Tooltip title="Clear advanced search">
+                            <IconButton size="small" onClick={() => setAdvParams(null)}>
+                                <Clear fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                )}
 
                 <Tabs
                     value={activeTab}
