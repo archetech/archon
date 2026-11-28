@@ -48,9 +48,15 @@ const SchemaTab = ()=> {
         if (!keymaster) {
             return;
         }
+        // The schema is read back only if no other was picked while it was
+        // being saved, or its text would be shown under the one picked.
+        const name = selectedSchemaName;
+        const read = schemaRead.current;
         try {
-            await keymaster.setSchema(selectedSchemaName, JSON.parse(schemaString));
-            await editSchema(selectedSchemaName);
+            await keymaster.setSchema(name, JSON.parse(schemaString));
+            if (schemaRead.current === read) {
+                await editSchema(name);
+            }
             setSuccess("Schema saved");
         } catch (error: any) {
             setError(error);
