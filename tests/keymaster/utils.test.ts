@@ -357,6 +357,33 @@ describe('rotateKeys', () => {
         }
     });
 
+    it('leaves out the relationships the document did not have', async () => {
+        const alice = await keymaster.createId('Alice', { registry: 'local' });
+        const document = (await keymaster.resolveDID(alice)).didDocument!;
+        delete document.authentication;
+        delete document.assertionMethod;
+        await keymaster.updateDID(alice, { didDocument: document });
+
+        await keymaster.rotateKeys();
+
+        const rotated = (await keymaster.resolveDID(alice)).didDocument!;
+        expect(rotated).not.toHaveProperty('authentication');
+        expect(rotated).not.toHaveProperty('assertionMethod');
+        expect(rotated.capabilityInvocation).toEqual(['#key-2']);
+        expect(rotated.verificationMethod!.map(vm => vm.id)).toEqual(['#key-2']);
+    });
+
+    it('renames the rotated key in each relationship the document has', async () => {
+        const alice = await keymaster.createId('Alice', { registry: 'local' });
+
+        await keymaster.rotateKeys();
+
+        const rotated = (await keymaster.resolveDID(alice)).didDocument!;
+        expect(rotated.authentication).toEqual(['#key-2']);
+        expect(rotated.assertionMethod).toEqual(['#key-2']);
+        expect(rotated.capabilityInvocation).toEqual(['#key-2']);
+    });
+
     it('should raise an exception if latest version is not confirmed', async () => {
         await keymaster.createId('Alice', { registry: 'BTC:signet' });
         await keymaster.rotateKeys();

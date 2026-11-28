@@ -3298,11 +3298,10 @@ class Keymaster:
                 "verificationMethod": [
                     updated_method if is_rotated(vm.get("id")) else vm for vm in verification_methods
                 ],
-                "authentication": retitle(did_document.get("authentication")),
-                "assertionMethod": retitle(did_document.get("assertionMethod")),
             }
-            if "capabilityInvocation" in did_document:
-                updated_doc["capabilityInvocation"] = retitle(did_document["capabilityInvocation"])
+            for relationship in ("authentication", "assertionMethod", "capabilityInvocation"):
+                if relationship in did_document:
+                    updated_doc[relationship] = retitle(did_document[relationship])
             ok = await self.update_did(id_info["did"], {"didDocument": updated_doc})
             if ok:
                 id_info["index"] = next_index

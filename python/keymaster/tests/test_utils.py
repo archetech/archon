@@ -72,6 +72,41 @@ def test_rotate_keys_updates_public_key_and_keeps_old_messages_decryptable(testb
     assert run(testbed.keymaster.decrypt_message(secret)) == "hi bob"
 
 
+def test_rotate_keys_leaves_out_relationships_the_document_did_not_have(testbed):
+    km = testbed.keymaster
+    alice = run(km.create_id("Alice", {"registry": "local"}))
+    document = run(km.resolve_did(alice))["didDocument"]
+    del document["authentication"]
+    del document["assertionMethod"]
+    document["capabilityInvocation"] = ["#key-1"]
+    run(km.update_did(alice, {"didDocument": document}))
+    testbed.gatekeeper.docs[alice]["didDocumentMetadata"]["confirmed"] = True
+
+    assert run(km.rotate_keys()) is True
+
+    rotated = run(km.resolve_did(alice))["didDocument"]
+    assert "authentication" not in rotated
+    assert "assertionMethod" not in rotated
+    assert rotated["capabilityInvocation"] == ["#key-2"]
+    assert [vm["id"] for vm in rotated["verificationMethod"]] == ["#key-2"]
+
+
+def test_rotate_keys_renames_the_rotated_key_in_each_relationship(testbed):
+    km = testbed.keymaster
+    alice = run(km.create_id("Alice", {"registry": "local"}))
+    document = run(km.resolve_did(alice))["didDocument"]
+    document["capabilityInvocation"] = ["#key-1"]
+    run(km.update_did(alice, {"didDocument": document}))
+    testbed.gatekeeper.docs[alice]["didDocumentMetadata"]["confirmed"] = True
+
+    assert run(km.rotate_keys()) is True
+
+    rotated = run(km.resolve_did(alice))["didDocument"]
+    assert rotated["authentication"] == ["#key-2"]
+    assert rotated["assertionMethod"] == ["#key-2"]
+    assert rotated["capabilityInvocation"] == ["#key-2"]
+
+
 def test_agent_did_and_public_key_helpers_validate_documents(testbed):
     bob = run(testbed.keymaster.create_id("Bob"))
     agent_doc = run(testbed.keymaster.resolve_did(bob))
