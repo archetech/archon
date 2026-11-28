@@ -790,6 +790,23 @@ describe('acceptCredential', () => {
         expect(await keymaster.listAliases()).toStrictEqual({});
     });
 
+    it('accepts a credential when its options are null, as a request\'s JSON may send them', async () => {
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+
+        await keymaster.setCurrentId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        await keymaster.setCurrentId('Bob');
+
+        expect(await keymaster.acceptCredential(did, null)).toBe(true);
+        expect(await keymaster.listCredentials()).toStrictEqual([did]);
+        expect(await keymaster.listAliases()).toStrictEqual({});
+    });
+
     it('adds no alias when the credential is not accepted', async () => {
         await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');

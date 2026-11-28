@@ -470,11 +470,13 @@ def list_issued():
     return response["issued"]
 
 
-def accept_credential(did):
+def accept_credential(did, options=None):
+    if options is None:
+        options = {}
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/credentials/held",
-        json={"did": did},
+        json={"did": did, "options": options},
     )
     return response["ok"]
 

@@ -5189,9 +5189,10 @@ export default class Keymaster implements KeymasterInterface {
 
     async acceptCredential(
         did: string,
-        options: { alias?: string } = {}
+        options: { alias?: string } | null = {}
     ): Promise<boolean> {
-        const { alias } = options;
+        // A request's JSON may carry options as null.
+        const { alias } = options ?? {};
 
         // An alias that is given is checked, empty or not, before the
         // credential is accepted, so a bad one leaves nothing accepted; one
