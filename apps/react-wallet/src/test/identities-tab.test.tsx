@@ -196,6 +196,19 @@ describe('the Identities tab with no identity', () => {
         expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
     });
 
+    it('does not create an identity on a remembered registry the node does not offer', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.registry = 'BTC:testnet4';
+        render(<IdentitiesTab />);
+        await user.click(screen.getAllByRole('button', { name: 'Create ID' })[0]);
+
+        const dialog = await screen.findByRole('dialog', { name: 'Create Identity' });
+        await user.type(within(dialog).getByLabelText('Name'), 'Bob');
+
+        expect(within(dialog).getByRole('combobox')).not.toHaveTextContent('BTC:testnet4');
+        expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
+
     it('reports a failed creation and leaves the dialog open', async () => {
         const user = userEvent.setup({ delay: null });
         keymaster.createId.mockRejectedValue(failure);
@@ -1309,6 +1322,15 @@ describe('the Identities tab with an identity', () => {
                 variables.registry = '';
                 await showUpload(user);
 
+                expect(screen.getByRole('button', { name: 'Upload Image...' })).toBeDisabled();
+            });
+
+            it('does not upload an image to a remembered registry the node does not offer', async () => {
+                const user = userEvent.setup({ delay: null });
+                variables.registry = 'BTC:testnet4';
+                await showUpload(user);
+
+                expect(screen.getByRole('combobox')).not.toHaveTextContent('BTC:testnet4');
                 expect(screen.getByRole('button', { name: 'Upload Image...' })).toBeDisabled();
             });
         });
