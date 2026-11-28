@@ -178,22 +178,27 @@ const DmailTab: React.FC = () => {
 
         try {
             const did = await keymaster.createDmail(dmail, opts);
-            setDmailDid(did);
 
-            const pendingAtt = { ...dmailAttachments };
+            // The attachments on screen belong to the message forwarded or to
+            // the draft being edited; the new Dmail gets copies of them.
+            const source = forwardSourceDid || dmailDid;
 
-            if (forwardSourceDid && Object.keys(pendingAtt).length) {
-                for (const name of Object.keys(pendingAtt)) {
-                    const buf = await keymaster.getDmailAttachment(forwardSourceDid, name);
-                    if (buf) {
-                        await keymaster.addDmailAttachment(did, name, buf);
+            try {
+                if (source) {
+                    for (const name of Object.keys(dmailAttachments)) {
+                        const buf = await keymaster.getDmailAttachment(source, name);
+                        if (buf) {
+                            await keymaster.addDmailAttachment(did, name, buf);
+                        }
                     }
                 }
+            } finally {
+                // The effect on dmailDid reads the new Dmail's attachments, so
+                // the DID is set only once the copies are made.
+                setForwardSourceDid(null);
+                setDmailDid(did);
             }
 
-            setForwardSourceDid(null);
-            setDmailAttachments(pendingAtt);
-            refreshDmailAttachments().catch(() => undefined);
             setSuccess(`Draft created ${did}`);
         } catch (err: any) {
             setError(err);
