@@ -135,7 +135,7 @@ const FileTab = () => {
             await refreshAliases();
             setSelectedFileName(name);
         } catch (error: any) {
-            setError(`Error uploading file: ${error}`);
+            setError(error);
         }
     }
 
@@ -165,7 +165,7 @@ const FileTab = () => {
             setSuccess(`File updated successfully`);
             await refreshFile(selectedFileName);
         } catch (error: any) {
-            setError(`Error updating file: ${error}`);
+            setError(error);
         }
     }
 

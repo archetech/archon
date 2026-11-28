@@ -280,7 +280,7 @@ describe('uploading a file', () => {
         await upload.answer(500, 'Error: no space left');
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error uploading file: Error: Upload failed: Error: no space left'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(new Error('Upload failed: Error: no space left')));
         expect(screen.queryByRole('progressbar')).toBeNull();
         expect(keymaster.createAsset).not.toHaveBeenCalled();
         expect(setSuccess).not.toHaveBeenCalled();
@@ -297,7 +297,7 @@ describe('uploading a file', () => {
         await upload.fail();
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error uploading file: Error: Upload failed: network error'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(new Error('Upload failed: network error')));
         expect(screen.queryByRole('progressbar')).toBeNull();
         expect(keymaster.createAsset).not.toHaveBeenCalled();
     });
@@ -305,14 +305,15 @@ describe('uploading a file', () => {
     it('reports an asset that cannot be made', async () => {
         const user = userEvent.setup({ delay: null });
         const upload = nodeUpload();
-        keymaster.createAsset.mockRejectedValue(new Error('registry unavailable'));
+        const refusal = new Error('registry unavailable');
+        keymaster.createAsset.mockRejectedValue(refusal);
         render(<FileTab />);
 
         await user.upload(uploadInput(), pdf());
         await upload.answer(200, 'cid-new');
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error uploading file: Error: registry unavailable'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
         expect(keymaster.addAlias).not.toHaveBeenCalled();
         expect(setSuccess).not.toHaveBeenCalled();
     });
@@ -552,7 +553,7 @@ describe('updating a file', () => {
         await upload.answer(500, 'Error: no space left');
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error updating file: Error: Upload failed: Error: no space left'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(new Error('Upload failed: Error: no space left')));
         expect(keymaster.mergeData).not.toHaveBeenCalled();
         expect(setSuccess).not.toHaveBeenCalled();
     });
@@ -560,14 +561,15 @@ describe('updating a file', () => {
     it('reports an update the asset does not take', async () => {
         const user = userEvent.setup({ delay: null });
         const upload = nodeUpload();
-        keymaster.mergeData.mockRejectedValue(new Error('not the owner'));
+        const refusal = new Error('not the owner');
+        keymaster.mergeData.mockRejectedValue(refusal);
         render(<FileTab />);
         await openFile(user);
 
         await user.upload(updateInput(), pdf());
         await upload.answer(200, 'cid-final');
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error updating file: Error: not the owner'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
         expect(setSuccess).not.toHaveBeenCalled();
         expect(detail('CID:')).toHaveTextContent('cid-report');
     });

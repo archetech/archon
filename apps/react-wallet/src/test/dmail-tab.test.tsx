@@ -1465,24 +1465,44 @@ describe('attachments of a draft', () => {
 
     it('reports a failure to attach the file', async () => {
         const user = userEvent.setup({ delay: null });
-        keymaster.addDmailAttachment.mockRejectedValue(new Error('file too large'));
+        const refusal = new Error('file too large');
+        keymaster.addDmailAttachment.mockRejectedValue(refusal);
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: file too large'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
     });
 
-    it('reports a file that cannot be read', async () => {
+    it('reports why a file cannot be read', async () => {
         const user = userEvent.setup({ delay: null });
-        readingEndsWith(reader => reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>));
+        const unreadable = new DOMException('The file could not be read', 'NotReadableError');
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: unreadable });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.stringMatching(/^Error uploading file: /)));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(unreadable));
+        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+    });
+
+    it('says a file cannot be read when the reader does not say why', async () => {
+        const user = userEvent.setup({ delay: null });
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: null });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
+        render(<DmailTab />);
+        await createDraft(user);
+
+        await user.upload(fileInput(), file());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith('Unable to read the file'));
         expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
     });
 
@@ -1512,15 +1532,16 @@ describe('attachments of a draft', () => {
 
     it('reports a file that cannot be handed to the reader', async () => {
         const user = userEvent.setup({ delay: null });
+        const busy = new Error('reader busy');
         vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(() => {
-            throw new Error('reader busy');
+            throw busy;
         });
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: reader busy'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(busy));
     });
 
     it('attaches nothing when the file chooser is closed without a file', async () => {
