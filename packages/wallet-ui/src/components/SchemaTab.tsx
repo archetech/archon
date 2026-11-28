@@ -9,6 +9,16 @@ import TextInputModal from "./TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
+// A schema is a JSON object; other text cannot be saved as one.
+function isJsonObject(text: string): boolean {
+    try {
+        const value = JSON.parse(text);
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+    } catch {
+        return false;
+    }
+}
+
 const SchemaTab = ()=> {
     const { keymaster } = useWalletContext();
     const {
@@ -26,6 +36,7 @@ const SchemaTab = ()=> {
     const [schemaName, setSchemaName] = useState<string>('');
     const [selectedSchemaName, setSelectedSchemaName] = useState<string>('');
     const [schemaString, setSchemaString] = useState<string>('');
+    const [schemaEdit, setSchemaEdit] = useState<boolean>(false);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
 
@@ -49,7 +60,11 @@ const SchemaTab = ()=> {
         try {
             const schema = (await keymaster.getSchema(name)) as unknown as object;
             setSchemaString(JSON.stringify(schema, null, 4));
+            setSchemaEdit(true);
         } catch (error: any) {
+            // No schema is shown under a name whose own could not be read.
+            setSchemaEdit(false);
+            setSchemaString('');
             setError(error);
         }
     };
@@ -218,7 +233,7 @@ const SchemaTab = ()=> {
                     </Box>
                 </Box>
             }
-            {schemaString &&
+            {schemaEdit &&
                 <Box display="flex" flexDirection="column">
                     <TextField
                         value={schemaString}
@@ -241,7 +256,7 @@ const SchemaTab = ()=> {
                         variant="contained"
                         color="primary"
                         onClick={saveSchema}
-                        disabled={!schemaString}
+                        disabled={!isJsonObject(schemaString)}
                         sx={{ width: 150 }}
                     >
                         Save Schema
