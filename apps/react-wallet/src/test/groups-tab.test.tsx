@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import GroupsTab from '../../../../packages/wallet-ui/src/components/GroupsTab';
@@ -39,13 +39,24 @@ const GROUP = 'did:cid:group';
 const BOB = 'did:cid:bob';
 const CAROL = 'did:cid:carol';
 
+let consoleError: MockInstance<typeof console.error>;
+
 beforeEach(() => {
     vi.resetAllMocks();
+    consoleError = vi.spyOn(console, 'error');
     wallet.keymaster = keymaster;
     variables.registries = ['hyperswarm', 'BTC:mainnet'];
     variables.aliasList = { team: GROUP, taken: 'did:cid:other', Bob: BOB };
     variables.groupList = ['team'];
     keymaster.getGroup.mockResolvedValue({ name: 'team', members: [BOB, CAROL] });
+});
+
+// React warns of a list without keys once per component, in whichever test
+// first renders the list.
+afterEach(() => {
+    const keyWarnings = consoleError.mock.calls.filter((args) => String(args[0]).includes('unique "key"'));
+    consoleError.mockRestore();
+    expect(keyWarnings).toEqual([]);
 });
 
 // Neither picker has a label: they are told apart by order.
@@ -192,6 +203,49 @@ describe('picking a group', () => {
         expect(screen.queryByLabelText('DID')).toBeNull();
         expect(openView).not.toHaveBeenCalled();
     });
+
+    it('shows no members, and no group, when the group picked next cannot be read', async () => {
+        const user = userEvent.setup();
+        variables.groupList = ['team', 'devs'];
+        render(<GroupsTab />);
+        await openGroup(user);
+        expect(screen.getByText(CAROL)).toBeInTheDocument();
+
+        const failure = new Error('unknown group');
+        keymaster.getGroup.mockRejectedValue(failure);
+        await user.click(groupPicker());
+        await user.click(await screen.findByRole('option', { name: 'devs' }));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(keymaster.getGroup).toHaveBeenLastCalledWith('devs');
+        expect(screen.queryByText(CAROL)).toBeNull();
+        expect(screen.queryByText('Bob')).toBeNull();
+        expect(screen.queryByLabelText('DID')).toBeNull();
+        expect(groupPicker()).toHaveTextContent('Select group');
+        expect(renameButton()).toBeDisabled();
+    });
+
+    it('keeps the group picked last when an earlier one fails to load after it', async () => {
+        const user = userEvent.setup();
+        variables.groupList = ['team', 'devs'];
+        let fail!: (error: Error) => void;
+        keymaster.getGroup.mockImplementation(async (name: string) => name === 'devs'
+            ? new Promise((_resolve, reject) => { fail = reject; })
+            : { name: 'team', members: [BOB, CAROL] });
+        render(<GroupsTab />);
+        await user.click(groupPicker());
+        await user.click(await screen.findByRole('option', { name: 'devs' }));
+        await waitFor(() => expect(keymaster.getGroup).toHaveBeenCalledWith('devs'));
+
+        await openGroup(user);
+        expect(await screen.findByText(CAROL)).toBeInTheDocument();
+        fail(new Error('unknown group'));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(screen.getByText(CAROL)).toBeInTheDocument();
+        expect(groupPicker()).toHaveTextContent('team');
+        expect(setError).not.toHaveBeenCalled();
+    });
 });
 
 describe('group members', () => {
@@ -258,6 +312,7 @@ describe('group members', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Delete' })[1]);
         const dialog = await screen.findByRole('dialog');
+        expect(within(dialog).getByText('Remove Member')).toBeInTheDocument();
         expect(within(dialog).getByText('Remove member from team?')).toBeInTheDocument();
         expect(keymaster.removeGroupMember).not.toHaveBeenCalled();
 
@@ -413,7 +468,6 @@ describe('a group left open when the wallet loses its keymaster', () => {
         await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
         const removing = await screen.findByRole('dialog');
         await user.click(within(removing).getByRole('button', { name: 'Confirm' }));
-        await user.click(within(removing).getByRole('button', { name: 'Cancel' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
         await user.click(renameButton());
