@@ -1261,6 +1261,18 @@ describe('the Identities tab with an identity', () => {
                 await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledExactlyOnceWith('portrait.png (2)', NEW));
             });
 
+            it('numbers an alias that ends in a space where the file\'s name is cut, when the wallet has it trimmed', async () => {
+                const user = userEvent.setup({ delay: null });
+                const NEW = 'did:cid:portrait';
+                assets[NEW] = imageAsset(NEW);
+                keymaster.createImage.mockResolvedValue(NEW);
+                keymaster.listAliases.mockResolvedValue({ 'my portrait from the gala': CAT });
+                await showUpload(user);
+                await user.upload(input(), new File([new Uint8Array([1, 2, 3])], 'my portrait from the gala party.png', { type: 'image/png' }));
+
+                await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledExactlyOnceWith('my portrait from the gala (1)', NEW));
+            });
+
             it('reports an image that cannot be created', async () => {
                 const user = userEvent.setup({ delay: null });
                 keymaster.createImage.mockRejectedValue(failure);

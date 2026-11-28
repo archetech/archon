@@ -345,11 +345,13 @@ function IdentitiesTab() {
 
                     const did = await keymaster.createImage(Buffer.from(e.target.result), { registry });
                     const names = await keymaster.listAliases();
-                    let alias = file.name.slice(0, 26);
+                    // Keymaster trims an alias, so the name checked is the one it will store.
+                    const base = file.name.slice(0, 26).trim();
+                    let alias = base;
                     let count = 1;
 
                     while (alias in names) {
-                        alias = `${file.name.slice(0, 26)} (${count++})`;
+                        alias = `${base} (${count++})`;
                     }
 
                     await keymaster.addAlias(alias, did);
