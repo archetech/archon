@@ -545,17 +545,17 @@ const DmailTab: React.FC = () => {
                         setError(`Error uploading file: ${file.name}`);
                     }
                 } catch (error) {
-                    setError(`Error uploading file: ${error}`);
+                    setError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                setError(`Error uploading file: ${error}`);
+            reader.onerror = () => {
+                setError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            setError(`Error uploading file: ${error}`);
+            setError(error);
         }
     }
 

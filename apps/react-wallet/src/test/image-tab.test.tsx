@@ -216,13 +216,14 @@ describe('uploading an image', () => {
 
     it('reports a file Keymaster does not take for an image', async () => {
         const user = userEvent.setup({ delay: null });
-        keymaster.createImage.mockRejectedValue(new Error('Invalid parameter: buffer'));
+        const refusal = new Error('Invalid parameter: buffer');
+        keymaster.createImage.mockRejectedValue(refusal);
         render(<ImageTab />);
 
         await user.upload(uploadInput(), png());
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error processing image: Error: Invalid parameter: buffer'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
         expect(keymaster.addAlias).not.toHaveBeenCalled();
         expect(setSuccess).not.toHaveBeenCalled();
     });
@@ -449,14 +450,15 @@ describe('updating an image', () => {
 
     it('reports a file Keymaster does not take for an image', async () => {
         const user = userEvent.setup({ delay: null });
-        keymaster.updateImage.mockRejectedValue(new Error('Invalid parameter: buffer'));
+        const refusal = new Error('Invalid parameter: buffer');
+        keymaster.updateImage.mockRejectedValue(refusal);
         render(<ImageTab />);
         await openImage(user);
 
         await user.upload(updateInput(), png());
 
         await waitFor(() =>
-            expect(setError).toHaveBeenCalledWith('Error processing image: Error: Invalid parameter: buffer'));
+            expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
         expect(setSuccess).not.toHaveBeenCalled();
         expect(screen.getByRole('img')).toHaveAttribute('src', dataUrl('cid-cat'));
     });
@@ -504,15 +506,34 @@ describe.each([
         expect(setSuccess).not.toHaveBeenCalled();
     };
 
-    it('is reported', async () => {
+    it('is reported with why the reader could not read it', async () => {
         const user = userEvent.setup({ delay: null });
+        const unreadable = new DOMException('The file could not be read', 'NotReadableError');
         render(<ImageTab />);
         await prepare(user);
-        readingEndsWith(reader => reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>));
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: unreadable });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
 
         await user.upload(input(), png());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.stringMatching(/^Error reading file: /)));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(unreadable));
+        nothingMade();
+    });
+
+    it('is reported plainly when the reader does not say why', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<ImageTab />);
+        await prepare(user);
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: null });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
+
+        await user.upload(input(), png());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith('Unable to read the file'));
         nothingMade();
     });
 
@@ -544,13 +565,14 @@ describe.each([
         const user = userEvent.setup({ delay: null });
         render(<ImageTab />);
         await prepare(user);
+        const notAFile = new Error('not a file');
         vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(() => {
-            throw new Error('not a file');
+            throw notAFile;
         });
 
         await user.upload(input(), png());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading image: Error: not a file'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(notAFile));
         nothingMade();
     });
 });

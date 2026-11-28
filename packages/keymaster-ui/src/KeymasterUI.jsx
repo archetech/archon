@@ -1625,17 +1625,17 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     await previewAvatarCandidate(did, { alias });
                     showSuccess(`Avatar image uploaded successfully: ${alias}. Review the preview, then set the avatar.`);
                 } catch (error) {
-                    showError(`Error processing avatar image: ${error}`);
+                    showError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                showError(`Error reading file: ${error}`);
+            reader.onerror = () => {
+                showError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            showError(`Error uploading avatar image: ${error}`);
+            showError(error);
         }
     }
 
@@ -3306,17 +3306,17 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     }
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
-                    showError(`Error uploading file: ${error}`);
+                    showError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                showError(`Error uploading file: ${error}`);
+            reader.onerror = () => {
+                showError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            showError(`Error uploading file: ${error}`);
+            showError(error);
         }
     }
 
@@ -3778,17 +3778,17 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     selectImage(alias);
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
-                    showError(`Error processing image: ${error}`);
+                    showError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                showError(`Error reading file: ${error}`);
+            reader.onerror = () => {
+                showError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            showError(`Error uploading image: ${error}`);
+            showError(error);
         }
     }
 
@@ -3815,17 +3815,17 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     showSuccess(`Image updated successfully`);
                     selectImage(selectedImageName);
                 } catch (error) {
-                    showError(`Error processing image: ${error}`);
+                    showError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                showError(`Error reading file: ${error}`);
+            reader.onerror = () => {
+                showError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            showError(`Error uploading image: ${error}`);
+            showError(error);
         }
     }
 
@@ -3917,7 +3917,7 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
             showSuccess(`File uploaded successfully: ${alias}`);
             refreshNames();
         } catch (error) {
-            showError(`Error uploading file: ${error}`);
+            showError(error);
         }
     }
 
@@ -3938,7 +3938,7 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
             showSuccess(`File updated successfully`);
             selectFile(selectedFileName);
         } catch (error) {
-            showError(`Error updating file: ${error}`);
+            showError(error);
         }
     }
 
@@ -4074,17 +4074,17 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     }
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
-                    showError(`Error uploading file: ${error}`);
+                    showError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                showError(`Error uploading file: ${error}`);
+            reader.onerror = () => {
+                showError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
-            showError(`Error uploading file: ${error}`);
+            showError(error);
         }
     }
 
