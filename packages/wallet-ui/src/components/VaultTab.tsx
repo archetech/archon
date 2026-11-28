@@ -569,7 +569,7 @@ function VaultTab() {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createVault}
-                        disabled={!vaultName.trim() || !registry}
+                        disabled={!vaultName.trim() || !registries.includes(registry)}
                     >
                         Create
                     </Button>

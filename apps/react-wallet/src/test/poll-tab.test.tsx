@@ -198,6 +198,19 @@ describe('creating a poll', () => {
         expect(createButton()).toBeDisabled();
     });
 
+    it('does not offer Create until a registry the node offers is chosen', async () => {
+        const user = setup();
+        variables.registries = ['BTC:mainnet'];
+        render(<PollTab />);
+
+        await fillForm(user);
+        expect(createButton()).toBeDisabled();
+
+        await user.click(screen.getByRole('combobox'));
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(createButton()).toBeEnabled();
+    });
+
     it('creates the poll on the chosen registry, names it and shows its DID', async () => {
         const user = setup();
         render(<PollTab />);

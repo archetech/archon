@@ -627,7 +627,7 @@ const PollsTab: React.FC = () => {
                                 }}
                                 size="large"
                                 fullWidth
-                                disabled={!pollName.trim() || !description || !optionsStr || !deadline}
+                                disabled={!pollName.trim() || !description || !optionsStr || !deadline || !registries.includes(registry)}
                             >
                             Create
                             </Button>

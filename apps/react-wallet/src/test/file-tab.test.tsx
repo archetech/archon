@@ -190,6 +190,19 @@ describe('uploading a file', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
+    it('does not offer Upload until a registry the node offers is chosen', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.registries = ['BTC:mainnet'];
+        render(<FileTab />);
+
+        expect(registryPicker()).not.toHaveTextContent('hyperswarm');
+        expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
+
+        await user.click(registryPicker());
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
+    });
+
     it('makes the asset on the registry chosen', async () => {
         const user = userEvent.setup({ delay: null });
         const upload = nodeUpload();
