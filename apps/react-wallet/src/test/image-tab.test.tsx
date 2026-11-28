@@ -207,6 +207,16 @@ describe('uploading an image', () => {
         await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledWith('a-very-long-name-for-a-hol', NEW_DID));
     });
 
+    it('numbers a name that ends in a space where it is cut, when the wallet has it trimmed', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.listAliases.mockResolvedValue({ 'my holiday photo from the': 'did:cid:one' });
+        render(<ImageTab />);
+
+        await user.upload(uploadInput(), png('my holiday photo from the beach.png'));
+
+        await waitFor(() => expect(keymaster.addAlias).toHaveBeenCalledWith('my holiday photo from the (1)', NEW_DID));
+    });
+
     it('numbers the name when the wallet already has it', async () => {
         const user = userEvent.setup({ delay: null });
         keymaster.listAliases.mockResolvedValue({ 'photo.png': 'did:cid:one', 'photo.png (1)': 'did:cid:two' });
