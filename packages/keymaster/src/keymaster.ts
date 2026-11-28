@@ -5188,10 +5188,27 @@ export default class Keymaster implements KeymasterInterface {
         return issued;
     }
 
-    async acceptCredential(did: string): Promise<boolean> {
+    async acceptCredential(
+        did: string,
+        options: { alias?: string } = {}
+    ): Promise<boolean> {
+        const { alias } = options;
+
+        // An alias that is given is checked, empty or not, before the
+        // credential is accepted, so a bad one leaves nothing accepted; one
+        // that is not given, or is null as JSON sends it, means no alias.
+        const aliased = alias !== undefined && alias !== null;
+
+        if (aliased) {
+            const wallet = await this.loadWallet();
+            this.validateAlias(alias, wallet, 'alias');
+        }
+
+        let credential: string;
+
         try {
             const id = await this.fetchIdInfo();
-            const credential = await this.lookupDID(did);
+            credential = await this.lookupDID(did);
             const vc = await this.decryptJSON(credential);
 
             if (this.isVerifiableCredential(vc) &&
@@ -5199,11 +5216,19 @@ export default class Keymaster implements KeymasterInterface {
                 return false;
             }
 
-            return this.addToHeld(credential);
+            if (!await this.addToHeld(credential)) {
+                return false;
+            }
         }
         catch (error) {
             return false;
         }
+
+        if (aliased) {
+            await this.addAlias(alias, credential);
+        }
+
+        return true;
     }
 
     async getCredential(id: string): Promise<VerifiableCredential | null> {

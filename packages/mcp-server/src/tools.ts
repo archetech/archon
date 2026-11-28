@@ -474,12 +474,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_list_issued', cliCommand: 'list-issued', description: 'List issued credentials.', schema: z.object({ issuer: z.string().optional() }), handler: (runtime, { issuer }) => requireKeymaster(runtime).listIssued(issuer) }),
     tool({ name: 'archon_update_credential', cliCommand: 'update-credential', description: 'Update an issued credential.', schema: z.object({ did: z.string(), credential: VerifiableCredentialSchema }), mutates: true, handler: (runtime, { did, credential }) => requireKeymaster(runtime).updateCredential(did, credential) }),
     tool({ name: 'archon_revoke_credential', cliCommand: 'revoke-credential', description: 'Revoke a verifiable credential.', schema: DidSchema.merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).revokeCredential(did) }),
-    tool({ name: 'archon_accept_credential', cliCommand: 'accept-credential', description: 'Save a verifiable credential for the current ID.', schema: DidSchema.extend({ alias: z.string().optional() }), mutates: true, handler: async (runtime, { did, alias }) => {
-        const keymaster = requireKeymaster(runtime);
-        const accepted = await keymaster.acceptCredential(did);
-        if (accepted && alias) await keymaster.addAlias(alias, did);
-        return accepted;
-    } }),
+    tool({ name: 'archon_accept_credential', cliCommand: 'accept-credential', description: 'Save a verifiable credential for the current ID.', schema: DidSchema.extend({ alias: z.string().optional() }), mutates: true, handler: (runtime, { did, alias }) => requireKeymaster(runtime).acceptCredential(did, compactOptions({ alias })) }),
     tool({ name: 'archon_list_credentials', cliCommand: 'list-credentials', description: 'List credentials held by an ID.', schema: z.object({ id: z.string().optional() }), handler: (runtime, { id }) => requireKeymaster(runtime).listCredentials(id) }),
     tool({ name: 'archon_get_credential', cliCommand: 'get-credential', description: 'Get a credential by DID.', schema: DidSchema, handler: (runtime, { did }) => requireKeymaster(runtime).getCredential(did) }),
     tool({ name: 'archon_view_credential', cliCommand: 'view-credential', description: 'Get a credential with proof validity.', schema: DidSchema, handler: async (runtime, { did }) => {

@@ -75,6 +75,49 @@ def test_accept_and_list_held_credential(testbed):
     assert run(testbed.keymaster.list_credentials()) == []
 
 
+def _credential_for_bob(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    bob = run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.set_current_id("Alice"))
+    schema_did = run(testbed.keymaster.create_schema(MOCK_SCHEMA))
+    bound = run(testbed.keymaster.bind_credential(bob, {"schema": schema_did}))
+    return run(testbed.keymaster.issue_credential(bound))
+
+
+def test_accept_credential_adds_an_alias_given_once_it_is_accepted(testbed):
+    did = _credential_for_bob(testbed)
+
+    run(testbed.keymaster.set_current_id("Bob"))
+    assert run(testbed.keymaster.accept_credential(did, {"alias": "license"})) is True
+    assert run(testbed.keymaster.list_credentials()) == [did]
+    assert run(testbed.keymaster.list_aliases()) == {"license": did}
+
+
+@pytest.mark.parametrize(
+    ("alias", "message"),
+    [
+        ("", "Invalid parameter: alias must be a non-empty string"),
+        ("Alice", "Invalid parameter: alias already used"),
+    ],
+)
+def test_accept_credential_refuses_a_bad_alias_without_accepting(testbed, alias, message):
+    did = _credential_for_bob(testbed)
+
+    run(testbed.keymaster.set_current_id("Bob"))
+    with pytest.raises(KeymasterError, match=message):
+        run(testbed.keymaster.accept_credential(did, {"alias": alias}))
+    assert run(testbed.keymaster.list_credentials()) == []
+    assert run(testbed.keymaster.list_aliases()) == {}
+
+
+def test_accept_credential_adds_no_alias_when_not_accepted(testbed):
+    did = _credential_for_bob(testbed)
+    run(testbed.keymaster.create_id("Carol"))
+
+    assert run(testbed.keymaster.accept_credential(did, {"alias": "license"})) is False
+    assert run(testbed.keymaster.list_aliases()) == {}
+
+
 def test_publish_and_unpublish_credential_updates_manifest(testbed):
     run(testbed.keymaster.create_id("Alice"))
     bob = run(testbed.keymaster.create_id("Bob"))

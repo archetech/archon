@@ -912,7 +912,7 @@ export interface KeymasterInterface {
     updateCredential(did: string, credential: VerifiableCredential): Promise<boolean>;
     revokeCredential(did: string): Promise<boolean>;
     listIssued(issuer?: string): Promise<string[]>;
-    acceptCredential(did: string): Promise<boolean>;
+    acceptCredential(did: string, options?: { alias?: string }): Promise<boolean>;
     getCredential(did: string): Promise<VerifiableCredential | null>;
     removeCredential(did: string): Promise<boolean>;
     listCredentials(id?: string): Promise<string[]>;

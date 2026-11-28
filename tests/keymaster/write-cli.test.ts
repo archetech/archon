@@ -20,6 +20,8 @@ let url: string;
 let cwd: string;
 let answer: boolean;
 let requests: string[];
+let bodies: unknown[];
+let refusal: string | undefined;
 
 // [command line, the request it makes, what it prints when taken, when refused]
 const WRITES: [string[], string, string, string][] = [
@@ -34,7 +36,8 @@ beforeAll(async () => {
     // Away from the repo, so a developer's .env cannot reach the command.
     cwd = mkdtempSync(path.join(tmpdir(), 'write-cli-'));
     server = http.createServer((req, res) => {
-        req.resume();
+        let raw = '';
+        req.on('data', chunk => { raw += chunk; });
         req.on('end', () => {
             const route = `${req.method} ${req.url!.replace('/api/v1', '')}`;
             let reply: Reply;
@@ -43,7 +46,8 @@ beforeAll(async () => {
             }
             else if (route === 'POST /didcomm/credential/accept' || WRITES.some(([, request]) => request === route)) {
                 requests.push(route);
-                reply = { body: { ok: answer } };
+                bodies.push(raw ? JSON.parse(raw) : undefined);
+                reply = refusal ? { status: 400, body: { error: refusal } } : { body: { ok: answer } };
             }
             else {
                 reply = { status: 404, body: { error: `no route ${route}` } };
@@ -63,6 +67,8 @@ afterAll(async () => {
 
 beforeEach(() => {
     requests = [];
+    bodies = [];
+    refusal = undefined;
 });
 
 function run(...args: string[]): Promise<{ status: number, stdout: string, stderr: string }> {
@@ -121,4 +127,36 @@ it('stops a chain of commands at the write the node refused', async () => {
     });
 
     expect(chained).toEqual({ status: 1, stdout: '' });
+});
+
+describe('accept-credential --alias', () => {
+    it('sends the alias with the credential, so that it is checked before the credential is accepted', async () => {
+        answer = true;
+
+        const { status, stdout } = await run('accept-credential', 'did:cid:credential', '--alias', 'license');
+
+        expect(bodies).toEqual([{ did: 'did:cid:credential', options: { alias: 'license' } }]);
+        expect(requests).toEqual(['POST /credentials/held']);
+        expect({ status, stdout }).toEqual({ status: 0, stdout: 'OK' });
+    });
+
+    it('sends an empty alias as given, and fails when the node refuses it', async () => {
+        refusal = 'Invalid parameter: alias must be a non-empty string';
+
+        const { status, stdout, stderr } = await run('accept-credential', 'did:cid:credential', '--alias', '');
+
+        expect(bodies).toEqual([{ did: 'did:cid:credential', options: { alias: '' } }]);
+        expect(requests).toEqual(['POST /credentials/held']);
+        expect({ status, stdout, stderr }).toEqual({ status: 1, stdout: '', stderr: refusal });
+    });
+
+    it('sends a taken alias, and fails with the node\'s refusal of it', async () => {
+        refusal = 'Invalid parameter: alias already used';
+
+        const { status, stdout, stderr } = await run('accept-credential', 'did:cid:credential', '--alias', 'Alice');
+
+        expect(bodies).toEqual([{ did: 'did:cid:credential', options: { alias: 'Alice' } }]);
+        expect(requests).toEqual(['POST /credentials/held']);
+        expect({ status, stdout, stderr }).toEqual({ status: 1, stdout: '', stderr: refusal });
+    });
 });

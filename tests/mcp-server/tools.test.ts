@@ -442,6 +442,27 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.repairDID).toHaveBeenCalledWith('Alice');
     });
 
+    it('gives Keymaster an alias with the credential to accept, so that a refused one leaves nothing accepted', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+        const accept = server.tools.get('archon_accept_credential')!.handler;
+
+        expect(expectOk(await accept({ did: 'did:cid:credential' }))).toBe(true);
+        expect(runtime.keymaster.acceptCredential).toHaveBeenLastCalledWith('did:cid:credential', undefined);
+
+        expect(expectOk(await accept({ did: 'did:cid:credential', alias: 'license' }))).toBe(true);
+        expect(runtime.keymaster.acceptCredential).toHaveBeenLastCalledWith('did:cid:credential', { alias: 'license' });
+
+        for (const [alias, refusal] of [['', 'Invalid parameter: alias must be a non-empty string'], ['Alice', 'Invalid parameter: alias already used']]) {
+            runtime.keymaster.acceptCredential.mockRejectedValueOnce(new Error(refusal));
+            expect(expectFail(await accept({ did: 'did:cid:credential', alias }))).toContain(refusal);
+            expect(runtime.keymaster.acceptCredential).toHaveBeenLastCalledWith('did:cid:credential', { alias });
+        }
+
+        expect(runtime.keymaster.addAlias).not.toHaveBeenCalled();
+    });
+
     it('passes force to removeLightning in its argument order', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();

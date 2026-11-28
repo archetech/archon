@@ -697,11 +697,11 @@ async def cmd_revoke_credential(km: Keymaster, args: argparse.Namespace) -> None
 
 
 async def cmd_accept_credential(km: Keymaster, args: argparse.Namespace) -> None:
-    ok = await km.accept_credential(args.did)
+    # Keymaster checks an alias that is given before it accepts the
+    # credential, and adds it after.
+    ok = await km.accept_credential(args.did, {"alias": args.alias})
     if ok:
         print(UPDATE_OK)
-        if args.alias:
-            await km.add_alias(args.alias, args.did)
     else:
         raise CommandError(UPDATE_FAILED)
 

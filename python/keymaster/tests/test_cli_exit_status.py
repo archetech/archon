@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from keymaster import cli
+from keymaster import KeymasterError, cli
 
 
 class _Gatekeeper:
@@ -179,3 +179,51 @@ def test_no_handler_prints_a_failure_on_standard_output() -> None:
     ]
 
     assert printed == []
+
+
+def _accepting(refusal: str | None = None) -> type:
+    class Accepting:
+        calls: list[tuple[str, Any]] = []
+
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def accept_credential(self, did: str, options: Any = None) -> bool:
+            type(self).calls.append((did, options))
+            if refusal:
+                raise KeymasterError(refusal)
+            return True
+
+    return Accepting
+
+
+def test_accept_credential_gives_keymaster_the_alias_to_check_before_accepting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    keymaster = _accepting()
+
+    assert _invoke(monkeypatch, tmp_path, ["accept-credential", "did:cid:credential", "--alias", "license"], keymaster) == 0
+    assert _invoke(monkeypatch, tmp_path, ["accept-credential", "did:cid:credential"], keymaster) == 0
+    assert capsys.readouterr().out == "OK\nOK\n"
+    assert keymaster.calls == [("did:cid:credential", {"alias": "license"}), ("did:cid:credential", {"alias": None})]
+
+
+@pytest.mark.parametrize(
+    ("alias", "refusal"),
+    [
+        ("", "Invalid parameter: alias must be a non-empty string"),
+        ("Alice", "Invalid parameter: alias already used"),
+    ],
+)
+def test_accept_credential_fails_with_keymasters_refusal_of_an_alias(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], alias: str, refusal: str,
+) -> None:
+    keymaster = _accepting(refusal)
+
+    status = _invoke(monkeypatch, tmp_path, ["accept-credential", "did:cid:credential", "--alias", alias], keymaster)
+    captured = capsys.readouterr()
+
+    assert status == 1
+    assert captured.out == ""
+    assert refusal in captured.err
+    assert keymaster.calls == [("did:cid:credential", {"alias": alias})]

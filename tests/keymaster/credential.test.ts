@@ -750,6 +750,63 @@ describe('acceptCredential', () => {
         expect(wallet.ids['Bob'].held!.includes(did));
     });
 
+    it('adds an alias given with the credential once it is accepted', async () => {
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+
+        await keymaster.setCurrentId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        await keymaster.setCurrentId('Bob');
+
+        const ok = await keymaster.acceptCredential(did, { alias: 'license' });
+        expect(ok).toBe(true);
+
+        expect(await keymaster.listCredentials()).toStrictEqual([did]);
+        expect(await keymaster.listAliases()).toStrictEqual({ license: did });
+    });
+
+    it.each([
+        ['an empty alias', '', 'Invalid parameter: alias must be a non-empty string'],
+        ['a taken alias', 'Alice', 'Invalid parameter: alias already used'],
+    ])('refuses %s without accepting the credential', async (_, alias, message) => {
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+
+        await keymaster.setCurrentId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        await keymaster.setCurrentId('Bob');
+
+        await expect(keymaster.acceptCredential(did, { alias })).rejects.toThrow(message);
+
+        expect(await keymaster.listCredentials()).toStrictEqual([]);
+        expect(await keymaster.listAliases()).toStrictEqual({});
+    });
+
+    it('adds no alias when the credential is not accepted', async () => {
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.createId('Carol');
+
+        await keymaster.setCurrentId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        await keymaster.setCurrentId('Carol');
+
+        expect(await keymaster.acceptCredential(did, { alias: 'license' })).toBe(false);
+        expect(await keymaster.listAliases()).toStrictEqual({});
+    });
+
     it('should return false if user cannot decrypt credential', async () => {
         await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');

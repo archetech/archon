@@ -3104,6 +3104,17 @@ describe('acceptCredential', () => {
         expect(ok).toBe(true);
     });
 
+    it('sends an alias given with the credential', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.credentials_held, { did: mockDID, options: { alias: '' } })
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.acceptCredential(mockDID, { alias: '' });
+
+        expect(ok).toBe(true);
+    });
+
     it('should throw exception on acceptCredential server error', async () => {
         nock(KeymasterURL)
             .post(Endpoints.credentials_held)

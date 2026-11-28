@@ -641,7 +641,7 @@ async def list_credentials() -> dict[str, Any]:
 
 @protected_api.post("/credentials/held")
 async def accept_credential(body: dict[str, Any]) -> dict[str, bool]:
-    return {"ok": await service.accept_credential(body["did"])}
+    return {"ok": await service.accept_credential(body["did"], body.get("options") or {})}
 
 
 @protected_api.get("/credentials/held/{identifier}")

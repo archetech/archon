@@ -1563,9 +1563,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async acceptCredential(did: string): Promise<boolean> {
+    async acceptCredential(did: string, options?: { alias?: string }): Promise<boolean> {
         try {
-            const response = await this.axios.post(`${this.API}/credentials/held`, { did });
+            const response = await this.axios.post(`${this.API}/credentials/held`, { did, options });
             return response.data.ok;
         }
         catch (error) {

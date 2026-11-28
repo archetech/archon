@@ -4430,16 +4430,27 @@ class Keymaster:
                 pass
         return issued
 
-    async def accept_credential(self, did: str) -> bool:
+    async def accept_credential(self, did: str, options: dict[str, Any] | None = None) -> bool:
+        alias = (options or {}).get("alias")
+        # An alias that is given is checked, empty or not, before the
+        # credential is accepted, so a bad one leaves nothing accepted; one
+        # that is not given, or is None as JSON's null arrives, means no alias.
+        aliased = alias is not None
+        if aliased:
+            self.validate_alias(alias, await self.load_wallet(), "alias")
         try:
             id_info = await self.fetch_id_info()
             credential_did = await self.lookup_did(did)
             vc = await self.decrypt_json(credential_did)
             if self.is_verifiable_credential(vc) and vc.get("credentialSubject", {}).get("id") != id_info["did"]:
                 return False
-            return await self.add_to_held(credential_did)
+            if not await self.add_to_held(credential_did):
+                return False
         except Exception:
             return False
+        if aliased:
+            await self.add_alias(alias, credential_did)
+        return True
 
     async def send_credential_didcomm(
         self,

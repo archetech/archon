@@ -5921,6 +5921,15 @@
                   "did": {
                     "type": "string",
                     "description": "The credential DID to hold."
+                  },
+                  "options": {
+                    "type": "object",
+                    "properties": {
+                      "alias": {
+                        "type": "string",
+                        "description": "An alias to add for the credential once it is accepted. It is checked first, and an invalid or taken one is refused with nothing accepted."
+                      }
+                    }
                   }
                 },
                 "required": [

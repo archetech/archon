@@ -729,14 +729,12 @@ program
     .action(async (did, options) => {
         const { alias } = options;
         try {
-            const ok = await keymaster.acceptCredential(did);
+            // Keymaster checks an alias that is given before it accepts
+            // the credential, and adds it after.
+            const ok = await keymaster.acceptCredential(did, { alias });
 
             if (ok) {
                 console.log(UPDATE_OK);
-
-                if (alias) {
-                    await keymaster.addAlias(alias, did);
-                }
             }
             else {
                 fail(UPDATE_FAILED);

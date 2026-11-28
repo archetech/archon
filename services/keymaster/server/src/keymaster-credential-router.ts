@@ -126,6 +126,12 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
      *               did:
      *                 type: string
      *                 description: The credential DID to hold.
+     *               options:
+     *                 type: object
+     *                 properties:
+     *                   alias:
+     *                     type: string
+     *                     description: An alias to add for the credential once it is accepted. It is checked first, and an invalid or taken one is refused with nothing accepted.
      *             required:
      *               - did
      *     responses:
@@ -150,8 +156,8 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
      */
     router.post('/credentials/held', async (req, res) => {
         try {
-            const { did } = req.body;
-            const ok = await getKeymaster().acceptCredential(did);
+            const { did, options } = req.body;
+            const ok = await getKeymaster().acceptCredential(did, options);
             res.json({ ok });
         } catch (error: any) {
             sendError(res, error);

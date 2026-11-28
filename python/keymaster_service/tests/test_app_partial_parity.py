@@ -833,8 +833,8 @@ class StubService:
         self.calls.append(("list_credentials",))
         return ["did:test:credential"]
 
-    async def accept_credential(self, did: str) -> bool:
-        self.calls.append(("accept_credential", did))
+    async def accept_credential(self, did: str, options) -> bool:
+        self.calls.append(("accept_credential", did, options))
         return True
 
     async def get_credential(self, identifier: str):
@@ -1328,6 +1328,7 @@ def test_credential_handlers(stub_service: StubService):
     bound = run(app_module.bind_credential({"subject": "did:test:alice", "options": {"schema": "did:test:schema"}}))
     held = run(app_module.list_credentials())
     accepted = run(app_module.accept_credential({"did": "did:test:credential"}))
+    aliased = run(app_module.accept_credential({"did": "did:test:credential", "options": {"alias": "license"}}))
     got = run(app_module.get_credential("did:test:credential"))
     removed = run(app_module.remove_credential("did:test:credential"))
     published = run(app_module.publish_credential("did:test:credential", {"options": {"reveal": True}}))
@@ -1341,6 +1342,7 @@ def test_credential_handlers(stub_service: StubService):
     assert bound == {"credential": {"issuer": "did:test:issuer", "credentialSubject": {"id": "did:test:alice"}}}
     assert held == {"held": ["did:test:credential"]}
     assert accepted == {"ok": True}
+    assert aliased == {"ok": True}
     assert got == {"credential": {"issuer": "did:test:issuer", "credentialSubject": {"id": "did:test:alice"}}}
     assert removed == {"ok": True}
     assert published == {"ok": {"credentialSubject": {"id": "did:test:alice"}}}
@@ -1353,7 +1355,8 @@ def test_credential_handlers(stub_service: StubService):
     assert stub_service.calls == [
         ("bind_credential", "did:test:alice", {"schema": "did:test:schema"}),
         ("list_credentials",),
-        ("accept_credential", "did:test:credential"),
+        ("accept_credential", "did:test:credential", {}),
+        ("accept_credential", "did:test:credential", {"alias": "license"}),
         ("get_credential", "did:test:credential"),
         ("remove_credential", "did:test:credential"),
         ("publish_credential", "did:test:credential", {"reveal": True}),
