@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import SchemaTab from '../../../../packages/wallet-ui/src/components/SchemaTab';
 
@@ -276,10 +276,10 @@ describe('picking a schema', () => {
         expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
 
         // The earlier read finishes later and must not overwrite the schema now open.
-        finishLicence(licence);
-        await waitFor(() => {
-            expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
+        await act(async () => {
+            finishLicence(licence);
         });
+        expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
         expect(setError).not.toHaveBeenCalled();
     });
 
@@ -309,10 +309,10 @@ describe('picking a schema', () => {
         finishLicence(licence);
         expect(await screen.findByRole('button', { name: 'Save Schema' })).toBeInTheDocument();
 
-        failDegree(new Error('stale failure'));
-        await waitFor(() => {
-            expect(editor()).toHaveValue(JSON.stringify(licence, null, 4));
+        await act(async () => {
+            failDegree(new Error('stale failure'));
         });
+        expect(editor()).toHaveValue(JSON.stringify(licence, null, 4));
         expect(saveButton()).toBeInTheDocument();
         expect(setError).not.toHaveBeenCalled();
     });
