@@ -2951,16 +2951,18 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
         }
     }
 
+    // Keymaster's publishCredential puts the credential itself in the manifest,
+    // its credentialSubject cut down to { id } unless the claims were revealed.
     function credentialRevealed(did) {
-        if (!manifest) {
+        const entry = manifest?.[did];
+
+        if (!entry) {
             return false;
         }
 
-        if (!manifest[did]) {
-            return false;
-        }
+        const subject = entry.credentialSubject;
 
-        return manifest[did].credential !== null;
+        return !!subject && Object.keys(subject).some(key => key !== 'id');
     }
 
     function credentialUnpublished(did) {

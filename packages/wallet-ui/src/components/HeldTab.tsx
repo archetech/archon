@@ -134,32 +134,22 @@ function HeldTab() {
         }
     };
 
-    function credentialPublished(did: string) {
-        if (!manifest) {
+    // Keymaster's publishCredential puts the credential itself in the manifest,
+    // its credentialSubject cut down to { id } unless the claims were revealed.
+    function credentialHidden(did: string) {
+        const entry = manifest?.[did] as { credentialSubject?: Record<string, unknown> } | undefined;
+
+        if (!entry) {
             return false;
         }
 
-        if (!manifest[did]) {
-            return false;
-        }
+        const subject = entry.credentialSubject;
 
-        const castManifest = manifest[did] as { credential?: string };
-
-        return castManifest.credential === null;
+        return !subject || Object.keys(subject).every(key => key === "id");
     }
 
     function credentialRevealed(did: string) {
-        if (!manifest) {
-            return false;
-        }
-
-        if (!manifest[did]) {
-            return false;
-        }
-
-        const castManifest = manifest[did] as { credential?: string };
-
-        return castManifest.credential !== null;
+        return !!manifest?.[did] && !credentialHidden(did);
     }
 
     function credentialUnpublished(did: string) {
@@ -302,7 +292,7 @@ function HeldTab() {
                                 <ActionMenu
                                     items={[
                                         { label: "Decrypt", onClick: () => decryptCredential(did) },
-                                        { label: "Publish", onClick: () => publishCredential(did), disabled: credentialPublished(did) },
+                                        { label: "Publish", onClick: () => publishCredential(did), disabled: credentialHidden(did) },
                                         { label: "Reveal", onClick: () => revealCredential(did), disabled: credentialRevealed(did) },
                                         { label: "Unpublish", onClick: () => unpublishCredential(did), disabled: credentialUnpublished(did) },
                                         {
