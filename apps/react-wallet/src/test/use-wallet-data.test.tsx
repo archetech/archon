@@ -296,12 +296,24 @@ describe('refreshCurrentID', () => {
     it('wipes the previous identity when there is no current one', async () => {
         const { result } = renderData();
         await act(() => result.current.data.refreshCurrentID());
+        await act(() => result.current.data.refreshInbox());
         await act(() => result.current.vars.setRegistry('BTC:mainnet'));
+        expect(result.current.vars.groupList).toEqual(['team']);
+        expect(Object.keys(result.current.vars.dmailList)).toEqual(['did:cid:mail']);
         keymaster.getCurrentId.mockResolvedValue(undefined);
 
         await act(() => result.current.data.refreshCurrentID());
 
         const vars = result.current.vars;
+        expect(vars.idList).toEqual([]);
+        expect(vars.unresolvedIdList).toEqual([]);
+        expect(vars.validId).toBe(false);
+        expect(vars.unresolvedList).toEqual({});
+        expect(vars.aliasRegistry).toEqual({});
+        expect(vars.groupList).toEqual([]);
+        expect(vars.imageList).toEqual([]);
+        expect(vars.fileList).toEqual([]);
+        expect(vars.dmailList).toEqual({});
         expect(vars.currentId).toBe('');
         expect(vars.currentDID).toBe('');
         expect(vars.registry).toBe('hyperswarm');
