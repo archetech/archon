@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {Box, Button, FormControl, IconButton, MenuItem, Select, TextField, Tooltip} from "@mui/material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -39,17 +39,32 @@ const SchemaTab = ()=> {
     const [schemaEdit, setSchemaEdit] = useState<boolean>(false);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
+    // Each schema read gets a number; an earlier read that finishes late is ignored.
+    const schemaRead = useRef<number>(0);
+    // The schema whose text the editor holds, or '' when it holds none.
+    const shownSchema = useRef<string>('');
+    // One save at a time, so that a later save is not read back as an earlier one.
+    const [saving, setSaving] = useState<boolean>(false);
 
     const saveSchema = async () => {
         if (!keymaster) {
             return;
         }
+        // The schema is read back only if no other was picked while it was
+        // being saved, or its text would be shown under the one picked.
+        const name = selectedSchemaName;
+        const read = schemaRead.current;
+        setSaving(true);
         try {
-            await keymaster.setSchema(selectedSchemaName, JSON.parse(schemaString));
-            await editSchema(selectedSchemaName);
+            await keymaster.setSchema(name, JSON.parse(schemaString));
+            if (schemaRead.current === read) {
+                await editSchema(name);
+            }
             setSuccess("Schema saved");
         } catch (error: any) {
             setError(error);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -57,14 +72,27 @@ const SchemaTab = ()=> {
         if (!keymaster || !name) {
             return;
         }
+        const read = ++schemaRead.current;
+        // Another schema's text is not left in the editor while this one is
+        // read, or if it cannot be. The same schema read again, as after a
+        // save, keeps its editor.
+        if (shownSchema.current !== name) {
+            shownSchema.current = '';
+            setSchemaEdit(false);
+            setSchemaString('');
+        }
         try {
             const schema = (await keymaster.getSchema(name)) as unknown as object;
+            if (schemaRead.current !== read) {
+                return;
+            }
+            shownSchema.current = name;
             setSchemaString(JSON.stringify(schema, null, 4));
             setSchemaEdit(true);
         } catch (error: any) {
-            // A schema that cannot be read leaves no other schema's text in the editor.
-            setSchemaEdit(false);
-            setSchemaString('');
+            if (schemaRead.current !== read) {
+                return;
+            }
             setError(error);
         }
     };
@@ -115,6 +143,9 @@ const SchemaTab = ()=> {
             await keymaster.addAlias(name, aliasList[selectedSchemaName]);
             await keymaster.removeAlias(selectedSchemaName);
             await refreshAliases();
+            if (shownSchema.current === selectedSchemaName) {
+                shownSchema.current = name;
+            }
             setSelectedSchemaName(name);
             setRenameOldName("");
             setSuccess("Schema renamed");
@@ -256,7 +287,7 @@ const SchemaTab = ()=> {
                         variant="contained"
                         color="primary"
                         onClick={saveSchema}
-                        disabled={!isJsonObject(schemaString)}
+                        disabled={saving || !isJsonObject(schemaString)}
                         sx={{ width: 150 }}
                     >
                         Save Schema
