@@ -978,6 +978,30 @@ describe('the Identities tab with an identity', () => {
             expect(picture()).toBeNull();
         });
 
+        it('says no avatar is set when the identity\'s document has no data', async () => {
+            const user = userEvent.setup({ delay: null });
+            keymaster.resolveDID.mockResolvedValue({ didDocument: { id: DID } });
+            render(<IdentitiesTab />);
+            await screen.findByTestId('did-document');
+            await openTab(user, 'Avatar');
+
+            expect(await screen.findByText('No avatar set')).toBeInTheDocument();
+            expect(screen.queryByText(/Cannot read properties/)).toBeNull();
+            expect(screen.getByRole('button', { name: 'Remove Avatar' })).toBeDisabled();
+        });
+
+        it('warns when the avatar\'s document has no data', async () => {
+            const user = userEvent.setup({ delay: null });
+            identity = { avatar: 'did:cid:gone' };
+            assets['did:cid:gone'] = { didDocument: { id: 'did:cid:gone' } };
+            render(<IdentitiesTab />);
+            await openTab(user, 'Avatar');
+
+            expect(await screen.findByText('The current avatar does not resolve to an image asset.')).toBeInTheDocument();
+            expect(screen.getByLabelText('Current Avatar DID')).toHaveValue('did:cid:gone');
+            expect(screen.getByRole('button', { name: 'Remove Avatar' })).toBeEnabled();
+        });
+
         it('says why when the avatar does not resolve', async () => {
             const user = userEvent.setup({ delay: null });
             identity = { avatar: 'did:cid:missing' };
@@ -1086,6 +1110,21 @@ describe('the Identities tab with an identity', () => {
             await user.click(screen.getByRole('radio', { name: 'Image Alias' }));
             expect(screen.queryByText('Avatar must resolve to an image asset DID')).toBeNull();
             expect(screen.getByText('Current Avatar')).toBeInTheDocument();
+        });
+
+        it('does not let a DID whose document has no data be set as the avatar', async () => {
+            const user = userEvent.setup({ delay: null });
+            assets['did:cid:gone'] = { didDocument: { id: 'did:cid:gone' } };
+            render(<IdentitiesTab />);
+            await screen.findByTestId('did-document');
+            await openTab(user, 'Avatar');
+            await user.click(screen.getByRole('radio', { name: 'DID' }));
+            await user.type(screen.getByLabelText('Avatar DID'), 'did:cid:gone');
+            await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+            expect(await screen.findByText('Avatar must resolve to an image asset DID')).toBeInTheDocument();
+            expect(screen.getByLabelText('Preview Avatar DID')).toHaveValue('did:cid:gone');
+            expect(screen.getByRole('button', { name: 'Set Avatar' })).toBeDisabled();
         });
 
         it('says why when the DID to preview does not resolve', async () => {
@@ -1199,21 +1238,49 @@ describe('the Identities tab with an identity', () => {
                 await showUpload(user);
                 await user.upload(input(), file());
 
-                await waitFor(() => expect(setError).toHaveBeenCalledWith('Error processing avatar image: Error: refused'));
+                await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(failure));
                 expect(keymaster.addAlias).not.toHaveBeenCalled();
                 expect(setSuccess).not.toHaveBeenCalled();
             });
 
-            it('reports a file that cannot be read', async () => {
+            it('reports a Keymaster error from the upload as it is given', async () => {
                 const user = userEvent.setup({ delay: null });
-                const read = vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(function (this: FileReader) {
+                const refusal = { error: 'Image too large' };
+                keymaster.createImage.mockRejectedValue(refusal);
+                await showUpload(user);
+                await user.upload(input(), file());
+
+                await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
+            });
+
+            // The reader reports a failure with an event; what went wrong is the reader's `error`.
+            function failRead(error: DOMException | null) {
+                return vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(function (this: FileReader) {
+                    Object.defineProperty(this, 'error', { value: error });
                     this.onerror?.(new ProgressEvent('error') as ProgressEvent<FileReader>);
                 });
+            }
+
+            it('reports why a file cannot be read', async () => {
+                const user = userEvent.setup({ delay: null });
+                const unreadable = new DOMException('The file could not be read', 'NotReadableError');
+                const read = failRead(unreadable);
                 await showUpload(user);
                 await user.upload(input(), file());
                 read.mockRestore();
 
-                expect(setError).toHaveBeenCalledWith(expect.stringMatching(/^Error reading file/));
+                expect(setError).toHaveBeenCalledExactlyOnceWith(unreadable);
+                expect(keymaster.createImage).not.toHaveBeenCalled();
+            });
+
+            it('says a file cannot be read when the reader does not say why', async () => {
+                const user = userEvent.setup({ delay: null });
+                const read = failRead(null);
+                await showUpload(user);
+                await user.upload(input(), file());
+                read.mockRestore();
+
+                expect(setError).toHaveBeenCalledExactlyOnceWith('Unable to read the file');
                 expect(keymaster.createImage).not.toHaveBeenCalled();
             });
 
