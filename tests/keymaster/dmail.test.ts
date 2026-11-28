@@ -384,6 +384,39 @@ describe('listDmail', () => {
         expect(dmails[did].tags).toStrictEqual([DmailTags.INBOX, DmailTags.UNREAD]);
     });
 
+    it('shows identity names before aliases', async () => {
+        const alice = await keymaster.createId('Alice');
+        const carol = await keymaster.createId('Carol');
+        const dave = await keymaster.createId('Dave');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.removeId('Carol');
+        await keymaster.removeId('Dave');
+
+        await keymaster.addAlias('me', bob);
+        await keymaster.addAlias('Ally', alice);
+        await keymaster.addAlias('c1', carol);
+        await keymaster.addAlias('c2', carol);
+
+        // An alias with an identity's name is refused when it is made, and a
+        // wallet that already has one shows the identity under that name.
+        const wallet = await keymaster.loadWallet();
+        wallet.aliases = { ...wallet.aliases, Bob: dave };
+        await keymaster.saveWallet(wallet, true);
+
+        const did = await keymaster.createDmail({
+            to: [alice, carol],
+            cc: [bob, dave],
+            subject: 'Names',
+            body: 'Who is who.',
+        });
+
+        const dmail = (await keymaster.listDmail())[did];
+
+        expect(dmail.sender).toBe('Bob');
+        expect(dmail.to).toStrictEqual(['Alice', 'c2']);
+        expect(dmail.cc).toStrictEqual(['Bob', dave]);
+    });
+
     it('should include attachments', async () => {
         const alice = await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');

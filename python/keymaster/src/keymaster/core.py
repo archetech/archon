@@ -4039,10 +4039,13 @@ class Keymaster:
         return verified
 
     def build_did_name_map(self, wallet: dict[str, Any]) -> dict[str, str]:
-        did_to_name = {info["did"]: name for name, info in wallet.get("ids", {}).items()}
-        for name, did in wallet.get("aliases", {}).items():
-            did_to_name[did] = name
-        return did_to_name
+        # As the TypeScript listAliases({ includeIDs: true }): identities are
+        # merged into the aliases, taking over an alias of the same name in its
+        # place, and the last name for a DID is the one it is shown by.
+        names = dict(wallet.get("aliases", {}))
+        for name, info in wallet.get("ids", {}).items():
+            names[name] = info["did"]
+        return {did: name for name, did in names.items()}
 
     async def list_dmail(self) -> dict[str, Any]:
         wallet = await self.load_wallet()
