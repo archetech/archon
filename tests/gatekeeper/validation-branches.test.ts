@@ -85,6 +85,7 @@ describe('agent public keys', () => {
         ['y is missing', { y: undefined }],
         ['x decodes to 31 bytes', { x: coordinate(31) }],
         ['y decodes to 33 bytes', { y: coordinate(33) }],
+        ['x is 32 bytes but no point on the curve', { x: base64url.baseEncode(new Uint8Array(32)) }],
     ])('refuses an agent whose key is malformed (%s)', async (_, change) => {
         const keypair = cipher.generateRandomJwk();
         const operation = agentOp(keypair, { ...keypair.publicJwk, ...change });
@@ -102,6 +103,45 @@ describe('agent public keys', () => {
         const did = await gatekeeper.createDID(agentOp(keypair, keypair.publicJwk));
 
         expect(await gatekeeper.getDIDs()).toStrictEqual([did]);
+    });
+});
+
+describe('agent signatures', () => {
+    function withProofValue(operation: Operation, bytes: Uint8Array): Operation {
+        return { ...operation, proof: { ...operation.proof!, proofValue: base64url.baseEncode(bytes) } };
+    }
+
+    const event = (operation: Operation): GatekeeperEvent => ({ registry: 'hyperswarm', time: CREATED, operation });
+
+    it('refuses as an invalid proof a 64-byte proofValue whose scalars are zero', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const operation = withProofValue(agentOp(keypair, keypair.publicJwk, 'hyperswarm'), new Uint8Array(64));
+
+        const error = await refusal(gatekeeper.createDID(operation));
+
+        expect(error.message).toBe('Invalid operation: proof');
+        expect(await gatekeeper.importEvent(event(operation))).toBe('deferred');
+        expect(await gatekeeper.getDIDs()).toStrictEqual([]);
+    });
+
+    it('defers an imported agent whose key is no point on the curve', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const operation = agentOp(keypair, { ...keypair.publicJwk, x: base64url.baseEncode(new Uint8Array(32)) }, 'hyperswarm');
+
+        expect(await gatekeeper.importEvent(event(operation))).toBe('deferred');
+        expect(await gatekeeper.getDIDs()).toStrictEqual([]);
+    });
+
+    it('rejects an imported agent signed by another well-formed key', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const other = cipher.generateRandomJwk();
+        const operation = agentOp(other, keypair.publicJwk, 'hyperswarm');
+
+        const error = await refusal(gatekeeper.createDID(operation));
+
+        expect(error.message).toBe('Invalid operation: proof');
+        expect(await gatekeeper.importEvent(event(operation))).toBe('rejected');
+        expect(await gatekeeper.getDIDs()).toStrictEqual([]);
     });
 });
 
