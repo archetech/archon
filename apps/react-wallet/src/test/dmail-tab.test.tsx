@@ -22,6 +22,7 @@ const { keymaster, wallet, variables, walletData, setError, setSuccess, openView
         wallet: { keymaster: keymaster as typeof keymaster | null },
         variables: {
             currentId: '',
+            currentDID: '',
             agentList: [] as string[] | null,
             dmailList: {} as Record<string, unknown>,
             registries: [] as string[],
@@ -96,6 +97,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     wallet.keymaster = keymaster;
     variables.currentId = 'Alice';
+    variables.currentDID = 'did:cid:alice';
     variables.agentList = ['Bob', 'Carol'];
     variables.dmailList = mailbox();
     variables.registries = ['hyperswarm', 'BTC:mainnet'];
@@ -276,6 +278,9 @@ describe('reading a message', () => {
 
         await waitFor(() => expect(keymaster.fileDmail).toHaveBeenCalledWith(LUNCH, ['inbox']));
         await waitFor(() => expect(walletData.refreshInbox).toHaveBeenCalled());
+        // Let anything still queued after the filing run before counting.
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(walletData.refreshInbox).toHaveBeenCalledTimes(1);
     });
 
     it('leaves the tags of a message that was already read', async () => {
@@ -670,7 +675,7 @@ describe('replying and forwarding', () => {
         }, { registry: 'hyperswarm' }));
     });
 
-    it('copies a reply to all to everyone else the message went to', async () => {
+    it('copies a reply to all to everyone else the message went to, leaving out the identity replying', async () => {
         const user = userEvent.setup({ delay: null });
         keymaster.createDmail.mockResolvedValue(NEW);
         render(<DmailTab />);
@@ -682,8 +687,29 @@ describe('replying and forwarding', () => {
         await waitFor(() => expect(keymaster.createDmail).toHaveBeenCalled());
         expect(keymaster.createDmail.mock.calls[0][0]).toMatchObject({
             to: ['Bob'],
-            cc: ['Alice', 'Dave', 'Carol'],
+            cc: ['Dave', 'Carol'],
             reference: LUNCH,
+        });
+    });
+
+    it('leaves the identity replying out of a reply to all when the message shows it by another name', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.createDmail.mockResolvedValue(NEW);
+        const team = mail('Bob', ['Dave'], ['Carol'], 'Team update', 'All well.', '2024-02-01T10:00:00Z', ['inbox']);
+        // The wallet names the current identity's DID by an alias of its own.
+        team.to.push('Me');
+        team.message.to.push('did:cid:alice');
+        variables.dmailList = { ...variables.dmailList, 'did:cid:team': team };
+        render(<DmailTab />);
+        await open(user, 'Team update');
+
+        await user.click(screen.getByRole('button', { name: 'Reply all' }));
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(keymaster.createDmail).toHaveBeenCalled());
+        expect(keymaster.createDmail.mock.calls[0][0]).toMatchObject({
+            to: ['Bob'],
+            cc: ['Dave', 'Carol'],
         });
     });
 
@@ -1015,6 +1041,34 @@ describe('sending a draft', () => {
         expect(keymaster.sendDmail).toHaveBeenCalledWith(NEW);
         await waitFor(() => expect(walletData.refreshInbox).toHaveBeenCalled());
         expect(setError).not.toHaveBeenCalled();
+    });
+
+    it('clears the form once the draft is sent, so it cannot be sent again', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.sendDmail.mockResolvedValue(true);
+        render(<DmailTab />);
+        await createDraft(user);
+
+        await user.click(screen.getByRole('button', { name: 'Send' }));
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled());
+        expect(screen.queryByText(NEW)).toBeNull();
+        expect(subjectField()).toHaveValue('');
+        expect(bodyField()).toHaveValue('');
+        expect(keymaster.sendDmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the draft when it is not sent', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.sendDmail.mockResolvedValue(false);
+        render(<DmailTab />);
+        await createDraft(user);
+
+        await user.click(screen.getByRole('button', { name: 'Send' }));
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith('DMail send failed'));
+        expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+        expect(subjectField()).toHaveValue('Greetings');
     });
 
     it('says so when the draft is not sent', async () => {
