@@ -502,6 +502,24 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.revokeGrant).toHaveBeenCalledWith('did:cid:grant');
     });
 
+    it('adds an alias that is given to an accepted credential, an empty one included', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+        const accept = server.tools.get('archon_accept_credential')!.handler;
+
+        expect(expectOk(await accept({ did: 'did:cid:credential' }))).toBe(true);
+        expect(runtime.keymaster.addAlias).not.toHaveBeenCalled();
+
+        expect(expectOk(await accept({ did: 'did:cid:credential', alias: 'license' }))).toBe(true);
+        expect(runtime.keymaster.addAlias).toHaveBeenLastCalledWith('license', 'did:cid:credential');
+
+        const refusal = 'Invalid parameter: alias must be a non-empty string';
+        runtime.keymaster.addAlias.mockRejectedValueOnce(new Error(refusal));
+        expect(expectFail(await accept({ did: 'did:cid:credential', alias: '' }))).toContain(refusal);
+        expect(runtime.keymaster.addAlias).toHaveBeenLastCalledWith('', 'did:cid:credential');
+    });
+
     it('offers only the grant listing in read-only mode', () => {
         const server = new FakeServer();
         registerArchonTools(server, mockRuntime() as any, { ...baseConfig, readOnly: true });

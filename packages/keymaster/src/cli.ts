@@ -908,7 +908,9 @@ program
             if (ok) {
                 console.log(UPDATE_OK);
 
-                if (alias) {
+                // An alias that is given is added, an empty one too, so that
+                // Keymaster refuses it and it is not passed over in silence.
+                if (alias !== undefined) {
                     await keymaster.addAlias(alias, did);
                 }
             }

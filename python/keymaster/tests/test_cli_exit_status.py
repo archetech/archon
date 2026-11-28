@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from keymaster import cli
+from keymaster import KeymasterError, cli
 
 
 class _Gatekeeper:
@@ -85,6 +85,38 @@ def test_reported_failure_exits_non_zero_and_says_why(
 # A write the node refuses ----------------------------------------------------
 
 CLI_SOURCE = Path(cli.__file__).read_text(encoding="utf-8")
+
+
+def test_accept_credential_reports_an_empty_alias_after_accepting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    refusal = "Invalid parameter: alias must be a non-empty string"
+
+    class Accepting:
+        calls: list[tuple[str, ...]] = []
+
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def accept_credential(self, did: str) -> bool:
+            type(self).calls.append(("accept", did))
+            return True
+
+        async def add_alias(self, alias: str, did: str) -> bool:
+            type(self).calls.append(("alias", alias, did))
+            raise KeymasterError(refusal)
+
+    status = _invoke(monkeypatch, tmp_path, ["accept-credential", "did:cid:credential", "--alias", ""], Accepting)
+    captured = capsys.readouterr()
+
+    assert status == 1
+    assert captured.out == "OK\n"
+    assert refusal in captured.err
+    assert Accepting.calls == [("accept", "did:cid:credential"), ("alias", "", "did:cid:credential")]
+
+    Accepting.calls.clear()
+    assert _invoke(monkeypatch, tmp_path, ["accept-credential", "did:cid:credential"], Accepting) == 0
+    assert Accepting.calls == [("accept", "did:cid:credential")]
 
 
 def _refusing(method: str) -> type:
