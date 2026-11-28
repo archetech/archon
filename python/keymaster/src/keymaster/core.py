@@ -3284,10 +3284,9 @@ class Keymaster:
             updated_method = {**rotated, "id": rotated_id, "publicKeyJwk": keypair["publicJwk"]}
 
             # Replace the rotated key in place and leave every other method
-            # alone. Rebuilding these as single-element lists dropped keys
-            # published beside the identity one -- publish_didcomm's
-            # `#key-agreement-1` among them -- while `keyAgreement`, which was
-            # never rebuilt, kept naming the method just deleted.
+            # alone: other keys are published beside the identity one,
+            # publish_didcomm's `#key-agreement-1` among them, and every
+            # relationship that names the rotated key has to name the new one.
             def is_rotated(ref: Any) -> bool:
                 return bool(rotated_target) and _absolute_key_id(ref, id_info["did"]) == rotated_target
 
@@ -4015,11 +4014,12 @@ class Keymaster:
             if not isinstance(recipient, str):
                 raise KeymasterError(f"Invalid parameter: Invalid recipient type: {type(recipient).__name__}")
 
+            # A name is read as it is shown: an identity's before an alias's.
             candidate = None
-            if recipient in aliases:
-                candidate = aliases[recipient]
-            elif recipient in ids:
+            if recipient in ids:
                 candidate = ids[recipient]["did"]
+            elif recipient in aliases:
+                candidate = aliases[recipient]
             elif "@" in recipient:
                 try:
                     address = await self.check_address(recipient)
@@ -4039,10 +4039,13 @@ class Keymaster:
         return verified
 
     def build_did_name_map(self, wallet: dict[str, Any]) -> dict[str, str]:
-        did_to_name = {info["did"]: name for name, info in wallet.get("ids", {}).items()}
-        for name, did in wallet.get("aliases", {}).items():
-            did_to_name[did] = name
-        return did_to_name
+        # As the TypeScript listAliases({ includeIDs: true }): identities are
+        # merged into the aliases, taking over an alias of the same name in its
+        # place, and the last name for a DID is the one it is shown by.
+        names = dict(wallet.get("aliases", {}))
+        for name, info in wallet.get("ids", {}).items():
+            names[name] = info["did"]
+        return {did: name for name, did in names.items()}
 
     async def list_dmail(self) -> dict[str, Any]:
         wallet = await self.load_wallet()

@@ -198,6 +198,19 @@ describe('creating a poll', () => {
         expect(createButton()).toBeDisabled();
     });
 
+    it('does not offer Create until a registry the node offers is chosen', async () => {
+        const user = setup();
+        variables.registries = ['BTC:mainnet'];
+        render(<PollTab />);
+
+        await fillForm(user);
+        expect(createButton()).toBeDisabled();
+
+        await user.click(screen.getByRole('combobox'));
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(createButton()).toBeEnabled();
+    });
+
     it('creates the poll on the chosen registry, names it and shows its DID', async () => {
         const user = setup();
         render(<PollTab />);
@@ -237,6 +250,18 @@ describe('creating a poll', () => {
         expect(sendButton()).toBeEnabled();
     });
 
+    it('names the poll with the name trimmed', async () => {
+        const user = setup();
+        render(<PollTab />);
+
+        await fillForm(user, '  dinner  ');
+        await user.click(createButton());
+
+        expect(await screen.findByText(NEW_POLL)).toBeInTheDocument();
+        expect(keymaster.createPoll).toHaveBeenCalledWith(expect.objectContaining({ name: 'dinner' }), { registry: 'hyperswarm' });
+        expect(keymaster.addAlias).toHaveBeenCalledWith('dinner', NEW_POLL);
+    });
+
     it('creates on hyperswarm unless another registry is chosen', async () => {
         const user = setup();
         render(<PollTab />);
@@ -251,6 +276,7 @@ describe('creating a poll', () => {
 
     it.each([
         ['a name that is already an alias', { name: 'taken' }, 'Name "taken" is already in use'],
+        ['a name already an alias with spaces round it', { name: '  taken  ' }, 'Name "taken" is already in use'],
         ['a description of only spaces', { description: '   ' }, 'Description is required'],
         ['a single option', { options: 'only' }, 'Provide between 2 and 10 options'],
         ['no option between the commas', { options: ', ,' }, 'Provide between 2 and 10 options'],

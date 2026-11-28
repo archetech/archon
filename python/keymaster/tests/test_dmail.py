@@ -187,3 +187,38 @@ def test_dmail_message_and_attachment_helpers(testbed):
 
     assert run(keymaster.remove_dmail(did)) is True
     assert did not in run(keymaster.list_dmail())
+
+def test_list_dmail_shows_identity_names_before_aliases(testbed):
+    keymaster = testbed.keymaster
+    alice = run(keymaster.create_id("Alice"))
+    carol = run(keymaster.create_id("Carol"))
+    dave = run(keymaster.create_id("Dave"))
+    bob = run(keymaster.create_id("Bob"))
+    assert run(keymaster.remove_id("Carol")) is True
+    assert run(keymaster.remove_id("Dave")) is True
+
+    assert run(keymaster.add_alias("me", bob)) is True
+    assert run(keymaster.add_alias("Ally", alice)) is True
+    assert run(keymaster.add_alias("c1", carol)) is True
+    assert run(keymaster.add_alias("c2", carol)) is True
+
+    # An alias with an identity's name is refused when it is made, and a
+    # wallet that already has one shows the identity under that name.
+    wallet = run(keymaster.load_wallet())
+    wallet["aliases"] = {**wallet["aliases"], "Bob": dave}
+    assert run(keymaster.save_wallet(wallet, True)) is True
+
+    did = run(keymaster.create_dmail({
+        "to": [alice, carol],
+        "cc": [bob, dave],
+        "subject": "Names",
+        "body": "Who is who.",
+    }))
+
+    dmail = run(keymaster.list_dmail())[did]
+    assert dmail["sender"] == "Bob"
+    assert dmail["to"] == ["Alice", "c2"]
+    assert dmail["cc"] == ["Bob", dave]
+
+    # A name shown is read back as the DID it was shown for.
+    assert run(keymaster.verify_recipient_list(["Bob"])) == [bob]

@@ -334,17 +334,17 @@ function VaultTab() {
                         setError(`Error uploading file: ${file.name}`);
                     }
                 } catch (error: any) {
-                    setError(`Error uploading file: ${error}`);
+                    setError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                setError(`Error uploading file: ${error}`);
+            reader.onerror = () => {
+                setError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading file: ${error}`);
+            setError(error);
         }
     }
 
@@ -569,7 +569,7 @@ function VaultTab() {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createVault}
-                        disabled={!vaultName.trim() || !registry}
+                        disabled={!vaultName.trim() || !registries.includes(registry)}
                     >
                         Create
                     </Button>

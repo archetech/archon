@@ -82,6 +82,19 @@ describe('creating a group', () => {
         expect(create).toBeEnabled();
     });
 
+    it('does not offer Create until a registry the node offers is chosen', async () => {
+        const user = userEvent.setup();
+        variables.registries = ['BTC:mainnet'];
+        render(<GroupsTab />);
+
+        await user.type(screen.getByLabelText('Group Name'), 'devs');
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+        await user.click(registryPicker());
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    });
+
     it('does not offer Create for a name of only spaces', async () => {
         const user = userEvent.setup();
         render(<GroupsTab />);

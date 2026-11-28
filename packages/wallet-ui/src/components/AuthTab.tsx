@@ -101,6 +101,9 @@ function SignIn() {
         setAutoLoginLoading(true);
         setAutoLogin(null);
         setAutoLoginSent(false);
+        clearResponse();
+        // Send is offered only once this challenge's response and callback are known.
+        setDisableSendResponse(true);
 
         try {
             const asset = await keymaster.resolveAsset(challengeDID);

@@ -27,11 +27,19 @@ function CloneAssetTab() {
             setAlias("");
             setAliasDID("");
         } catch (error: any) {
-            setError("Only assets can be cloned");
+            // cloneAsset refuses a DID that is not an asset with "Invalid parameter: id",
+            // which names no field the user sees. A Keymaster service sends it as
+            // { error }, the TypeScript service with an "Error: " prefix.
+            const message = error?.error || error?.message || "";
+            if (typeof message === "string" && /Invalid parameter: id$/.test(message)) {
+                setError("Only assets can be cloned");
+            } else {
+                setError(error);
+            }
         }
     }
 
-    const isDisabled = !alias.trim() || !aliasDID || !registry;
+    const isDisabled = !alias.trim() || !aliasDID || !registries.includes(registry);
 
     return (
         <Box display="flex" flexDirection="column" sx={{ mt: 1, gap: 0, width: isTabletUp ? '70%' : '100%' }}>

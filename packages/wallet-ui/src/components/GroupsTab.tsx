@@ -232,7 +232,7 @@ const GroupsTab = () => {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createGroup}
-                        disabled={!groupName.trim()}
+                        disabled={!groupName.trim() || !registries.includes(registry)}
                     >
                         Create
                     </Button>

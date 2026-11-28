@@ -1,4 +1,5 @@
 import { segment } from './path.js';
+import { uploadBody } from './body.js';
 import axiosModule, { AxiosError, type AxiosInstance, type AxiosStatic } from 'axios';
 import {
     BatchMetadata,
@@ -505,7 +506,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/ipfs/stream`, stream, {
+            const response = await this.axios.post(`${this.API}/ipfs/stream`, await uploadBody(stream), {
                 headers: { 'Content-Type': 'application/octet-stream' },
                 responseType: 'text',
                 maxBodyLength: Infinity,

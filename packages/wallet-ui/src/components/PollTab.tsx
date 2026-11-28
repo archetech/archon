@@ -206,12 +206,13 @@ const PollsTab: React.FC = () => {
 
         const template: PollConfig = await keymaster.pollTemplate();
 
-        if (!pollName || !pollName.trim()) {
+        const name = pollName.trim();
+        if (!name) {
             setError("Poll name is required");
             return null;
         }
-        if (pollName in aliasList) {
-            setError(`Name "${pollName}" is already in use`);
+        if (name in aliasList) {
+            setError(`Name "${name}" is already in use`);
             return null;
         }
         if (!description.trim()) {
@@ -235,7 +236,7 @@ const PollsTab: React.FC = () => {
 
         return {
             ...template,
-            name: pollName.trim(),
+            name,
             description: description.trim(),
             options,
             deadline: new Date(deadline).toISOString(),
@@ -256,7 +257,7 @@ const PollsTab: React.FC = () => {
             const did = await keymaster.createPoll(poll, { registry });
             setCreatedPollDid(did);
             setPollNoticeSent(false);
-            await keymaster.addAlias(pollName, did);
+            await keymaster.addAlias(poll.name, did);
             await refreshAliases();
             setSuccess(`Poll created: ${did}`);
         } catch (error: any) {
@@ -626,7 +627,7 @@ const PollsTab: React.FC = () => {
                                 }}
                                 size="large"
                                 fullWidth
-                                disabled={!pollName.trim() || !description || !optionsStr || !deadline}
+                                disabled={!pollName.trim() || !description || !optionsStr || !deadline || !registries.includes(registry)}
                             >
                             Create
                             </Button>

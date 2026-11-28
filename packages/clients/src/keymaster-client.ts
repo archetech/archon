@@ -75,6 +75,7 @@ import {
 
 import { Buffer } from 'buffer';
 import { segment } from './path.js';
+import { uploadBody } from './body.js';
 import axiosModule, { AxiosError, type AxiosInstance, type AxiosStatic } from 'axios';
 
 export * from './keymaster-types.js';
@@ -1908,7 +1909,7 @@ export default class KeymasterClient implements KeymasterInterface {
         options: FileAssetOptions = {}
     ): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/files`, stream, {
+            const response = await this.axios.post(`${this.API}/files`, await uploadBody(stream), {
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'X-Options': JSON.stringify(options),
@@ -1948,7 +1949,7 @@ export default class KeymasterClient implements KeymasterInterface {
         options: FileAssetOptions = {}
     ): Promise<boolean> {
         try {
-            const response = await this.axios.put(`${this.API}/files/${segment(id)}`, stream, {
+            const response = await this.axios.put(`${this.API}/files/${segment(id)}`, await uploadBody(stream), {
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'X-Options': JSON.stringify(options),
