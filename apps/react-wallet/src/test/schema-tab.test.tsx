@@ -334,6 +334,77 @@ describe('saving a schema', () => {
         expect(setError).not.toHaveBeenCalled();
     });
 
+    it('keeps the editor on screen while a saved schema is read back', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.setSchema.mockResolvedValue(true);
+        render(<SchemaTab />);
+        await openSchema(user);
+        retype(JSON.stringify(amended));
+        const shown = editor();
+        let readBack!: (value: object) => void;
+        keymaster.getSchema.mockImplementation(() => new Promise<object>((resolve) => { readBack = resolve; }));
+
+        await user.click(saveButton());
+        await waitFor(() => expect(keymaster.getSchema).toHaveBeenCalledTimes(2));
+
+        expect(editor()).toBe(shown);
+        expect(saveButton()).toBeInTheDocument();
+
+        await act(async () => {
+            readBack(amended);
+        });
+
+        expect(editor()).toBe(shown);
+        expect(editor()).toHaveValue(JSON.stringify(amended, null, 4));
+        expect(setSuccess).toHaveBeenCalledWith('Schema saved');
+    });
+
+    it('keeps the editor when a saved schema cannot be read back', async () => {
+        const user = userEvent.setup({ delay: null });
+        const failure = new Error('node unreachable');
+        keymaster.setSchema.mockResolvedValue(true);
+        render(<SchemaTab />);
+        await openSchema(user);
+        retype(JSON.stringify(amended));
+        keymaster.getSchema.mockRejectedValue(failure);
+
+        await user.click(saveButton());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledWith(failure));
+        expect(keymaster.setSchema).toHaveBeenCalledWith('degree', amended);
+        expect(editor()).toHaveValue(JSON.stringify(amended));
+        expect(saveButton()).toBeInTheDocument();
+    });
+
+    it('keeps the editor through a save after the schema is renamed', async () => {
+        const user = userEvent.setup({ delay: null });
+        keymaster.setSchema.mockResolvedValue(true);
+        keymaster.addAlias.mockResolvedValue(true);
+        keymaster.removeAlias.mockResolvedValue(true);
+        render(<SchemaTab />);
+        await openSchema(user);
+        await user.click(renameButton());
+        const dialog = await screen.findByRole('dialog');
+        await user.clear(within(dialog).getByLabelText('New Name'));
+        await user.type(within(dialog).getByLabelText('New Name'), 'diploma');
+        await user.click(within(dialog).getByRole('button', { name: 'Rename' }));
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith('Schema renamed'));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        const shown = editor();
+        let readBack!: (value: object) => void;
+        keymaster.getSchema.mockImplementation(() => new Promise<object>((resolve) => { readBack = resolve; }));
+
+        await user.click(saveButton());
+        await waitFor(() => expect(keymaster.getSchema).toHaveBeenLastCalledWith('diploma'));
+
+        expect(editor()).toBe(shown);
+
+        await act(async () => {
+            readBack(amended);
+        });
+        expect(editor()).toBe(shown);
+    });
+
     it('keeps the editor when its text is cleared, so that it can be typed again', async () => {
         const user = userEvent.setup({ delay: null });
         render(<SchemaTab />);

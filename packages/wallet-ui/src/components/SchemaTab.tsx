@@ -41,6 +41,8 @@ const SchemaTab = ()=> {
     const [renameOldName, setRenameOldName] = useState<string>("");
     // Each schema read gets a number; an earlier read that finishes late is ignored.
     const schemaRead = useRef<number>(0);
+    // The schema whose text the editor holds, or '' when it holds none.
+    const shownSchema = useRef<string>('');
 
     const saveSchema = async () => {
         if (!keymaster) {
@@ -60,22 +62,26 @@ const SchemaTab = ()=> {
             return;
         }
         const read = ++schemaRead.current;
-        setSchemaEdit(false);
-        setSchemaString('');
+        // Another schema's text is not left in the editor while this one is
+        // read, or if it cannot be. The same schema read again, as after a
+        // save, keeps its editor.
+        if (shownSchema.current !== name) {
+            shownSchema.current = '';
+            setSchemaEdit(false);
+            setSchemaString('');
+        }
         try {
             const schema = (await keymaster.getSchema(name)) as unknown as object;
             if (schemaRead.current !== read) {
                 return;
             }
+            shownSchema.current = name;
             setSchemaString(JSON.stringify(schema, null, 4));
             setSchemaEdit(true);
         } catch (error: any) {
             if (schemaRead.current !== read) {
                 return;
             }
-            // A schema that cannot be read leaves no other schema's text in the editor.
-            setSchemaEdit(false);
-            setSchemaString('');
             setError(error);
         }
     };
@@ -126,6 +132,9 @@ const SchemaTab = ()=> {
             await keymaster.addAlias(name, aliasList[selectedSchemaName]);
             await keymaster.removeAlias(selectedSchemaName);
             await refreshAliases();
+            if (shownSchema.current === selectedSchemaName) {
+                shownSchema.current = name;
+            }
             setSelectedSchemaName(name);
             setRenameOldName("");
             setSuccess("Schema renamed");
