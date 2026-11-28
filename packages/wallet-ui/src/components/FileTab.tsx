@@ -261,7 +261,7 @@ const FileTab = () => {
                             borderBottomLeftRadius: 0
                         }}
                         onClick={() => document.getElementById("fileUpload")!.click()}
-                        disabled={!registry}
+                        disabled={!registries.includes(registry)}
                     >
                         Upload
                     </Button>

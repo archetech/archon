@@ -1202,7 +1202,7 @@ const DmailTab: React.FC = () => {
                     <Button
                         variant="contained"
                         onClick={handleCreate}
-                        disabled={(!sendToList.length && !sendTo) || !sendSubject || !sendBody}
+                        disabled={(!sendToList.length && !sendTo) || !sendSubject || !sendBody || !registries.includes(registry)}
                     >
                         Create
                     </Button>

@@ -61,6 +61,20 @@ describe('cloning an asset', () => {
         expect(cloneButton()).toBeDisabled();
     });
 
+    it('does not offer Clone until a registry the node offers is chosen', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.registries = ['BTC:mainnet'];
+        render(<CloneAssetTab />);
+
+        await user.type(nameField(), 'copy');
+        await user.type(didField(), ASSET);
+        expect(cloneButton()).toBeDisabled();
+
+        await user.click(screen.getByRole('combobox'));
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(cloneButton()).toBeEnabled();
+    });
+
     it('clones on hyperswarm unless another registry is chosen, then empties the form', async () => {
         const user = userEvent.setup({ delay: null });
         render(<CloneAssetTab />);

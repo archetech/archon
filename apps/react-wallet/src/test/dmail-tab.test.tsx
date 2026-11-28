@@ -928,6 +928,19 @@ describe('replying and forwarding', () => {
 });
 
 describe('composing a message', () => {
+    it('does not offer Create until a registry the node offers is chosen', async () => {
+        const user = userEvent.setup({ delay: null });
+        variables.registries = ['BTC:mainnet'];
+        render(<DmailTab />);
+
+        await write(user);
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+        await user.click(registryPicker());
+        await user.click(await screen.findByRole('option', { name: 'BTC:mainnet' }));
+        expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    });
+
     it('offers Create only once there is a recipient, a subject and a body', async () => {
         const user = userEvent.setup({ delay: null });
         render(<DmailTab />);

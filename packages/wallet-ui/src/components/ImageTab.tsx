@@ -273,7 +273,7 @@ const ImageTab = () => {
                             borderBottomLeftRadius: 0
                         }}
                         onClick={() => document.getElementById('imageUpload')!.click()}
-                        disabled={!registry}
+                        disabled={!registries.includes(registry)}
                     >
                         Upload
                     </Button>

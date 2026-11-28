@@ -184,7 +184,7 @@ const SchemaTab = ()=> {
                             borderBottomLeftRadius: 0,
                         }}
                         onClick={createSchema}
-                        disabled={!schemaName.trim()}
+                        disabled={!schemaName.trim() || !registries.includes(registry)}
                     >
                         Create
                     </Button>

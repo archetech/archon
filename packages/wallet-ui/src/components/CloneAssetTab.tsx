@@ -31,7 +31,7 @@ function CloneAssetTab() {
         }
     }
 
-    const isDisabled = !alias.trim() || !aliasDID || !registry;
+    const isDisabled = !alias.trim() || !aliasDID || !registries.includes(registry);
 
     return (
         <Box display="flex" flexDirection="column" sx={{ mt: 1, gap: 0, width: isTabletUp ? '70%' : '100%' }}>
