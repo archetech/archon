@@ -204,6 +204,35 @@ describe('a challenge that arrives by a link', () => {
         expect(await screen.findByText(/Login Request/)).toBeTruthy();
         expect(keymaster.createResponse).toHaveBeenCalledWith(CHALLENGE, { retries: 10 });
     });
+
+    // A challenge answered by hand and not sent, then a link whose answer fails.
+    it.each([
+        ['names a grant request', () => {
+            keymaster.resolveAsset.mockResolvedValue({ exampleGrantRequest: { registries: ['BTC:mainnet'] } });
+        }],
+        ['cannot be answered', () => {
+            keymaster.createResponse.mockRejectedValue(new Error('Invalid parameter: challengeDID'));
+        }],
+        ['gives a response that cannot be read', () => {
+            keymaster.createResponse.mockResolvedValue('did:cid:second-response');
+            keymaster.decryptJSON.mockRejectedValue(new Error('Cannot decrypt'));
+        }],
+    ])('offers no send for an earlier answered challenge when a later one arrives that %s', async (_case, failing) => {
+        const user = userEvent.setup({ delay: null });
+        const shown = render(<AuthTab />);
+        await user.type(input('Challenge'), CHALLENGE);
+        await user.click(button('Respond'));
+        await waitFor(() => expect(button('Send').disabled).toBe(false));
+
+        failing();
+        navigation.pendingChallenge = 'did:cid:second-challenge';
+        await act(async () => { shown.rerender(<AuthTab />); });
+
+        await waitFor(() => expect(setError).toHaveBeenCalled());
+        expect(screen.queryByText('Processing challenge...')).toBeNull();
+        expect(input('Response').value).not.toBe(RESPONSE);
+        expect(button('Send').disabled).toBe(true);
+    });
 });
 
 describe('answering a challenge by hand', () => {

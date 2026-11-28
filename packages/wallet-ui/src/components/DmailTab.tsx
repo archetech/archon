@@ -76,6 +76,7 @@ const DmailTab: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [advancedOpen, setAdvancedOpen] = useState<boolean>(false);
     const [advParams, setAdvParams] = useState<AdvancedSearchParams | null>(null);
+    const [searchesCleared, setSearchesCleared] = useState<number>(0);
     const [forwardSourceDid, setForwardSourceDid] = useState<string | null>(null);
     const [ephemeral, setEphemeral] = useState<boolean>(false);
     const [expiresAt, setExpiresAt] = useState<string>("");
@@ -617,6 +618,13 @@ const DmailTab: React.FC = () => {
 
     function runSimpleSearch(term: string) {
         setSearchQuery(term);
+    }
+
+    // The dialog keeps what was typed into it, so it is made anew when its
+    // search is cleared and opens empty.
+    function clearAdvancedSearch() {
+        setAdvParams(null);
+        setSearchesCleared(n => n + 1);
     }
 
     function runAdvancedSearch(p: AdvancedSearchParams) {
@@ -1324,6 +1332,7 @@ const DmailTab: React.FC = () => {
             />
 
             <DmailSearchModal
+                key={searchesCleared}
                 open={advancedOpen}
                 onClose={() => setAdvancedOpen(false)}
                 onSearch={runAdvancedSearch}
@@ -1386,7 +1395,7 @@ const DmailTab: React.FC = () => {
                             Advanced search applied
                         </Typography>
                         <Tooltip title="Clear advanced search">
-                            <IconButton size="small" onClick={() => setAdvParams(null)}>
+                            <IconButton size="small" onClick={clearAdvancedSearch}>
                                 <Clear fontSize="small" />
                             </IconButton>
                         </Tooltip>
