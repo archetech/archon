@@ -219,3 +219,6 @@ def test_list_dmail_shows_identity_names_before_aliases(testbed):
     assert dmail["sender"] == "Bob"
     assert dmail["to"] == ["Alice", "c2"]
     assert dmail["cc"] == ["Bob", dave]
+
+    # A name shown is read back as the DID it was shown for.
+    assert run(keymaster.verify_recipient_list(["Bob"])) == [bob]

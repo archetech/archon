@@ -415,6 +415,9 @@ describe('listDmail', () => {
         expect(dmail.sender).toBe('Bob');
         expect(dmail.to).toStrictEqual(['Alice', 'c2']);
         expect(dmail.cc).toStrictEqual(['Bob', dave]);
+
+        // A name shown is read back as the DID it was shown for.
+        expect(await keymaster.verifyRecipientList(['Bob'])).toStrictEqual([bob]);
     });
 
     it('should include attachments', async () => {

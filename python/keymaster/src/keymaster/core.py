@@ -4015,11 +4015,12 @@ class Keymaster:
             if not isinstance(recipient, str):
                 raise KeymasterError(f"Invalid parameter: Invalid recipient type: {type(recipient).__name__}")
 
+            # A name is read as it is shown: an identity's before an alias's.
             candidate = None
-            if recipient in aliases:
-                candidate = aliases[recipient]
-            elif recipient in ids:
+            if recipient in ids:
                 candidate = ids[recipient]["did"]
+            elif recipient in aliases:
+                candidate = aliases[recipient]
             elif "@" in recipient:
                 try:
                     address = await self.check_address(recipient)
