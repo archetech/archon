@@ -1612,11 +1612,12 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
                     const buffer = Buffer.from(arrayBuffer);
                     const did = await keymaster.createImage(buffer, { registry });
                     const names = await keymaster.listAliases();
-                    let alias = file.name.slice(0, 26);
+                    const base = file.name.slice(0, 26).trim();
+                    let alias = base;
                     let count = 1;
 
                     while (alias in names) {
-                        alias = `${file.name.slice(0, 26)} (${count++})`;
+                        alias = `${base} (${count++})`;
                     }
 
                     await keymaster.addAlias(alias, did);
@@ -3764,11 +3765,12 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
 
                     const aliasList = await keymaster.listAliases();
                     // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
-                    let alias = file.name.slice(0, 26);
+                    const base = file.name.slice(0, 26).trim();
+                    let alias = base;
                     let count = 1;
 
                     while (alias in aliasList) {
-                        alias = `${file.name.slice(0, 26)} (${count++})`;
+                        alias = `${base} (${count++})`;
                     }
 
                     await keymaster.addAlias(alias, did);
@@ -3905,11 +3907,12 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
 
             // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
             const names = await keymaster.listAliases();
-            let alias = file.name.slice(0, 26);
+            const base = file.name.slice(0, 26).trim();
+            let alias = base;
             let count = 1;
 
             while (alias in names) {
-                alias = `${file.name.slice(0, 26)} (${count++})`;
+                alias = `${base} (${count++})`;
             }
 
             const did = await keymaster.createAsset({ file: fileAsset }, { registry });
@@ -4360,12 +4363,15 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
     const buildPoll = async () => {
         const template = await keymaster.pollTemplate();
 
-        if (!pollName.trim()) {
+        // Keymaster trims a name, so the name checked is the one it will store.
+        const name = pollName.trim();
+
+        if (!name) {
             showError("Poll name is required");
             return null;
         }
-        if (pollName in aliasList) {
-            showError(`Name "${pollName}" is already in use`);
+        if (name in aliasList) {
+            showError(`Name "${name}" is already in use`);
             return null;
         }
         if (!description.trim()) {
@@ -4388,7 +4394,7 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
 
         return {
             ...template,
-            name: pollName.trim(),
+            name,
             description: description.trim(),
             options,
             deadline: new Date(deadline).toISOString(),
@@ -4405,7 +4411,7 @@ function KeymasterUI({ keymaster, title, challengeDID, grantDID, onWalletUpload,
             const did = await keymaster.createPoll(poll, { registry });
             setCreatedPollDid(did);
             setPollNoticeSent(false);
-            await keymaster.addAlias(pollName, did);
+            await keymaster.addAlias(poll.name, did);
             await refreshNames();
             showSuccess(`Poll created: ${did}`);
         } catch (e) {
