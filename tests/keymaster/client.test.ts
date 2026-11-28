@@ -1,4 +1,5 @@
 import nock from 'nock';
+import { Readable } from 'node:stream';
 import KeymasterClient from '@didcid/clients/keymaster';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import {Seed, WalletEncFile, WalletFile} from "@didcid/keymaster/types";
@@ -3998,13 +3999,41 @@ describe('createFile', () => {
 describe('createFileStream', () => {
     it('should create a streamed file asset', async () => {
         nock(KeymasterURL)
+            .post(Endpoints.files, 'hello, world')
+            .reply(200, { did: 'mockDid' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const did = await keymaster.createFileStream(mockStream('hello', ', world'), { filename: 'file.txt' });
+
+        expect(did).toBe('mockDid');
+    });
+
+    it('sends a Node stream as a stream, with no length given', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.files, 'hello, world')
+            .matchHeader('content-length', (value: string | undefined) => value === undefined)
+            .reply(200, { did: 'mockDid' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const did = await keymaster.createFileStream(Readable.from([Buffer.from('hello'), Buffer.from(', world')]));
+
+        expect(did).toBe('mockDid');
+    });
+
+    it('refuses a stream that yields something other than bytes, and sends nothing', async () => {
+        async function* text() {
+            yield 'hello';
+        }
+        const scope = nock(KeymasterURL)
             .post(Endpoints.files)
             .reply(200, { did: 'mockDid' });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const did = await keymaster.createFileStream(mockStream('hello'), { filename: 'file.txt' });
 
-        expect(did).toBe('mockDid');
+        await expect(keymaster.createFileStream(text() as unknown as AsyncIterable<Uint8Array>))
+            .rejects.toThrow('a stream must yield Uint8Array chunks');
+        expect(scope.isDone()).toBe(false);
+        nock.cleanAll();
     });
 
     it('should throw exception on createFileStream server error', async () => {
@@ -4061,11 +4090,11 @@ describe('updateFileStream', () => {
 
     it('should update a streamed file asset', async () => {
         nock(KeymasterURL)
-            .put(`${Endpoints.files}/${mockDID}`)
+            .put(`${Endpoints.files}/${mockDID}`, 'hello, world')
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await keymaster.updateFileStream(mockDID, mockStream('hello'), { filename: 'file.txt' });
+        const ok = await keymaster.updateFileStream(mockDID, mockStream('hello', ', world'), { filename: 'file.txt' });
 
         expect(ok).toBe(true);
     });
