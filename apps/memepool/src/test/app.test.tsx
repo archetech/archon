@@ -774,6 +774,10 @@ describe('reading and publishing', () => {
         expect(within(shown).getByRole('status', { hidden: true }).textContent).toBe('A grant has expired');
         expect(within(shown).getByText(/It has expired, and nothing more is published under it/)).toBeTruthy();
 
+        // The panel listens for the reader coming back from an effect, which
+        // runs after the panel is drawn.
+        await act(async () => {});
+
         // Narrowed in the wallet while the page was out of sight.
         const asked = vi.mocked(api.me).mock.calls.length;
 
