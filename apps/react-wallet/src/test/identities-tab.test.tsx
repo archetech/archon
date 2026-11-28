@@ -226,6 +226,22 @@ describe('the Identities tab with no identity', () => {
         await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
+
+    it('clears the name typed into the create dialog when it is cancelled', async () => {
+        const user = userEvent.setup({ delay: null });
+        render(<IdentitiesTab />);
+        await user.click(screen.getAllByRole('button', { name: 'Create ID' })[0]);
+
+        let dialog = await screen.findByRole('dialog', { name: 'Create Identity' });
+        await user.type(within(dialog).getByLabelText('Name'), 'Bob');
+        await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+        await user.click(screen.getAllByRole('button', { name: 'Create ID' })[0]);
+        dialog = await screen.findByRole('dialog', { name: 'Create Identity' });
+        expect(within(dialog).getByLabelText('Name')).toHaveValue('');
+        expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+    });
 });
 
 describe('the Identities tab with an identity', () => {
@@ -1338,6 +1354,15 @@ describe('the Identities tab with an identity', () => {
 
     describe('nostr', () => {
         const keys = { npub: 'npub1alice', pubkey: 'a1b2c3' };
+        // Keymaster stores the keys in the identity's document, which is read again afterwards.
+        const storeKeys = async () => {
+            identity = { ...identity, nostr: keys };
+            return keys;
+        };
+        const details = async (user: UserEvent) => {
+            await openTab(user, 'Details');
+            return screen.getByTestId('did-document');
+        };
 
         async function showNostr(user: UserEvent) {
             render(<IdentitiesTab />);
@@ -1347,7 +1372,7 @@ describe('the Identities tab with an identity', () => {
 
         it('adds Nostr keys to an identity that has none', async () => {
             const user = userEvent.setup({ delay: null });
-            keymaster.addNostr.mockResolvedValue(keys);
+            keymaster.addNostr.mockImplementation(storeKeys);
             await showNostr(user);
             expect(screen.getByText('No Nostr keys')).toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Show nsec' })).toBeNull();
@@ -1358,6 +1383,7 @@ describe('the Identities tab with an identity', () => {
             expect(screen.getByText('pubkey: a1b2c3')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Remove Nostr' })).toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Add Nostr' })).toBeNull();
+            expect(await details(user)).toHaveTextContent('"npub":"npub1alice"');
         });
 
         it('reports keys that cannot be added', async () => {
@@ -1372,7 +1398,7 @@ describe('the Identities tab with an identity', () => {
 
         it('imports an nsec', async () => {
             const user = userEvent.setup({ delay: null });
-            keymaster.importNostr.mockResolvedValue(keys);
+            keymaster.importNostr.mockImplementation(storeKeys);
             await showNostr(user);
             await user.click(screen.getByRole('button', { name: 'Import nsec' }));
 
@@ -1386,6 +1412,8 @@ describe('the Identities tab with an identity', () => {
             await waitFor(() => expect(setSuccess).toHaveBeenCalledWith('Nostr keys imported'));
             expect(keymaster.importNostr).toHaveBeenCalledExactlyOnceWith('nsec1secret');
             expect(screen.getByText('npub: npub1alice')).toBeInTheDocument();
+            await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+            expect(await details(user)).toHaveTextContent('"npub":"npub1alice"');
         });
 
         it('imports nothing when no nsec is given or the dialog is cancelled', async () => {
@@ -1452,6 +1480,10 @@ describe('the Identities tab with an identity', () => {
             const user = userEvent.setup({ delay: null });
             identity = { nostr: keys };
             keymaster.exportNsec.mockResolvedValue('nsec1secret');
+            keymaster.removeNostr.mockImplementation(async () => {
+                identity = {};
+                return true;
+            });
             await showNostr(user);
             await user.click(await screen.findByRole('button', { name: 'Show nsec' }));
             await screen.findByText('nsec: nsec1secret');
@@ -1465,6 +1497,7 @@ describe('the Identities tab with an identity', () => {
             expect(keymaster.removeNostr).toHaveBeenCalledTimes(1);
             expect(screen.getByText('No Nostr keys')).toBeInTheDocument();
             expect(screen.queryByText(/nsec:/)).toBeNull();
+            expect(await details(user)).not.toHaveTextContent('npub');
         });
 
         it('keeps the keys when removal is cancelled', async () => {
@@ -1512,6 +1545,8 @@ describe('the Identities tab with an identity', () => {
             render(<IdentitiesTab />);
 
             expect(screen.getByText('No DID document')).toBeInTheDocument();
+            await openTab(user, 'Name');
+            expect(screen.getByLabelText('Current Name')).toHaveAttribute('placeholder', 'No name set');
             await openTab(user, 'Addresses');
             expect(screen.getByText('No addresses yet')).toBeInTheDocument();
             await openTab(user, 'Avatar');
