@@ -1055,7 +1055,7 @@ describe('addDataStream', () => {
 
     it('should return a CID for streamed data', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.ipfs.stream)
+            .post(Endpoints.ipfs.stream, 'stream data')
             .reply(200, mockCID);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });

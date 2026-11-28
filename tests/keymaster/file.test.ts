@@ -431,4 +431,37 @@ describe('a file streamed to a Gatekeeper over HTTP', () => {
         expect(updated!.bytes).toBe(11);
         expect(updated!.data).toStrictEqual(Buffer.from('version two'));
     });
+
+    it('stores what an async generator yielded', async () => {
+        const chunks = [Buffer.from('first chunk, '), Buffer.from('second chunk')];
+
+        await remote.createId('Bob');
+        const did = await remote.createFileStream(chunksOf(chunks));
+        const file = await remote.getFile(did);
+
+        expect(file!.bytes).toBe(25);
+        expect(file!.data).toStrictEqual(Buffer.concat(chunks));
+
+        expect(await remote.updateFileStream(did, chunksOf([Buffer.from('version two')]))).toBe(true);
+        const updated = await remote.getFile(did);
+
+        expect(updated!.bytes).toBe(11);
+        expect(updated!.data).toStrictEqual(Buffer.from('version two'));
+    });
+
+    it('stores each chunk of a generator that fills one buffer again for the next', async () => {
+        async function* reusing() {
+            const buffer = new Uint8Array(4);
+            for (const text of ['abcd', 'efgh']) {
+                buffer.set(Buffer.from(text));
+                yield buffer;
+            }
+        }
+
+        await remote.createId('Bob');
+        const did = await remote.createFileStream(reusing());
+        const file = await remote.getFile(did);
+
+        expect(file!.data).toStrictEqual(Buffer.from('abcdefgh'));
+    });
 });

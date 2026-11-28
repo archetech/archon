@@ -134,17 +134,17 @@ const ImageTab = () => {
                     await refreshAliases();
                     setSelectedImageName(name);
                 } catch (error: any) {
-                    setError(`Error processing image: ${error}`);
+                    setError(error);
                 }
             };
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
+            reader.onerror = () => {
+                setError(reader.error || "Unable to read the file");
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading image: ${error}`);
+            setError(error);
         }
     }
 
@@ -182,16 +182,16 @@ const ImageTab = () => {
                     setSuccess(`Image updated successfully`);
                     await refreshImage(selectedImageName);
                 } catch (error: any) {
-                    setError(`Error processing image: ${error}`);
+                    setError(error);
                 }
             };
 
-            reader.onerror = (err) => {
-                setError(`Error reading file: ${err}`);
+            reader.onerror = () => {
+                setError(reader.error || "Unable to read the file");
             };
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading image: ${error}`);
+            setError(error);
         }
     }
 

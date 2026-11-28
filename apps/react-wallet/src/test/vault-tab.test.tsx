@@ -771,25 +771,45 @@ describe('uploading a file', () => {
 
     it('reports a failure to store the file', async () => {
         const user = userEvent.setup();
-        keymaster.addVaultItem.mockRejectedValue(new Error('item too large'));
+        const refusal = new Error('item too large');
+        keymaster.addVaultItem.mockRejectedValue(refusal);
         render(<VaultTab />);
         await openVault(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: item too large'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
         expect(setSuccess).not.toHaveBeenCalled();
     });
 
-    it('reports a file that cannot be read', async () => {
+    it('reports why a file cannot be read', async () => {
         const user = userEvent.setup();
-        readingEndsWith(reader => reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>));
+        const unreadable = new DOMException('The file could not be read', 'NotReadableError');
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: unreadable });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
         render(<VaultTab />);
         await openVault(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.stringMatching(/^Error uploading file: /)));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(unreadable));
+        expect(keymaster.addVaultItem).not.toHaveBeenCalled();
+    });
+
+    it('says a file cannot be read when the reader does not say why', async () => {
+        const user = userEvent.setup();
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: null });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
+        render(<VaultTab />);
+        await openVault(user);
+
+        await user.upload(fileInput(), file());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith('Unable to read the file'));
         expect(keymaster.addVaultItem).not.toHaveBeenCalled();
     });
 
@@ -819,15 +839,16 @@ describe('uploading a file', () => {
 
     it('reports a file that cannot be handed to the reader', async () => {
         const user = userEvent.setup();
+        const busy = new Error('reader busy');
         vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(() => {
-            throw new Error('reader busy');
+            throw busy;
         });
         render(<VaultTab />);
         await openVault(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: reader busy'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(busy));
         expect(keymaster.addVaultItem).not.toHaveBeenCalled();
     });
 

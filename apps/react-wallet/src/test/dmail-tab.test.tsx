@@ -923,7 +923,9 @@ describe('replying and forwarding', () => {
 
         await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
         expect(keymaster.getDmailAttachment).not.toHaveBeenCalledWith(LUNCH, expect.anything());
-        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'menu.pdf');
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(1);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'menu.pdf', Buffer.from('menu'));
     });
 });
 
@@ -1237,6 +1239,62 @@ describe('editing a draft', () => {
         expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
     });
 
+    it('creates a new Dmail with the attachments of the draft and then lists that Dmail\'s own', async () => {
+        const user = userEvent.setup({ delay: null });
+        const notes = Buffer.from('notes');
+        const added: Record<string, { bytes: number }> = {};
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.listDmailAttachments.mockImplementation(async (did: string) => (
+            did === DRAFT ? { 'notes.txt': { bytes: 5 }, 'gone.txt': { bytes: 3 } } : did === NEW ? { ...added } : {}
+        ));
+        keymaster.getDmailAttachment.mockImplementation(async (_did: string, name: string) => (name === 'notes.txt' ? notes : null));
+        keymaster.addDmailAttachment.mockImplementation(async (_did: string, name: string, buf: Buffer) => {
+            added[name] = { bytes: buf.length };
+            return true;
+        });
+        render(<DmailTab />);
+        await editDraft(user);
+        expect(await screen.findByText('gone.txt')).toBeInTheDocument();
+        const draftReads = keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === DRAFT).length;
+
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'notes.txt');
+        expect(keymaster.getDmailAttachment).toHaveBeenCalledWith(DRAFT, 'gone.txt');
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledTimes(1);
+        expect(keymaster.addDmailAttachment).toHaveBeenCalledWith(NEW, 'notes.txt', notes);
+        await waitFor(() => expect(screen.queryByText('gone.txt')).toBeNull());
+        expect(screen.getByText('notes.txt')).toBeInTheDocument();
+        expect(screen.getByText(NEW)).toBeInTheDocument();
+        expect(keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === NEW)).toHaveLength(1);
+        expect(keymaster.listDmailAttachments.mock.calls.filter(([did]) => did === DRAFT)).toHaveLength(draftReads);
+    });
+
+    it('offers no Send or Save draft while a new Dmail is being created from the draft', async () => {
+        const user = userEvent.setup({ delay: null });
+        let fetched!: (buf: Buffer) => void;
+        keymaster.createDmail.mockResolvedValue(NEW);
+        keymaster.listDmailAttachments.mockImplementation(async (did: string) => (did === DRAFT ? { 'notes.txt': { bytes: 5 } } : {}));
+        keymaster.getDmailAttachment.mockReturnValue(new Promise(resolve => { fetched = resolve; }));
+        keymaster.addDmailAttachment.mockResolvedValue(true);
+        render(<DmailTab />);
+        await editDraft(user);
+        expect(await screen.findByText('notes.txt')).toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Create' }));
+        await waitFor(() => expect(keymaster.getDmailAttachment).toHaveBeenCalled());
+
+        expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+        fetched(Buffer.from('notes'));
+
+        await waitFor(() => expect(setSuccess).toHaveBeenCalledWith(`Draft created ${NEW}`));
+        expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+    });
+
     it('saves the draft as it now reads', async () => {
         const user = userEvent.setup({ delay: null });
         keymaster.updateDmail.mockResolvedValue(true);
@@ -1478,24 +1536,44 @@ describe('attachments of a draft', () => {
 
     it('reports a failure to attach the file', async () => {
         const user = userEvent.setup({ delay: null });
-        keymaster.addDmailAttachment.mockRejectedValue(new Error('file too large'));
+        const refusal = new Error('file too large');
+        keymaster.addDmailAttachment.mockRejectedValue(refusal);
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: file too large'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(refusal));
     });
 
-    it('reports a file that cannot be read', async () => {
+    it('reports why a file cannot be read', async () => {
         const user = userEvent.setup({ delay: null });
-        readingEndsWith(reader => reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>));
+        const unreadable = new DOMException('The file could not be read', 'NotReadableError');
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: unreadable });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith(expect.stringMatching(/^Error uploading file: /)));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(unreadable));
+        expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
+    });
+
+    it('says a file cannot be read when the reader does not say why', async () => {
+        const user = userEvent.setup({ delay: null });
+        readingEndsWith(reader => {
+            Object.defineProperty(reader, 'error', { value: null });
+            reader.onerror?.call(reader, new ProgressEvent('error') as ProgressEvent<FileReader>);
+        });
+        render(<DmailTab />);
+        await createDraft(user);
+
+        await user.upload(fileInput(), file());
+
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith('Unable to read the file'));
         expect(keymaster.addDmailAttachment).not.toHaveBeenCalled();
     });
 
@@ -1525,15 +1603,16 @@ describe('attachments of a draft', () => {
 
     it('reports a file that cannot be handed to the reader', async () => {
         const user = userEvent.setup({ delay: null });
+        const busy = new Error('reader busy');
         vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(() => {
-            throw new Error('reader busy');
+            throw busy;
         });
         render(<DmailTab />);
         await createDraft(user);
 
         await user.upload(fileInput(), file());
 
-        await waitFor(() => expect(setError).toHaveBeenCalledWith('Error uploading file: Error: reader busy'));
+        await waitFor(() => expect(setError).toHaveBeenCalledExactlyOnceWith(busy));
     });
 
     it('attaches nothing when the file chooser is closed without a file', async () => {
