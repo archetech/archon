@@ -20,7 +20,8 @@ export async function uploadBody(
         if (!ArrayBuffer.isView(chunk)) {
             throw new TypeError('Invalid parameter: a stream must yield Uint8Array chunks');
         }
-        chunks.push(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength));
+        // A copy, since a source may fill one buffer again for its next chunk
+        chunks.push(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength).slice());
         length += chunk.byteLength;
     }
 
