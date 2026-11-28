@@ -78,6 +78,8 @@ const DmailTab: React.FC = () => {
     const [advParams, setAdvParams] = useState<AdvancedSearchParams | null>(null);
     const [searchesCleared, setSearchesCleared] = useState<number>(0);
     const [forwardSourceDid, setForwardSourceDid] = useState<string | null>(null);
+    // A Dmail is being created: until it is, the form still names the last one.
+    const [creating, setCreating] = useState<boolean>(false);
     const [ephemeral, setEphemeral] = useState<boolean>(false);
     const [expiresAt, setExpiresAt] = useState<string>("");
     const [dmailReference, setDmailReference] = useState<string>("");
@@ -177,6 +179,7 @@ const DmailTab: React.FC = () => {
             ? { registry, validUntil: new Date(expiresAt).toISOString() }
             : { registry };
 
+        setCreating(true);
         try {
             const did = await keymaster.createDmail(dmail, opts);
 
@@ -203,6 +206,8 @@ const DmailTab: React.FC = () => {
             setSuccess(`Draft created ${did}`);
         } catch (err: any) {
             setError(err);
+        } finally {
+            setCreating(false);
         }
     }
 
@@ -1215,7 +1220,7 @@ const DmailTab: React.FC = () => {
                     <Button
                         variant="contained"
                         onClick={handleCreate}
-                        disabled={(!sendToList.length && !sendTo) || !sendSubject || !sendBody}
+                        disabled={creating || (!sendToList.length && !sendTo) || !sendSubject || !sendBody}
                     >
                         Create
                     </Button>
@@ -1223,11 +1228,11 @@ const DmailTab: React.FC = () => {
 
                 <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
 
-                    <Button variant="contained" onClick={handleSend} disabled={!dmailDid}>
+                    <Button variant="contained" onClick={handleSend} disabled={creating || !dmailDid}>
                         Send
                     </Button>
 
-                    <Button variant="outlined" onClick={handleUpdate} disabled={!dmailDid}>
+                    <Button variant="outlined" onClick={handleUpdate} disabled={creating || !dmailDid}>
                         Save draft
                     </Button>
 
