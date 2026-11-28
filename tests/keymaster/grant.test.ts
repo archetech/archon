@@ -354,6 +354,13 @@ describe('createGrant', () => {
         expect(await keymaster.listAssets('Bob')).toStrictEqual([did]);
     });
 
+    it('refuses an empty alias and creates no grant', async () => {
+        const request = await requestOf();
+
+        await expect(keymaster.createGrant(request, { alias: '' })).rejects.toThrow('Invalid parameter: alias must be a non-empty string');
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
     it('creates and signs the grant as the identity it checked, whatever the current ID becomes', async () => {
         const request = await requestOf();
         const resolve = gatekeeper.resolveDID.bind(gatekeeper);

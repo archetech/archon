@@ -1030,7 +1030,11 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        if (alias) {
+        // An alias that is given is checked, empty or not; one that is not
+        // given, or is null as JSON sends it, means no alias.
+        const aliased = alias !== undefined && alias !== null;
+
+        if (aliased) {
             const wallet = await this.loadWallet();
             this.validateAlias(alias, wallet, 'alias');
         }
@@ -1076,8 +1080,8 @@ export default class Keymaster implements KeymasterInterface {
             await this.addToOwned(did, id.did);
         }
 
-        if (alias) {
-            await this.addAlias(alias, did);
+        if (aliased) {
+            await this.addAlias(alias!, did);
         }
 
         return did;
