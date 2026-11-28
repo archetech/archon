@@ -13,6 +13,7 @@
     - Check the service logs for any errors
     - An easy check is to run `./kc perf-test` (to create 100 local ephemeral credentials) followed by `./admin verify-db` (to garbage-collect the test credentials)
 5. Merge the PR with squashed commits
+    - The exception is a release branch being merged back to `main`: merge it with a merge commit, so that the release's tagged commits stay in `main`'s history. The next release's changelogs are written from those tags
 6. Use [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) prefixes for the merge commit message
 
 ## Protocol changes

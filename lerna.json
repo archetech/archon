@@ -11,7 +11,8 @@
       "allowBranch": [
         "main", "*-beta", "*-release", "beta-*", "release-*", "release/*", "hotfix/*" 
       ],
-      "conventionalCommits": true
+      "conventionalCommits": true,
+      "message": "chore(release): publish"
     }
   },
   "$schema": "node_modules/lerna/schemas/lerna-schema.json",
