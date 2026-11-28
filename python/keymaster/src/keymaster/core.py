@@ -3284,10 +3284,9 @@ class Keymaster:
             updated_method = {**rotated, "id": rotated_id, "publicKeyJwk": keypair["publicJwk"]}
 
             # Replace the rotated key in place and leave every other method
-            # alone. Rebuilding these as single-element lists dropped keys
-            # published beside the identity one -- publish_didcomm's
-            # `#key-agreement-1` among them -- while `keyAgreement`, which was
-            # never rebuilt, kept naming the method just deleted.
+            # alone: other keys are published beside the identity one,
+            # publish_didcomm's `#key-agreement-1` among them, and every
+            # relationship that names the rotated key has to name the new one.
             def is_rotated(ref: Any) -> bool:
                 return bool(rotated_target) and _absolute_key_id(ref, id_info["did"]) == rotated_target
 

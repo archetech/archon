@@ -2907,10 +2907,9 @@ export default class Keymaster implements KeymasterInterface {
             const vmethod = { ...rotated, id: rotatedId, publicKeyJwk: keypair.publicJwk };
 
             // Replace the rotated key in place and leave every other method
-            // alone. Rebuilding these as single-element arrays dropped keys
-            // published beside the identity one -- publishDidComm's
-            // `#key-agreement-1` among them -- while `keyAgreement`, which was
-            // never rebuilt, kept pointing at the method just deleted.
+            // alone: other keys are published beside the identity one,
+            // publishDidComm's `#key-agreement-1` among them, and every
+            // relationship that names the rotated key has to name the new one.
             const isRotated = (ref: string | undefined) =>
                 !!ref && !!rotatedTarget && this.absoluteKeyId(ref, id.did) === rotatedTarget;
 
