@@ -995,6 +995,38 @@ def test_accept_credential_didcomm_requires_a_resolvable_did():
     assert asyncio.run(km.accept_credential_didcomm({"body": {}})) is False
 
 
+def test_send_credential_didcomm_refuses_a_did_that_is_no_credential_held(monkeypatch):
+    import asyncio
+    from keymaster import KeymasterError
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    monkeypatch.setattr(km, "lookup_did", _async_return("did:cid:asset"))
+    monkeypatch.setattr(km, "get_credential", _async_return(None))
+
+    with pytest.raises(KeymasterError, match="^Invalid parameter: did$"):
+        asyncio.run(km.send_credential_didcomm("did:cid:asset", "did:web:example.com"))
+
+
+def test_signing_an_object_that_cannot_be_serialized_is_a_bad_parameter():
+    from keymaster import KeymasterError
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    def digest():
+        raise TypeError("Object of type set is not JSON serializable")
+
+    with pytest.raises(KeymasterError, match="^Invalid parameter: obj$"):
+        km._sign_proof_value(digest, {"privateJwk": {}})
+
+
 def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypatch):
     # The whole point: a foreign holder cannot resolve or decrypt a credential
     # DID, so the message must contain the signed VC itself.

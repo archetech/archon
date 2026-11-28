@@ -2137,7 +2137,7 @@ class Keymaster:
         try:
             return b64url(bytes.fromhex(sign_hash(digest(), keypair["privateJwk"])))
         except Exception as error:
-            raise InvalidParameterError("obj") from error
+            raise KeymasterError("Invalid parameter: obj") from error
 
     async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
         secp = await self._archon_ecdsa_jcs_2019_proof(payload, controller, proof_purpose)
@@ -4466,7 +4466,7 @@ class Keymaster:
         vc = await self.get_credential(credential_did)
 
         if not vc:
-            raise InvalidParameterError("did")
+            raise KeymasterError("Invalid parameter: did")
 
         message = dc_protocols.issue_credential_message(
             vc,
